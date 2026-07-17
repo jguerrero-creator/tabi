@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
 import { strings } from '../../lib/strings'
@@ -69,9 +70,14 @@ function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {trips.map((trip) => (
-          <li key={trip.id} className="px-4 py-3">
-            <p className="text-sm font-medium text-slate-900">{trip.name}</p>
-            <p className="text-xs text-slate-500">{formatDateRange(trip.start_date, trip.end_date)}</p>
+          <li key={trip.id}>
+            <Link to={`/trips/${trip.id}/stay`} className="block px-4 py-3 hover:bg-slate-50">
+              <p className="text-sm font-medium text-slate-900">{trip.name}</p>
+              {trip.destinations.length > 0 && (
+                <p className="text-xs text-slate-500">{trip.destinations.join(', ')}</p>
+              )}
+              <p className="text-xs text-slate-500">{formatDateRange(trip.start_date, trip.end_date)}</p>
+            </Link>
           </li>
         ))}
       </ul>

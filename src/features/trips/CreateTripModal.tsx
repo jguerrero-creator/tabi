@@ -5,13 +5,19 @@ import type { Trip } from '../../types/trip'
 
 interface CreateTripModalProps {
   onClose: () => void
-  onCreate: (input: { name: string; start_date: string | null; end_date: string | null }) => Promise<Trip>
+  onCreate: (input: {
+    name: string
+    start_date: string | null
+    end_date: string | null
+    destinations: string[]
+  }) => Promise<Trip>
 }
 
 export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [destinations, setDestinations] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,6 +36,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
         name: name.trim(),
         start_date: startDate || null,
         end_date: endDate || null,
+        destinations: parseDestinations(destinations),
       })
       onClose()
     } catch {
@@ -55,6 +62,19 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={strings.createTrip.namePlaceholder}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="trip-destinations" className="mb-1 block text-sm font-medium text-slate-700">
+              {strings.createTrip.destinationsLabel}
+            </label>
+            <input
+              id="trip-destinations"
+              type="text"
+              value={destinations}
+              onChange={(event) => setDestinations(event.target.value)}
+              placeholder={strings.createTrip.destinationsPlaceholder}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
             />
           </div>
@@ -99,4 +119,11 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
       </div>
     </div>
   )
+}
+
+function parseDestinations(input: string): string[] {
+  return input
+    .split(',')
+    .map((destination) => destination.trim())
+    .filter((destination) => destination.length > 0)
 }

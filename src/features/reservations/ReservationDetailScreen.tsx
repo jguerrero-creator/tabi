@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { MiniMap } from '../../components/ui/MiniMap'
+import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { formatInZone } from '../../lib/datetime'
@@ -174,11 +175,16 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     <ScreenShell onBack={onBack}>
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
-              {strings.reservationType[reservation.type]}
-            </p>
-            <h1 className="text-lg font-semibold text-slate-900">{reservation.name}</h1>
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
+              <ReservationTypeIcon type={reservation.type} className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
+                {strings.reservationType[reservation.type]}
+              </p>
+              <h1 className="text-lg font-semibold text-slate-900">{reservation.name}</h1>
+            </div>
           </div>
           <div className="flex shrink-0 gap-2">
             <Button variant="secondary" onClick={() => setEditing((v) => !v)} disabled={deleting}>
@@ -323,18 +329,20 @@ async function geocodeIfChanged(
 }
 
 function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
+  const legLabels = strings.reservationLegLabels[reservation.type]
+
   if (reservation.type === 'transport') {
     return (
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
         <LegRow
-          label={strings.reservationDetail.startLabel}
+          label={legLabels.start}
           placeName={reservation.start_place_name}
           address={reservation.start_address}
           at={reservation.start_at}
           timezone={reservation.start_timezone}
         />
         <LegRow
-          label={strings.reservationDetail.endLabel}
+          label={legLabels.end}
           placeName={reservation.end_place_name}
           address={reservation.end_address}
           at={reservation.end_at}
@@ -347,7 +355,7 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
   return (
     <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
       <LegRow
-        label={strings.reservationDetail.startLabel}
+        label={legLabels.start}
         placeName={reservation.start_place_name}
         address={reservation.start_address}
         at={reservation.start_at}
@@ -355,7 +363,7 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
       />
       {reservation.end_at && (
         <LegRow
-          label={strings.reservationDetail.endLabel}
+          label={legLabels.end}
           placeName={reservation.end_place_name}
           address={reservation.end_address}
           at={reservation.end_at}

@@ -16,6 +16,8 @@ export const strings = {
     namePlaceholder: 'e.g. Japan 2026',
     startLabel: 'Start date',
     endLabel: 'End date',
+    destinationsLabel: 'Destination(s)',
+    destinationsPlaceholder: 'e.g. Tokyo, Kyoto',
     submit: 'Create Trip',
     cancel: 'Cancel',
     errorDateRange: 'End date must be on or after the start date.',
@@ -34,6 +36,11 @@ export const strings = {
     stay: 'Stay',
     transport: 'Transport',
     activity: 'Activity',
+  },
+  reservationLegLabels: {
+    stay: { start: 'Check-in', end: 'Check-out' },
+    transport: { start: 'Departure', end: 'Arrival' },
+    activity: { start: 'Start', end: 'End' },
   },
   reservationDetail: {
     statusLabel: 'Status',
@@ -58,5 +65,14 @@ export const strings = {
     endAddressLabel: 'End address',
     geocoding: 'Locating address…',
     geocodeErrorGeneric: 'Could not locate this address. Please try again.',
+  },
+  stayMenu: {
+    title: 'Stay',
+    loading: 'Loading stays…',
+    errorLoading: 'Could not load this trip.',
+    emptyTitle: 'No stays booked yet',
+    emptyBody: 'This trip has no accommodation reservations.',
+    setDatesHint: 'Set trip start and end dates to see coverage gaps.',
+    gapLabel: 'Not booked',
   },
 } as const
