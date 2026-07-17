@@ -13,7 +13,7 @@ Working title: **Tabi** (旅, "journey" in Japanese). A trip planner built aroun
 - **Hosting**: Vercel (project "tabi" already created — team `jguerrero-2639s-projects`).
 - **Backend / DB**: Supabase, PostgreSQL + Auth (project "Tabi" already created — ref `czyeohubhsqiumhpodbc`, region eu-west-1).
 - **Auth**: Supabase anonymous sessions from first launch (no login screen in V0.5), upgradable to a real account later without data loss.
-- **Geocoding & travel time**: Google Maps Platform (Geocoding + Directions/Distance Matrix + Time Zone API).
+- **Geocoding & travel time**: Google Maps Platform (Geocoding + Routes API + Time Zone API). Routes API (`computeRoutes`), not the legacy Directions/Distance Matrix APIs.
 - **Places, ratings, reviews**: Google Places API.
 - **Import parsing (V1+)**: Claude API (multimodal — handles email text, PDF, and photos of tickets/receipts through the same extraction pipeline).
 - **Reminders (V1+)**: Resend (email) + Vercel Cron for scheduled checks.
