@@ -6,6 +6,7 @@ import { MiniMap } from '../../components/ui/MiniMap'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { formatInZone } from '../../lib/datetime'
+import { fetchGeocode } from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { useReservation } from './useReservation'
@@ -64,7 +65,7 @@ function ScreenShell({ onBack, children }: { onBack: () => void; children: React
         <button
           type="button"
           onClick={onBack}
-          aria-label={strings.reservationDetail.back}
+          aria-label={strings.common.back}
           className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
         >
           ←
@@ -85,6 +86,7 @@ interface ReservationDetailBodyProps {
 function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: ReservationDetailBodyProps) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [geocoding, setGeocoding] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -92,6 +94,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [note, setNote] = useState(reservation.note ?? '')
   const [priceAmount, setPriceAmount] = useState(reservation.price_amount?.toString() ?? '')
   const [priceCurrency, setPriceCurrency] = useState(reservation.price_currency ?? '')
+  const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
+  const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
 
   const points: MapPoint[] = []
   if (reservation.start_lat !== null && reservation.start_lng !== null) {
@@ -119,15 +123,34 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
   async function handleSave(event: FormEvent) {
     event.preventDefault()
-    setSaving(true)
     setFormError(null)
+
+    let patch: Partial<Reservation> = {
+      name: name.trim(),
+      note: note.trim() || null,
+      price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
+      price_currency: priceCurrency.trim() || null,
+    }
+
     try {
-      await onUpdate({
-        name: name.trim(),
-        note: note.trim() || null,
-        price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
-        price_currency: priceCurrency.trim() || null,
-      })
+      setGeocoding(true)
+      patch = {
+        ...patch,
+        ...(await geocodeIfChanged('start', startAddress, reservation.start_address)),
+        ...(reservation.type === 'transport'
+          ? await geocodeIfChanged('end', endAddress, reservation.end_address)
+          : {}),
+      }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : strings.reservationDetail.geocodeErrorGeneric)
+      setGeocoding(false)
+      return
+    }
+    setGeocoding(false)
+
+    setSaving(true)
+    try {
+      await onUpdate(patch)
       setEditing(false)
     } catch {
       setFormError(strings.reservationDetail.errorGeneric)
@@ -217,9 +240,26 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
               />
             </Field>
+            <Field label={strings.reservationDetail.startAddressLabel}>
+              <input
+                value={startAddress}
+                onChange={(e) => setStartAddress(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
+            {reservation.type === 'transport' && (
+              <Field label={strings.reservationDetail.endAddressLabel}>
+                <input
+                  value={endAddress}
+                  onChange={(e) => setEndAddress(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+            )}
+            {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
             {formError && <p className="text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <Button type="submit" disabled={saving || !name.trim()}>
+              <Button type="submit" disabled={saving || geocoding || !name.trim()}>
                 {strings.reservationDetail.save}
               </Button>
             </div>
@@ -250,6 +290,36 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       </div>
     </ScreenShell>
   )
+}
+
+async function geocodeIfChanged(
+  leg: 'start' | 'end',
+  newAddress: string,
+  previousAddress: string | null,
+): Promise<Partial<Reservation>> {
+  const trimmed = newAddress.trim()
+  if (trimmed === (previousAddress ?? '')) return {}
+
+  if (!trimmed) {
+    return leg === 'start'
+      ? { start_address: null, start_lat: null, start_lng: null, start_timezone: null }
+      : { end_address: null, end_lat: null, end_lng: null, end_timezone: null }
+  }
+
+  const geocoded = await fetchGeocode(trimmed)
+  return leg === 'start'
+    ? {
+        start_address: geocoded.formattedAddress,
+        start_lat: geocoded.lat,
+        start_lng: geocoded.lng,
+        start_timezone: geocoded.timezone,
+      }
+    : {
+        end_address: geocoded.formattedAddress,
+        end_lat: geocoded.lat,
+        end_lng: geocoded.lng,
+        end_timezone: geocoded.timezone,
+      }
 }
 
 function TypeSpecificZone({ reservation }: { reservation: Reservation }) {

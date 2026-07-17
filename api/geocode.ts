@@ -1,0 +1,105 @@
+// Server-side only — calls Google Geocoding API + Time Zone API with the
+// secret GOOGLE_MAPS_API_KEY. Never call these APIs from src/.
+// Timezone is resolved at geocoding time, same key/ecosystem (see Decision Log).
+// See ./README.md.
+
+interface GeocodeRequestBody {
+  address: string
+}
+
+interface GeocodeResult {
+  lat: number
+  lng: number
+  formattedAddress: string
+  timezone: string
+}
+
+const GEOCODE_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
+const TIMEZONE_API_URL = 'https://maps.googleapis.com/maps/api/timezone/json'
+
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405)
+  }
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+  if (!apiKey) {
+    console.error('geocode: GOOGLE_MAPS_API_KEY is not configured')
+    return jsonResponse({ error: 'Server misconfigured' }, 500)
+  }
+
+  let body: GeocodeRequestBody
+  try {
+    body = await request.json()
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON body' }, 400)
+  }
+
+  const address = body.address?.trim()
+  if (!address) {
+    return jsonResponse({ error: 'address is required' }, 400)
+  }
+
+  const geocodeUrl = new URL(GEOCODE_API_URL)
+  geocodeUrl.searchParams.set('address', address)
+  geocodeUrl.searchParams.set('key', apiKey)
+
+  const geocodeResponse = await fetch(geocodeUrl)
+  if (!geocodeResponse.ok) {
+    console.error('geocode: Geocoding API HTTP error', geocodeResponse.status, await geocodeResponse.text())
+    return jsonResponse({ error: 'Failed to geocode address' }, 502)
+  }
+
+  const geocodeData = await geocodeResponse.json()
+  if (geocodeData.status === 'ZERO_RESULTS') {
+    return jsonResponse({ error: 'Address not found' }, 404)
+  }
+  if (geocodeData.status !== 'OK') {
+    console.error('geocode: Geocoding API status error', geocodeData.status, geocodeData.error_message)
+    return jsonResponse({ error: 'Failed to geocode address' }, 502)
+  }
+
+  const result = geocodeData.results?.[0]
+  const location = result?.geometry?.location
+  if (!result || !location) {
+    return jsonResponse({ error: 'Address not found' }, 404)
+  }
+
+  const timezone = await fetchTimezone(location.lat, location.lng, apiKey)
+  if (!timezone) {
+    return jsonResponse({ error: 'Failed to resolve timezone for this location' }, 502)
+  }
+
+  const payload: GeocodeResult = {
+    lat: location.lat,
+    lng: location.lng,
+    formattedAddress: result.formatted_address ?? address,
+    timezone,
+  }
+  return jsonResponse(payload)
+}
+
+async function fetchTimezone(lat: number, lng: number, apiKey: string): Promise<string | null> {
+  const timezoneUrl = new URL(TIMEZONE_API_URL)
+  timezoneUrl.searchParams.set('location', `${lat},${lng}`)
+  timezoneUrl.searchParams.set('timestamp', String(Math.floor(Date.now() / 1000)))
+  timezoneUrl.searchParams.set('key', apiKey)
+
+  const response = await fetch(timezoneUrl)
+  if (!response.ok) {
+    console.error('geocode: Time Zone API HTTP error', response.status, await response.text())
+    return null
+  }
+
+  const data = await response.json()
+  if (data.status !== 'OK' || typeof data.timeZoneId !== 'string') {
+    console.error('geocode: Time Zone API status error', data.status, data.errorMessage)
+    return null
+  }
+
+  return data.timeZoneId
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}

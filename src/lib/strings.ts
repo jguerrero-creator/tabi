@@ -1,4 +1,7 @@
 export const strings = {
+  common: {
+    back: 'Back',
+  },
   home: {
     title: 'My Trips',
     emptyTitle: 'No trips yet',
@@ -33,7 +36,6 @@ export const strings = {
     activity: 'Activity',
   },
   reservationDetail: {
-    back: 'Back',
     statusLabel: 'Status',
     edit: 'Edit',
     save: 'Save',
@@ -54,5 +56,7 @@ export const strings = {
     nameLabel: 'Name',
     startAddressLabel: 'Start address',
     endAddressLabel: 'End address',
+    geocoding: 'Locating address…',
+    geocodeErrorGeneric: 'Could not locate this address. Please try again.',
   },
 } as const
