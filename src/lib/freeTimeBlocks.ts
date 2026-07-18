@@ -22,6 +22,9 @@ interface LegDuration {
   durationSeconds: number | null
 }
 
+/** Free blocks shorter than this aren't worth surfacing to the user as "free time". */
+export const MIN_FREE_SECONDS_TO_SHOW = 5 * 60
+
 /**
  * Free time between two consecutive reservations = the gap between them minus
  * the travel time needed to get from one to the other — the core "actual free

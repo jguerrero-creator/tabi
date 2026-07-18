@@ -12,8 +12,14 @@ import type { TripLeg } from './useTripLegs'
 interface TripTimelineProps {
   reservations: Reservation[]
   legs: TripLeg[]
-  /** While legs are (re-)loading, gaps are shown without a free-time verdict rather than guessing zero travel time. */
+  /**
+   * While legs are (re-)loading, or failed to load entirely, gaps are shown
+   * without a free-time verdict rather than guessing zero travel time — an
+   * empty `legs` array here means "no travel-time data", not "no travel
+   * needed", and those must not be conflated.
+   */
   legsLoading: boolean
+  legsError: string | null
 }
 
 /**
@@ -21,7 +27,7 @@ interface TripTimelineProps {
  * (TABI-31), interleaving each day's free-time blocks between the
  * reservations they fall between (TABI-4).
  */
-export function TripTimeline({ reservations, legs, legsLoading }: TripTimelineProps) {
+export function TripTimeline({ reservations, legs, legsLoading, legsError }: TripTimelineProps) {
   const groups = groupByDate(
     reservations,
     (reservation) => ({ at: reservation.start_at, timezone: reservation.start_timezone }),
@@ -29,7 +35,7 @@ export function TripTimeline({ reservations, legs, legsLoading }: TripTimelinePr
   )
 
   const freeTimeByPair = new Map<string, FreeTimeBlock>(
-    legsLoading
+    legsLoading || legsError
       ? []
       : computeFreeTimeBlocks(reservations, legs).map((block) => [
           legKey(block.fromReservationId, block.toReservationId),

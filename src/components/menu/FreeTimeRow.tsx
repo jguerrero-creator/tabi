@@ -1,11 +1,10 @@
 import { formatDuration } from '../../lib/duration'
+import { MIN_FREE_SECONDS_TO_SHOW } from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
 
 interface FreeTimeRowProps {
   durationSeconds: number
 }
-
-const MIN_FREE_SECONDS_TO_SHOW = 5 * 60
 
 export function FreeTimeRow({ durationSeconds }: FreeTimeRowProps) {
   const isTight = durationSeconds < 0

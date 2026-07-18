@@ -145,7 +145,7 @@ export function OverviewScreen() {
             )}
 
             {activeTab === 'planning' && (
-              <TripTimeline reservations={reservations} legs={legs} legsLoading={legsLoading} />
+              <TripTimeline reservations={reservations} legs={legs} legsLoading={legsLoading} legsError={legsError} />
             )}
           </div>
         )}

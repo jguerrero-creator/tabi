@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { TravelModePicker } from '../../components/ui/TravelModePicker'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDuration, formatDistance } from '../../lib/duration'
-import { computeFreeTimeBlocks } from '../../lib/freeTimeBlocks'
+import { computeFreeTimeBlocks, MIN_FREE_SECONDS_TO_SHOW } from '../../lib/freeTimeBlocks'
 import { legKey } from '../../lib/tripLegs'
 import type { TravelMode } from '../../lib/travelTime'
 import { strings } from '../../lib/strings'
@@ -16,8 +16,6 @@ interface TripLegsSectionProps {
   error: string | null
   onModeChange: (key: string, mode: TravelMode) => void
 }
-
-const MIN_FREE_SECONDS_TO_SHOW = 5 * 60
 
 export function TripLegsSection({ reservations, legs, loading, error, onModeChange }: TripLegsSectionProps) {
   const freeTimeByLeg = useMemo(() => {
