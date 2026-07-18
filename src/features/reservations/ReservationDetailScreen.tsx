@@ -1,18 +1,31 @@
+import { APIProvider } from '@vis.gl/react-google-maps'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { MiniMap } from '../../components/ui/MiniMap'
+import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
+import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
 import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { formatInZone } from '../../lib/datetime'
-import { AddressSelectionCancelledError, resolveAddress, type GeocodeCandidate } from '../../lib/geocode'
+import {
+  AddressSelectionCancelledError,
+  fetchGeocodeByPlaceId,
+  resolveAddress,
+  type GeocodeCandidate,
+  type GeocodeResult,
+} from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
+
+const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+
+type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
 export function ReservationDetailScreen() {
   const { reservationId } = useParams<{ reservationId: string }>()
@@ -100,6 +113,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [priceCurrency, setPriceCurrency] = useState(reservation.price_currency ?? '')
   const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
   const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
+  const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
+  const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(null)
 
   const points: MapPoint[] = []
   if (reservation.start_lat !== null && reservation.start_lng !== null) {
@@ -125,6 +140,40 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     await onUpdate({ status })
   }
 
+  function handleStartAddressChange(text: string) {
+    setStartAddress(text)
+    setStartPlace(null)
+  }
+
+  function handleEndAddressChange(text: string) {
+    setEndAddress(text)
+    setEndPlace(null)
+  }
+
+  async function handleStartPlaceSelect({ placeId, placeName }: PlaceAutocompleteSelection) {
+    setGeocoding(true)
+    try {
+      const result = await fetchGeocodeByPlaceId(placeId)
+      setStartPlace({ ...result, placeName })
+    } catch {
+      // Fall back silently — handleSave's free-text geocodeIfChanged() covers this.
+    } finally {
+      setGeocoding(false)
+    }
+  }
+
+  async function handleEndPlaceSelect({ placeId, placeName }: PlaceAutocompleteSelection) {
+    setGeocoding(true)
+    try {
+      const result = await fetchGeocodeByPlaceId(placeId)
+      setEndPlace({ ...result, placeName })
+    } catch {
+      // Fall back silently — handleSave's free-text geocodeIfChanged() covers this.
+    } finally {
+      setGeocoding(false)
+    }
+  }
+
   async function handleSave(event: FormEvent) {
     event.preventDefault()
     setFormError(null)
@@ -140,9 +189,9 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       setGeocoding(true)
       patch = {
         ...patch,
-        ...(await geocodeIfChanged('start', startAddress, reservation.start_address, requestPick)),
+        ...(await geocodeIfChanged('start', startAddress, reservation.start_address, requestPick, startPlace)),
         ...(reservation.type === 'transport'
-          ? await geocodeIfChanged('end', endAddress, reservation.end_address, requestPick)
+          ? await geocodeIfChanged('end', endAddress, reservation.end_address, requestPick, endPlace)
           : {}),
       }
     } catch (err) {
@@ -181,132 +230,134 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   }
 
   return (
-    <ScreenShell onBack={onBack}>
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
-              <ReservationTypeIcon type={reservation.type} className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
-                {strings.reservationType[reservation.type]}
-              </p>
-              <h1 className="text-lg font-semibold text-slate-900">{reservation.name}</h1>
+    <APIProvider apiKey={mapsApiKey ?? ''}>
+      <ScreenShell onBack={onBack}>
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
+                <ReservationTypeIcon type={reservation.type} className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
+                  {strings.reservationType[reservation.type]}
+                </p>
+                <h1 className="text-lg font-semibold text-slate-900">{reservation.name}</h1>
+              </div>
             </div>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="secondary" onClick={() => setEditing((v) => !v)} disabled={deleting}>
-              {editing ? strings.reservationDetail.cancel : strings.reservationDetail.edit}
-            </Button>
-            <Button variant="secondary" onClick={handleDelete} disabled={deleting}>
-              {strings.reservationDetail.delete}
-            </Button>
-          </div>
-        </div>
-
-        <MiniMap points={points} />
-
-        <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {strings.reservationDetail.statusLabel}
-          </p>
-          <StatusPicker value={reservation.status} onChange={handleStatusChange} />
-        </div>
-
-        <TypeSpecificZone reservation={reservation} />
-
-        {editing ? (
-          <form onSubmit={handleSave} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <Field label={strings.reservationDetail.nameLabel}>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-            <div className="flex gap-3">
-              <Field label={strings.reservationDetail.priceLabel} className="flex-1">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={priceAmount}
-                  onChange={(e) => setPriceAmount(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-              <Field label="Currency" className="w-24">
-                <input
-                  value={priceCurrency}
-                  onChange={(e) => setPriceCurrency(e.target.value.toUpperCase())}
-                  maxLength={3}
-                  placeholder="USD"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-            </div>
-            <Field label={strings.reservationDetail.notesLabel}>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={strings.reservationDetail.notesPlaceholder}
-                rows={3}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-            <Field label={strings.reservationDetail.startAddressLabel}>
-              <input
-                value={startAddress}
-                onChange={(e) => setStartAddress(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-            {reservation.type === 'transport' && (
-              <Field label={strings.reservationDetail.endAddressLabel}>
-                <input
-                  value={endAddress}
-                  onChange={(e) => setEndAddress(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-            )}
-            {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
-            {formError && <p className="text-sm text-red-600">{formError}</p>}
-            <div className="flex justify-end gap-2 pt-1">
-              <Button type="submit" disabled={saving || geocoding || !name.trim()}>
-                {strings.reservationDetail.save}
+            <div className="flex shrink-0 gap-2">
+              <Button variant="secondary" onClick={() => setEditing((v) => !v)} disabled={deleting}>
+                {editing ? strings.reservationDetail.cancel : strings.reservationDetail.edit}
+              </Button>
+              <Button variant="secondary" onClick={handleDelete} disabled={deleting}>
+                {strings.reservationDetail.delete}
               </Button>
             </div>
-          </form>
-        ) : (
-          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {strings.reservationDetail.priceLabel}
-              </p>
-              <p className="text-sm text-slate-900">
-                {reservation.price_amount !== null
-                  ? `${reservation.price_amount} ${reservation.price_currency ?? ''}`.trim()
-                  : strings.reservationDetail.noPrice}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {strings.reservationDetail.notesLabel}
-              </p>
-              <p className="whitespace-pre-wrap text-sm text-slate-900">
-                {reservation.note || strings.reservationDetail.notesPlaceholder}
-              </p>
-            </div>
-            {formError && <p className="text-sm text-red-600">{formError}</p>}
           </div>
+
+          <MiniMap points={points} />
+
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {strings.reservationDetail.statusLabel}
+            </p>
+            <StatusPicker value={reservation.status} onChange={handleStatusChange} />
+          </div>
+
+          <TypeSpecificZone reservation={reservation} />
+
+          {editing ? (
+            <form onSubmit={handleSave} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <Field label={strings.reservationDetail.nameLabel}>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+              <div className="flex gap-3">
+                <Field label={strings.reservationDetail.priceLabel} className="flex-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={priceAmount}
+                    onChange={(e) => setPriceAmount(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+                <Field label="Currency" className="w-24">
+                  <input
+                    value={priceCurrency}
+                    onChange={(e) => setPriceCurrency(e.target.value.toUpperCase())}
+                    maxLength={3}
+                    placeholder="USD"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+              </div>
+              <Field label={strings.reservationDetail.notesLabel}>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={strings.reservationDetail.notesPlaceholder}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+              <PlaceAutocompleteField
+                id="reservation-start-address"
+                label={strings.reservationDetail.startAddressLabel}
+                value={startAddress}
+                onTextChange={handleStartAddressChange}
+                onPlaceSelect={handleStartPlaceSelect}
+              />
+              {reservation.type === 'transport' && (
+                <PlaceAutocompleteField
+                  id="reservation-end-address"
+                  label={strings.reservationDetail.endAddressLabel}
+                  value={endAddress}
+                  onTextChange={handleEndAddressChange}
+                  onPlaceSelect={handleEndPlaceSelect}
+                />
+              )}
+              {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
+              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="submit" disabled={saving || geocoding || !name.trim()}>
+                  {strings.reservationDetail.save}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {strings.reservationDetail.priceLabel}
+                </p>
+                <p className="text-sm text-slate-900">
+                  {reservation.price_amount !== null
+                    ? `${reservation.price_amount} ${reservation.price_currency ?? ''}`.trim()
+                    : strings.reservationDetail.noPrice}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {strings.reservationDetail.notesLabel}
+                </p>
+                <p className="whitespace-pre-wrap text-sm text-slate-900">
+                  {reservation.note || strings.reservationDetail.notesPlaceholder}
+                </p>
+              </div>
+              {formError && <p className="text-sm text-red-600">{formError}</p>}
+            </div>
+          )}
+        </div>
+        {candidates && (
+          <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
         )}
-      </div>
-      {candidates && (
-        <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
-      )}
-    </ScreenShell>
+      </ScreenShell>
+    </APIProvider>
   )
 }
 
@@ -315,17 +366,18 @@ async function geocodeIfChanged(
   newAddress: string,
   previousAddress: string | null,
   requestPick: (candidates: GeocodeCandidate[]) => Promise<GeocodeCandidate | null>,
+  cached: ResolvedPlace | null,
 ): Promise<Partial<Reservation>> {
   const trimmed = newAddress.trim()
   if (trimmed === (previousAddress ?? '')) return {}
 
   if (!trimmed) {
     return leg === 'start'
-      ? { start_address: null, start_lat: null, start_lng: null, start_timezone: null }
-      : { end_address: null, end_lat: null, end_lng: null, end_timezone: null }
+      ? { start_address: null, start_lat: null, start_lng: null, start_timezone: null, start_place_name: null }
+      : { end_address: null, end_lat: null, end_lng: null, end_timezone: null, end_place_name: null }
   }
 
-  const geocoded = await resolveAddress(trimmed, requestPick)
+  const geocoded = cached ?? (await resolveAddress(trimmed, requestPick))
   if (!geocoded) return {}
   return leg === 'start'
     ? {
@@ -333,12 +385,14 @@ async function geocodeIfChanged(
         start_lat: geocoded.lat,
         start_lng: geocoded.lng,
         start_timezone: geocoded.timezone,
+        start_place_name: cached?.placeName ?? null,
       }
     : {
         end_address: geocoded.formattedAddress,
         end_lat: geocoded.lat,
         end_lng: geocoded.lng,
         end_timezone: geocoded.timezone,
+        end_place_name: cached?.placeName ?? null,
       }
 }
 

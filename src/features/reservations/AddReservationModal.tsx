@@ -1,15 +1,29 @@
-import { useState, type FormEvent } from 'react'
+import { APIProvider } from '@vis.gl/react-google-maps'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
+import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
-import { AddressSelectionCancelledError, resolveAddress } from '../../lib/geocode'
+import {
+  AddressSelectionCancelledError,
+  fetchGeocodeByPlaceId,
+  resolveAddress,
+  type GeocodeResult,
+} from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { NewReservation, Reservation, ReservationStatus, ReservationType } from '../../types/reservation'
+import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationGaps'
+import { useTrip } from '../trips/useTrip'
 import { findOverlappingReservation } from './reservationOverlap'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservationsByType } from './useReservationsByType'
+
+const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+
+type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
 type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'activity'
 
@@ -48,10 +62,14 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   const [status, setStatus] = useState<ReservationStatus>('to_book')
   const [startAddress, setStartAddress] = useState('')
   const [endAddress, setEndAddress] = useState('')
+  const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
+  const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(null)
   const [startDate, setStartDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endDate, setEndDate] = useState('')
   const [endTime, setEndTime] = useState('')
+  const [nights, setNights] = useState('')
+  const [manualEndDate, setManualEndDate] = useState(false)
   const [priceAmount, setPriceAmount] = useState('')
   const [priceCurrency, setPriceCurrency] = useState('')
   const [note, setNote] = useState('')
@@ -68,7 +86,79 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
   // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
   // whichever type is currently selected so switching type mid-form checks against the right set.
-  const { reservations: sameTypeReservations } = useReservationsByType(tripId, option.dbType)
+  const { reservations: sameTypeReservations, loading: sameTypeLoading } = useReservationsByType(
+    tripId,
+    option.dbType,
+  )
+  const { trip, loading: tripLoading } = useTrip(tripId)
+
+  // TABI-111: prefill the start date with the trip's first night not yet covered by a Stay
+  // reservation (reusing the accommodation coverage-gap logic) — or the trip's own start date
+  // if no stay is booked yet. Runs once the relevant data has loaded, and only while the field
+  // is still untouched, so it never overwrites what the user typed.
+  const hasPrefilledStartDateRef = useRef(false)
+  useEffect(() => {
+    if (hasPrefilledStartDateRef.current) return
+    if (option.dbType !== 'stay') return
+    if (tripLoading || sameTypeLoading) return
+    if (startDate !== '') return
+
+    const gaps = computeAccommodationGaps(trip ?? { start_date: null, end_date: null }, sameTypeReservations)
+    const firstUncoveredStart =
+      gaps.length > 0 ? gaps[0].start : sameTypeReservations.length === 0 ? (trip?.start_date ?? null) : null
+
+    if (firstUncoveredStart) {
+      setStartDate(firstUncoveredStart)
+      hasPrefilledStartDateRef.current = true
+    }
+  }, [option.dbType, trip, tripLoading, sameTypeReservations, sameTypeLoading, startDate])
+
+  // TABI-112: for Stay, derive the checkout date from check-in + nights instead of asking the
+  // user to pick it directly. Only while manualEndDate is off — flipping it hands endDate back
+  // to direct editing via DateTimeField.
+  useEffect(() => {
+    if (option.dbType !== 'stay' || manualEndDate) return
+    const n = Number(nights)
+    if (!startDate || nights.trim() === '' || !Number.isFinite(n) || n < 1) {
+      setEndDate('')
+      return
+    }
+    setEndDate(addDays(startDate, Math.trunc(n)))
+  }, [option.dbType, manualEndDate, startDate, nights])
+
+  function handleStartAddressChange(text: string) {
+    setStartAddress(text)
+    setStartPlace(null)
+  }
+
+  function handleEndAddressChange(text: string) {
+    setEndAddress(text)
+    setEndPlace(null)
+  }
+
+  async function handleStartPlaceSelect({ placeId, placeName }: PlaceAutocompleteSelection) {
+    setGeocoding(true)
+    try {
+      const result = await fetchGeocodeByPlaceId(placeId)
+      setStartPlace({ ...result, placeName })
+    } catch {
+      // Fall back silently — handleSubmit's free-text resolveAddress() covers this.
+    } finally {
+      setGeocoding(false)
+    }
+  }
+
+  async function handleEndPlaceSelect({ placeId, placeName }: PlaceAutocompleteSelection) {
+    setGeocoding(true)
+    try {
+      const result = await fetchGeocodeByPlaceId(placeId)
+      setEndPlace({ ...result, placeName })
+    } catch {
+      // Fall back silently — handleSubmit's free-text resolveAddress() covers this.
+    } finally {
+      setGeocoding(false)
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -82,17 +172,30 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       setError(strings.addReservation.errorStartRequired)
       return
     }
-    if (option.requiresEnd && (!endDate || !endTime)) {
-      setError(strings.addReservation.errorEndRequired)
-      return
+    if (option.requiresEnd) {
+      if (option.dbType === 'stay' && !manualEndDate) {
+        if (!nights.trim() || Number(nights) < 1 || !endTime) {
+          setError(strings.addReservation.errorNightsRequired)
+          return
+        }
+      } else if (!endDate || !endTime) {
+        setError(strings.addReservation.errorEndRequired)
+        return
+      }
     }
 
     setGeocoding(true)
-    let startGeo: Awaited<ReturnType<typeof resolveAddress>> = null
-    let endGeo: Awaited<ReturnType<typeof resolveAddress>> = null
+    let startGeo: ResolvedPlace | null = startPlace
+    let endGeo: ResolvedPlace | null = endPlace
     try {
-      startGeo = await resolveAddress(startAddress, requestPick)
-      if (option.requiresEndAddress) endGeo = await resolveAddress(endAddress, requestPick)
+      if (!startGeo) {
+        const resolved = await resolveAddress(startAddress, requestPick)
+        startGeo = resolved ? { ...resolved, placeName: null } : null
+      }
+      if (option.requiresEndAddress && !endGeo) {
+        const resolved = await resolveAddress(endAddress, requestPick)
+        endGeo = resolved ? { ...resolved, placeName: null } : null
+      }
     } catch (err) {
       setError(
         err instanceof AddressSelectionCancelledError
@@ -129,10 +232,12 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       start_address: startGeo?.formattedAddress ?? (startAddress.trim() || null),
       start_lat: startGeo?.lat ?? null,
       start_lng: startGeo?.lng ?? null,
+      start_place_name: startGeo?.placeName ?? null,
       start_timezone: startAt ? startTimezone : null,
       end_address: option.requiresEndAddress ? (endGeo?.formattedAddress ?? (endAddress.trim() || null)) : null,
       end_lat: option.requiresEndAddress ? (endGeo?.lat ?? null) : null,
       end_lng: option.requiresEndAddress ? (endGeo?.lng ?? null) : null,
+      end_place_name: option.requiresEndAddress ? (endGeo?.placeName ?? null) : null,
       end_timezone: endAt ? endTimezone : null,
     }
 
@@ -180,144 +285,202 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">{strings.addReservation.title}</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label={strings.addReservation.typeLabel}>
-            <select
-              value={uiType}
-              onChange={(event) => setUiType(event.target.value as UiReservationType)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-            >
-              {typeOptions.map((candidate) => (
-                <option key={candidate.value} value={candidate.value}>
-                  {strings.addReservation.types[candidate.value]}
-                </option>
-              ))}
-            </select>
-          </Field>
+    <APIProvider apiKey={mapsApiKey ?? ''}>
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+        <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">{strings.addReservation.title}</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Field label={strings.addReservation.typeLabel}>
+              <select
+                value={uiType}
+                onChange={(event) => setUiType(event.target.value as UiReservationType)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              >
+                {typeOptions.map((candidate) => (
+                  <option key={candidate.value} value={candidate.value}>
+                    {strings.addReservation.types[candidate.value]}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-          <Field label={strings.addReservation.nameLabel}>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={strings.addReservation.namePlaceholder}
-              required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-            />
-          </Field>
+            <Field label={strings.addReservation.nameLabel}>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={strings.addReservation.namePlaceholder}
+                required
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
 
-          <div>
-            <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
-            <StatusPicker value={status} onChange={setStatus} />
-          </div>
+            <div>
+              <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
+              <StatusPicker value={status} onChange={setStatus} />
+            </div>
 
-          <Field
-            label={
-              option.requiresEndAddress
-                ? strings.addReservation.startAddressLabelTransport
-                : strings.addReservation.startAddressLabel
-            }
-          >
-            <input
+            <PlaceAutocompleteField
+              id="start-address"
+              label={
+                option.requiresEndAddress
+                  ? strings.addReservation.startAddressLabelTransport
+                  : strings.addReservation.startAddressLabel
+              }
               value={startAddress}
-              onChange={(event) => setStartAddress(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              onTextChange={handleStartAddressChange}
+              onPlaceSelect={handleStartPlaceSelect}
             />
-          </Field>
 
-          {option.requiresEndAddress && (
-            <Field label={strings.addReservation.endAddressLabel}>
-              <input
+            {option.requiresEndAddress && (
+              <PlaceAutocompleteField
+                id="end-address"
+                label={strings.addReservation.endAddressLabel}
                 value={endAddress}
-                onChange={(event) => setEndAddress(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                onTextChange={handleEndAddressChange}
+                onPlaceSelect={handleEndPlaceSelect}
               />
-            </Field>
-          )}
+            )}
 
-          <DateTimeField
-            legend={strings.addReservation.startLabel}
-            date={startDate}
-            time={startTime}
-            onDateChange={setStartDate}
-            onTimeChange={setStartTime}
-            required={option.requiresStart}
-          />
-
-          <DateTimeField
-            legend={strings.addReservation.endLabel}
-            date={endDate}
-            time={endTime}
-            onDateChange={setEndDate}
-            onTimeChange={setEndTime}
-            required={option.requiresEnd}
-          />
-
-          <div className="flex gap-3">
-            <Field label={strings.addReservation.priceLabel} className="flex-1">
-              <input
-                type="number"
-                step="0.01"
-                value={priceAmount}
-                onChange={(event) => setPriceAmount(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-            <Field label={strings.addReservation.currencyLabel} className="w-24">
-              <input
-                value={priceCurrency}
-                onChange={(event) => setPriceCurrency(event.target.value.toUpperCase())}
-                maxLength={3}
-                placeholder="USD"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-          </div>
-
-          <Field label={strings.addReservation.notesLabel}>
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder={strings.addReservation.notesPlaceholder}
-              rows={3}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            <DateTimeField
+              legend={strings.addReservation.startLabel}
+              date={startDate}
+              time={startTime}
+              onDateChange={setStartDate}
+              onTimeChange={setStartTime}
+              required={option.requiresStart}
             />
-          </Field>
 
-          {geocoding && <p className="text-sm text-slate-500">{strings.addReservation.geocoding}</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+            {option.dbType === 'stay' && !manualEndDate ? (
+              <div className="space-y-2">
+                <div className="flex gap-3">
+                  <Field label={strings.addReservation.nightsLabel} className="w-20">
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={nights}
+                      onChange={(event) => setNights(event.target.value)}
+                      required={option.requiresEnd}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    />
+                  </Field>
+                  <fieldset className="flex-1">
+                    <legend className="mb-1 block text-sm font-medium text-slate-700">
+                      {strings.addReservation.endLabel}
+                    </legend>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        aria-label={`${strings.addReservation.endLabel} date`}
+                        value={endDate}
+                        disabled
+                        className="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-500"
+                      />
+                      <input
+                        type="time"
+                        aria-label={`${strings.addReservation.endLabel} time`}
+                        value={endTime}
+                        onChange={(event) => setEndTime(event.target.value)}
+                        required={option.requiresEnd}
+                        className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                      />
+                    </div>
+                  </fieldset>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setManualEndDate(true)}
+                  className="text-sm text-teal-700 underline"
+                >
+                  {strings.addReservation.manualCheckoutToggle}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <DateTimeField
+                  legend={strings.addReservation.endLabel}
+                  date={endDate}
+                  time={endTime}
+                  onDateChange={setEndDate}
+                  onTimeChange={setEndTime}
+                  required={option.requiresEnd}
+                />
+                {option.dbType === 'stay' && (
+                  <button
+                    type="button"
+                    onClick={() => setManualEndDate(false)}
+                    className="text-sm text-teal-700 underline"
+                  >
+                    {strings.addReservation.nightsCheckoutToggle}
+                  </button>
+                )}
+              </div>
+            )}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-              {strings.addReservation.cancel}
-            </Button>
-            <Button type="submit" disabled={submitting || geocoding}>
-              {strings.addReservation.submit}
-            </Button>
-          </div>
-        </form>
+            <div className="flex gap-3">
+              <Field label={strings.addReservation.priceLabel} className="flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={priceAmount}
+                  onChange={(event) => setPriceAmount(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+              <Field label={strings.addReservation.currencyLabel} className="w-24">
+                <input
+                  value={priceCurrency}
+                  onChange={(event) => setPriceCurrency(event.target.value.toUpperCase())}
+                  maxLength={3}
+                  placeholder="USD"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+            </div>
+
+            <Field label={strings.addReservation.notesLabel}>
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder={strings.addReservation.notesPlaceholder}
+                rows={3}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
+
+            {geocoding && <p className="text-sm text-slate-500">{strings.addReservation.geocoding}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+                {strings.addReservation.cancel}
+              </Button>
+              <Button type="submit" disabled={submitting || geocoding}>
+                {strings.addReservation.submit}
+              </Button>
+            </div>
+          </form>
+        </div>
+        {candidates && (
+          <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+        )}
+        {overlapConfirm && (
+          <ConfirmDialog
+            title={strings.addReservation.overlapConfirmTitle}
+            message={strings.addReservation.overlapConfirmMessage(overlapConfirm.reservation.name)}
+            noteLabel={strings.addReservation.overlapNoteLabel}
+            notePlaceholder={strings.addReservation.overlapNotePlaceholder}
+            note={overlapNote}
+            onNoteChange={setOverlapNote}
+            confirmLabel={strings.addReservation.overlapConfirmCta}
+            cancelLabel={strings.addReservation.overlapCancelCta}
+            onConfirm={handleConfirmOverlap}
+            onCancel={handleCancelOverlap}
+            confirming={submitting}
+          />
+        )}
       </div>
-      {candidates && (
-        <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
-      )}
-      {overlapConfirm && (
-        <ConfirmDialog
-          title={strings.addReservation.overlapConfirmTitle}
-          message={strings.addReservation.overlapConfirmMessage(overlapConfirm.reservation.name)}
-          noteLabel={strings.addReservation.overlapNoteLabel}
-          notePlaceholder={strings.addReservation.overlapNotePlaceholder}
-          note={overlapNote}
-          onNoteChange={setOverlapNote}
-          confirmLabel={strings.addReservation.overlapConfirmCta}
-          cancelLabel={strings.addReservation.overlapCancelCta}
-          onConfirm={handleConfirmOverlap}
-          onCancel={handleCancelOverlap}
-          confirming={submitting}
-        />
-      )}
-    </div>
+    </APIProvider>
   )
 }
 

@@ -22,7 +22,13 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
 
   const { data: trip, error: tripError } = await client
     .from('trips')
-    .insert({ organizer_id: user.id, name: `E2E overlap trip ${runId}`, start_date: null, end_date: null })
+    .insert({
+      organizer_id: user.id,
+      name: `E2E overlap trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'USD',
+    })
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')

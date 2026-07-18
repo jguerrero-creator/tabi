@@ -36,6 +36,50 @@ export function formatDateHeader(isoUtc: string, timeZone: string | null): strin
   }).format(new Date(isoUtc))
 }
 
+/** Short "Mon D" label for a day-tab pill, from a `groupByDate` dateKey (already a resolved local calendar date — no further timezone conversion needed). */
+export function formatDayPillLabel(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(year, month - 1, day)),
+  )
+}
+
+/**
+ * "Dec 6 → Dec 20 · 14 days" header label for a trip's overall date range.
+ * `start_date`/`end_date` are plain calendar dates (no time/timezone
+ * component), so formatting anchors to UTC noon to avoid any local-machine
+ * timezone shifting the displayed day — same reasoning as `formatDayPillLabel`.
+ */
+export function formatTripDateRange(startDate: string | null, endDate: string | null): string | null {
+  if (!startDate || !endDate) return null
+
+  const start = new Date(`${startDate}T00:00:00Z`)
+  const end = new Date(`${endDate}T00:00:00Z`)
+  const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+  const format = (date: Date) =>
+    new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date)
+
+  return `${format(start)} → ${format(end)} · ${days} day${days === 1 ? '' : 's'}`
+}
+
+/**
+ * "Japan Standard Time (UTC+9)" style label for a timezone banner. Derived
+ * entirely from ICU's timezone database via Intl — never a hardcoded
+ * IANA-id-to-country lookup table, per the country-agnostic architecture rule.
+ */
+export function formatLocalTimeZoneLabel(isoUtc: string, timeZone: string): string {
+  const date = new Date(isoUtc)
+  const longName =
+    new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'long' })
+      .formatToParts(date)
+      .find((part) => part.type === 'timeZoneName')?.value ?? timeZone
+  const offset =
+    new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'shortOffset' })
+      .formatToParts(date)
+      .find((part) => part.type === 'timeZoneName')?.value ?? ''
+  return `${longName} (${offset.replace('GMT', 'UTC')})`
+}
+
 /**
  * Converts a wall-clock date + time as observed in `timeZone` into a UTC ISO string.
  * Two-pass offset resolution so DST transitions on the given day resolve correctly.

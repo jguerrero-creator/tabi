@@ -6,7 +6,7 @@ export interface DateGroup<T> {
   items: T[]
 }
 
-const UNSCHEDULED_KEY = '￿'
+export const UNSCHEDULED_KEY = '￿'
 
 export function groupByDate<T>(
   items: T[],

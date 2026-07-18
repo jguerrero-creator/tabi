@@ -20,7 +20,13 @@ test('a reservation can be edited and deleted from the detail screen', async ({ 
 
   const { data: trip, error: tripError } = await client
     .from('trips')
-    .insert({ organizer_id: user.id, name: `E2E edit/delete trip ${runId}`, start_date: null, end_date: null })
+    .insert({
+      organizer_id: user.id,
+      name: `E2E edit/delete trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'USD',
+    })
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')

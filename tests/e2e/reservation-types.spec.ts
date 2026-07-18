@@ -26,7 +26,13 @@ test('reservation type determines the icon and the fields shown on the detail sc
 
   const { data: trip, error: tripError } = await client
     .from('trips')
-    .insert({ organizer_id: user.id, name: `E2E types trip ${runId}`, start_date: null, end_date: null })
+    .insert({
+      organizer_id: user.id,
+      name: `E2E types trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'USD',
+    })
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
