@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
@@ -8,8 +8,11 @@ import type { Reservation } from '../../types/reservation'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { OverviewMap } from './OverviewMap'
 import { TripLegsSection } from './TripLegsSection'
+import { TripTimeline } from './TripTimeline'
 import { useTrip } from './useTrip'
 import { useTripReservations } from './useTripReservations'
+
+type OverviewTab = 'overview' | 'planning'
 
 export function OverviewScreen() {
   const { tripId } = useParams<{ tripId: string }>()
@@ -20,6 +23,7 @@ export function OverviewScreen() {
     loading: reservationsLoading,
     error: reservationsError,
   } = useTripReservations(tripId ?? '')
+  const [activeTab, setActiveTab] = useState<OverviewTab>('overview')
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -60,62 +64,75 @@ export function OverviewScreen() {
         {!loading && !error && (
           <div className="space-y-5">
             <div className="flex rounded-lg border border-slate-200 bg-white p-1">
-              <span className="flex-1 rounded-md bg-teal-600 px-3 py-1.5 text-center text-sm font-medium text-white">
-                {strings.overview.overviewTab}
-              </span>
               <button
                 type="button"
-                disabled
-                title={strings.overview.planningComingSoon}
-                className="flex-1 rounded-md px-3 py-1.5 text-center text-sm font-medium text-slate-400"
+                onClick={() => setActiveTab('overview')}
+                className={`flex-1 rounded-md px-3 py-1.5 text-center text-sm font-medium ${
+                  activeTab === 'overview' ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {strings.overview.overviewTab}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('planning')}
+                className={`flex-1 rounded-md px-3 py-1.5 text-center text-sm font-medium ${
+                  activeTab === 'planning' ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                }`}
               >
                 {strings.overview.planningTab}
               </button>
             </div>
 
-            <OverviewMap points={points} />
+            {activeTab === 'overview' && (
+              <>
+                <OverviewMap points={points} />
 
-            <TripLegsSection reservations={reservations} />
+                <TripLegsSection reservations={reservations} />
 
-            <section>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {strings.overview.needsAttentionTitle}
-              </h2>
-              {needsAttention.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-                  {strings.overview.needsAttentionEmpty}
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  {needsAttention.map((reservation) => (
-                    <MenuListRow
-                      key={reservation.id}
-                      to={`/reservations/${reservation.id}`}
-                      type={reservation.type}
-                      title={reservation.name}
-                      status={reservation.status}
-                      secondaryLabel={
-                        reservation.start_at
-                          ? formatInZone(reservation.start_at, reservation.start_timezone)
-                          : null
-                      }
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
+                <section>
+                  <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {strings.overview.needsAttentionTitle}
+                  </h2>
+                  {needsAttention.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                      {strings.overview.needsAttentionEmpty}
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      {needsAttention.map((reservation) => (
+                        <MenuListRow
+                          key={reservation.id}
+                          to={`/reservations/${reservation.id}`}
+                          type={reservation.type}
+                          title={reservation.name}
+                          status={reservation.status}
+                          secondaryLabel={
+                            reservation.start_at
+                              ? formatInZone(reservation.start_at, reservation.start_timezone)
+                              : null
+                          }
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </section>
 
-            <section>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {strings.overview.menusTitle}
-              </h2>
-              <div className="grid grid-cols-2 gap-2">
-                <MenuLink to={`/trips/${tripId}/stay`} label={strings.menus.stay} />
-                <MenuLink to={`/trips/${tripId}/transport`} label={strings.menus.transport} />
-                <MenuLink to={`/trips/${tripId}/activities`} label={strings.menus.activities} />
-                <MenuLink label={strings.menus.budget} />
-              </div>
-            </section>
+                <section>
+                  <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {strings.overview.menusTitle}
+                  </h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    <MenuLink to={`/trips/${tripId}/stay`} label={strings.menus.stay} />
+                    <MenuLink to={`/trips/${tripId}/transport`} label={strings.menus.transport} />
+                    <MenuLink to={`/trips/${tripId}/activities`} label={strings.menus.activities} />
+                    <MenuLink label={strings.menus.budget} />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {activeTab === 'planning' && <TripTimeline reservations={reservations} />}
           </div>
         )}
       </main>

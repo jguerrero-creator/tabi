@@ -7,6 +7,13 @@ export function formatInZone(isoUtc: string, timeZone: string | null): string {
   }).format(date)
 }
 
+export function formatTimeInZone(isoUtc: string, timeZone: string | null): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeStyle: 'short',
+    timeZone: timeZone ?? 'UTC',
+  }).format(new Date(isoUtc))
+}
+
 export function localTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }

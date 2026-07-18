@@ -72,12 +72,16 @@ export const strings = {
     errorLoading: 'Could not load this trip.',
     overviewTab: 'Overview',
     planningTab: 'Planning',
-    planningComingSoon: 'Planning is coming soon',
     expandMap: 'Expand map',
     needsAttentionTitle: 'Needs attention',
     needsAttentionEmpty: 'Nothing needs attention right now.',
     menusTitle: 'Menus',
     comingSoon: 'Coming soon',
+  },
+  planning: {
+    unscheduledLabel: 'Unscheduled',
+    emptyTitle: 'Nothing planned yet',
+    emptyBody: 'Add reservations to see your day-by-day timeline.',
   },
   menus: {
     stay: 'Stay',
@@ -96,6 +100,7 @@ export const strings = {
     title: 'Getting around',
     loading: 'Computing travel times…',
     errorLoading: 'Could not compute travel times for this trip.',
+    freeTime: (duration: string) => `${duration} free before next stop`,
   },
   stayMenu: {
     title: 'Stay',

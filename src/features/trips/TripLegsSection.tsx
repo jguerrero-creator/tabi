@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { TravelModePicker } from '../../components/ui/TravelModePicker'
 import { Spinner } from '../../components/ui/Spinner'
+import { computeFreeTimeBlocks } from '../../lib/freeTimeBlocks'
 import { legKey } from '../../lib/tripLegs'
 import type { TravelMode } from '../../lib/travelTime'
 import { strings } from '../../lib/strings'
@@ -14,6 +15,10 @@ interface TripLegsSectionProps {
 export function TripLegsSection({ reservations }: TripLegsSectionProps) {
   const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
   const { legs, loading, error } = useTripLegs(reservations, modeByLeg)
+  const freeTimeByLeg = useMemo(() => {
+    const blocks = computeFreeTimeBlocks(reservations, legs)
+    return new Map(blocks.map((block) => [legKey(block.fromReservationId, block.toReservationId), block]))
+  }, [reservations, legs])
 
   const byId = new Map(reservations.map((reservation) => [reservation.id, reservation]))
 
@@ -44,12 +49,20 @@ export function TripLegsSection({ reservations }: TripLegsSectionProps) {
             const from = byId.get(leg.fromReservationId)
             const to = byId.get(leg.toReservationId)
             const key = legKey(leg.fromReservationId, leg.toReservationId)
+            const freeBlock = freeTimeByLeg.get(key)
             return (
               <li key={key} className="rounded-xl border border-slate-200 bg-white p-3">
                 <p className="truncate text-sm font-medium text-slate-900">
                   {from?.name ?? '—'} → {to?.name ?? '—'}
                 </p>
-                <p className="mb-2 text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>
+                <div className="mb-2">
+                  <p className="text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>
+                  {freeBlock && (
+                    <p className="text-xs font-medium text-teal-700">
+                      {strings.tripLegs.freeTime(formatDuration(freeBlock.durationSeconds))}
+                    </p>
+                  )}
+                </div>
                 <TravelModePicker
                   value={leg.mode}
                   onChange={(mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
