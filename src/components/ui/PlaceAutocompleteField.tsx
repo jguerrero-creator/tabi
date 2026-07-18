@@ -81,12 +81,29 @@ function PlaceAutocompleteFieldWithPlaces({
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
+  // The debounced fetchSuggestions() call is scheduled from a setTimeout closure that
+  // may have captured `placesLib` while it was still null (library loads async on
+  // mount) — reading it via a ref instead of the closed-over variable ensures the
+  // callback always sees the current value by the time it actually fires.
+  const placesLibRef = useRef(placesLib)
+  placesLibRef.current = placesLib
+  const lastTypedTextRef = useRef('')
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [])
+
+  // If the library was still loading when the debounced fetch fired (fetchSuggestions
+  // no-ops without it), retry as soon as it becomes available rather than silently
+  // dropping that search — otherwise the user would need to type again to get results.
+  useEffect(() => {
+    if (placesLib && lastTypedTextRef.current.trim()) {
+      fetchSuggestions(lastTypedTextRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when the library itself becomes available
+  }, [placesLib])
 
   function closeList() {
     setIsOpen(false)
@@ -96,6 +113,7 @@ function PlaceAutocompleteFieldWithPlaces({
 
   function handleChange(text: string) {
     onTextChange(text)
+    lastTypedTextRef.current = text
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
@@ -108,15 +126,16 @@ function PlaceAutocompleteFieldWithPlaces({
   }
 
   async function fetchSuggestions(text: string) {
-    if (!placesLib) return
+    const currentPlacesLib = placesLibRef.current
+    if (!currentPlacesLib) return
 
     const requestId = ++requestIdRef.current
     if (!sessionTokenRef.current) {
-      sessionTokenRef.current = new placesLib.AutocompleteSessionToken()
+      sessionTokenRef.current = new currentPlacesLib.AutocompleteSessionToken()
     }
 
     try {
-      const { suggestions: results } = await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      const { suggestions: results } = await currentPlacesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: text,
         sessionToken: sessionTokenRef.current,
       })

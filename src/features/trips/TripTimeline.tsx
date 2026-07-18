@@ -1,19 +1,20 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
 import { statusDotClasses } from '../../components/menu/statusDotClasses'
-import { groupByDate, UNSCHEDULED_KEY } from '../../components/menu/groupByDate'
+import { groupByDate, UNSCHEDULED_KEY, type DateGroup } from '../../components/menu/groupByDate'
 import { formatDayPillLabel, formatLocalTimeZoneLabel, formatTimeInZone, localTimeZone } from '../../lib/datetime'
 import { formatDuration } from '../../lib/duration'
 import { computeFreeTimeBlocks, MIN_FREE_SECONDS_TO_SHOW, type FreeTimeBlock } from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
 import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
+import type { Trip } from '../../types/trip'
 import { DayTabs } from './DayTabs'
 import type { TripLeg } from './useTripLegs'
 
 interface TripTimelineProps {
+  trip: Trip | null
   reservations: Reservation[]
   legs: TripLeg[]
   /**
@@ -24,6 +25,13 @@ interface TripTimelineProps {
    */
   legsLoading: boolean
   legsError: string | null
+  /**
+   * Controlled by the parent (URL search param) rather than owned locally
+   * (TABI-131) — so leaving Planning for a reservation's detail screen and
+   * pressing back restores the same day instead of resetting to the first.
+   */
+  selectedDayKey: string | null
+  onSelectDay: (key: string) => void
 }
 
 type RailEntry =
@@ -37,14 +45,21 @@ type RailEntry =
  * (TABI-31), one day selected at a time via day-tab pills, with each day's
  * free-time/travel blocks threaded into a single vertical rail (TABI-13/TABI-3/TABI-4).
  */
-export function TripTimeline({ reservations, legs, legsLoading, legsError }: TripTimelineProps) {
-  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null)
-
+export function TripTimeline({
+  trip,
+  reservations,
+  legs,
+  legsLoading,
+  legsError,
+  selectedDayKey,
+  onSelectDay,
+}: TripTimelineProps) {
   const groups = groupByDate(
     reservations,
     (reservation) => ({ at: reservation.start_at, timezone: reservation.start_timezone }),
     { unscheduledLabel: strings.planning.unscheduledLabel },
   )
+  const groupsByKey = new Map(groups.map((group) => [group.dateKey, group]))
 
   // Keyed by fromReservationId, not by (from, to) pair: a gap is rendered right
   // after the reservation it follows regardless of which day-group that
@@ -57,7 +72,9 @@ export function TripTimeline({ reservations, legs, legsLoading, legsError }: Tri
       : computeFreeTimeBlocks(reservations, legs).map((block) => [block.fromReservationId, block]),
   )
 
-  if (groups.length === 0) {
+  const days = buildDayTabs(trip, groups)
+
+  if (days.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-16 text-center">
         <h2 className="text-base font-medium text-slate-900">{strings.planning.emptyTitle}</h2>
@@ -66,21 +83,17 @@ export function TripTimeline({ reservations, legs, legsLoading, legsError }: Tri
     )
   }
 
-  const days = groups.map((group) => ({
-    key: group.dateKey,
-    label: group.dateKey === UNSCHEDULED_KEY ? group.label : formatDayPillLabel(group.dateKey),
-  }))
   const effectiveSelectedKey =
-    selectedDayKey && groups.some((group) => group.dateKey === selectedDayKey) ? selectedDayKey : days[0].key
-  const selectedGroup = groups.find((group) => group.dateKey === effectiveSelectedKey)!
+    selectedDayKey && days.some((day) => day.key === selectedDayKey) ? selectedDayKey : days[0].key
+  const selectedItems = groupsByKey.get(effectiveSelectedKey)?.items ?? []
 
-  const dayTimezone = selectedGroup.items[0]?.start_timezone ?? localTimeZone()
-  const anchorInstant = selectedGroup.items[0]?.start_at
-  const railEntries = buildRailEntries(selectedGroup.items, freeTimeByFromId)
+  const dayTimezone = selectedItems[0]?.start_timezone ?? localTimeZone()
+  const anchorInstant = selectedItems[0]?.start_at
+  const railEntries = buildRailEntries(selectedItems, freeTimeByFromId)
 
   return (
     <div className="space-y-4">
-      <DayTabs days={days} selectedKey={effectiveSelectedKey} onSelect={setSelectedDayKey} />
+      <DayTabs days={days} selectedKey={effectiveSelectedKey} onSelect={onSelectDay} />
 
       <div className="flex items-center justify-between gap-2">
         {anchorInstant && (
@@ -88,26 +101,73 @@ export function TripTimeline({ reservations, legs, legsLoading, legsError }: Tri
             {strings.planning.localTimeLabel(formatLocalTimeZoneLabel(anchorInstant, dayTimezone))}
           </p>
         )}
-        {dayHasTooLongTravel(selectedGroup.items, freeTimeByFromId) && (
+        {dayHasTooLongTravel(selectedItems, freeTimeByFromId) && (
           <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
             {strings.planning.longTravelDay}
           </span>
         )}
       </div>
 
-      <ul className="ml-14 space-y-4 border-l-2 border-slate-200 pl-4">
-        {railEntries.map((entry) => (
-          <li key={entry.key} className="relative">
-            <span className="absolute -left-[4.75rem] top-2 w-14 text-right text-xs font-medium text-slate-500">
-              {entry.time ? formatTimeInZone(entry.time, dayTimezone) : ''}
-            </span>
-            <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
-            {renderEntry(entry)}
-          </li>
-        ))}
-      </ul>
+      {railEntries.length === 0 ? (
+        <p className="ml-14 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+          {strings.planning.dayEmptyBody}
+        </p>
+      ) : (
+        <ul className="ml-14 space-y-4 border-l-2 border-slate-200 pl-4">
+          {railEntries.map((entry) => (
+            <li key={entry.key} className="relative">
+              <span className="absolute -left-[4.75rem] top-2 w-14 text-right text-xs font-medium text-slate-500">
+                {entry.time ? formatTimeInZone(entry.time, dayTimezone) : ''}
+              </span>
+              <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
+              {renderEntry(entry)}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
+}
+
+/**
+ * Day-tab pills must cover the whole trip (start_date → end_date), not just
+ * the days that already have a reservation (TABI-139) — otherwise a day with
+ * nothing booked yet is invisible instead of surfaced as free/unplanned.
+ * Reservation dates outside the trip's own range are still included
+ * defensively (e.g. a trip edited after items were added), and the
+ * "Unscheduled" pill is only shown when it's actually got items.
+ */
+function buildDayTabs(trip: Trip | null, groups: DateGroup<Reservation>[]): { key: string; label: string }[] {
+  const rangeKeys = tripDateRangeKeys(trip?.start_date ?? null, trip?.end_date ?? null)
+  const scheduledGroupKeys = groups.map((group) => group.dateKey).filter((key) => key !== UNSCHEDULED_KEY)
+  const dateKeys = Array.from(new Set([...rangeKeys, ...scheduledGroupKeys])).sort()
+
+  const days = dateKeys.map((key) => ({ key, label: formatDayPillLabel(key) }))
+
+  const unscheduledGroup = groups.find((group) => group.dateKey === UNSCHEDULED_KEY)
+  if (unscheduledGroup) {
+    days.push({ key: unscheduledGroup.dateKey, label: unscheduledGroup.label })
+  }
+
+  return days
+}
+
+/** Trip `start_date`/`end_date` are plain calendar dates; anchor to UTC midnight per day, same reasoning as `formatTripDateRange`. */
+function tripDateRangeKeys(startDate: string | null, endDate: string | null): string[] {
+  if (!startDate || !endDate) return []
+
+  const keys: string[] = []
+  const start = Date.UTC(...dateParts(startDate))
+  const end = Date.UTC(...dateParts(endDate))
+  for (let t = start; t <= end; t += 24 * 60 * 60 * 1000) {
+    keys.push(new Date(t).toISOString().slice(0, 10))
+  }
+  return keys
+}
+
+function dateParts(dateStr: string): [number, number, number] {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return [year, month - 1, day]
 }
 
 function buildRailEntries(items: Reservation[], freeTimeByFromId: Map<string, FreeTimeBlock>): RailEntry[] {

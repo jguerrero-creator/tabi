@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatInZone, formatTripDateRange } from '../../lib/datetime'
@@ -25,7 +25,42 @@ export function OverviewScreen() {
     loading: reservationsLoading,
     error: reservationsError,
   } = useTripReservations(tripId ?? '')
-  const [activeTab, setActiveTab] = useState<OverviewTab>('overview')
+  // TABI-131: tab + selected day live in the URL (not local state) so that
+  // navigating to a reservation's detail screen and back restores Planning
+  // and its selected day instead of remounting to the Overview default.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab: OverviewTab = searchParams.get('tab') === 'planning' ? 'planning' : 'overview'
+  const selectedDayKey = searchParams.get('day')
+
+  const setActiveTab = useCallback(
+    (tab: OverviewTab) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (tab === 'planning') next.set('tab', 'planning')
+          else next.delete('tab')
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
+  const setSelectedDayKey = useCallback(
+    (day: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('day', day)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
   const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
   // Lifted above both TripLegsSection and TripTimeline so switching tabs
   // doesn't re-trigger a billed Google Routes API call for the same legs.
@@ -138,7 +173,15 @@ export function OverviewScreen() {
             )}
 
             {activeTab === 'planning' && (
-              <TripTimeline reservations={reservations} legs={legs} legsLoading={legsLoading} legsError={legsError} />
+              <TripTimeline
+                trip={trip}
+                reservations={reservations}
+                legs={legs}
+                legsLoading={legsLoading}
+                legsError={legsError}
+                selectedDayKey={selectedDayKey}
+                onSelectDay={setSelectedDayKey}
+              />
             )}
           </div>
         )}

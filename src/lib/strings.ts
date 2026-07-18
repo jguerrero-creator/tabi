@@ -93,6 +93,7 @@ export const strings = {
     unscheduledLabel: 'Unscheduled',
     emptyTitle: 'Nothing planned yet',
     emptyBody: 'Add reservations to see your day-by-day timeline.',
+    dayEmptyBody: 'Nothing planned for this day yet.',
     freeTime: (duration: string) => `${duration} free`,
     travelTime: (duration: string, mode: TravelMode) => `${duration} ${travelModeVerb[mode]}`,
     tightConnection: (shortfall: string) => `${shortfall} short on travel time`,
