@@ -56,6 +56,7 @@ test('selecting an Autocomplete suggestion by click fills the address and saves 
 
     await page.getByLabel('Start date').fill('2026-09-10')
     await page.getByLabel('Start time').fill('15:00')
+    await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
     await page.getByLabel('End date').fill('2026-09-12')
     await page.getByLabel('End time').fill('11:00')
 
@@ -132,6 +133,7 @@ test('selecting an Autocomplete suggestion via keyboard fills the address and sa
 
     await page.getByLabel('Start date').fill('2026-09-10')
     await page.getByLabel('Start time').fill('15:00')
+    await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
     await page.getByLabel('End date').fill('2026-09-12')
     await page.getByLabel('End time').fill('11:00')
 

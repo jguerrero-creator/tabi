@@ -58,6 +58,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
     await page.getByLabel('Address').fill('1 Chome-1-2 Oshiage, Sumida City, Tokyo, Japan')
     await page.getByLabel('Start date').fill('2026-09-11')
     await page.getByLabel('Start time').fill('15:00')
+    await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
     await page.getByLabel('End date').fill('2026-09-13')
     await page.getByLabel('End time').fill('11:00')
     await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
@@ -90,6 +91,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
     await page.getByLabel('Address').fill('1 Chome-1-2 Oshiage, Sumida City, Tokyo, Japan')
     await page.getByLabel('Start date').fill('2026-09-13')
     await page.getByLabel('Start time').fill('11:00')
+    await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
     await page.getByLabel('End date').fill('2026-09-14')
     await page.getByLabel('End time').fill('10:00')
 

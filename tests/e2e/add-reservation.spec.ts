@@ -48,6 +48,7 @@ test('a reservation can be created from the Stay menu via the Add Reservation fo
     await page.getByLabel('Address').fill('1 Chome-1-2 Oshiage, Sumida City, Tokyo, Japan')
     await page.getByLabel('Start date').fill('2026-09-10')
     await page.getByLabel('Start time').fill('15:00')
+    await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
     await page.getByLabel('End date').fill('2026-09-12')
     await page.getByLabel('End time').fill('11:00')
     await page.getByLabel('Price').fill('250')

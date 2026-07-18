@@ -48,10 +48,15 @@ export function OverviewScreen() {
         >
           ←
         </button>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-semibold text-slate-900">
             {trip?.name ?? strings.overview.title}
           </h1>
+          {trip && formatTripDateRange(trip.start_date, trip.end_date) && (
+            <p className="truncate text-xs text-slate-500">
+              {formatTripDateRange(trip.start_date, trip.end_date)}
+            </p>
+          )}
         </div>
       </header>
 
@@ -69,12 +74,12 @@ export function OverviewScreen() {
 
         {!loading && !error && (
           <div className="space-y-5">
-            <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+            <div className="flex rounded-full border border-slate-200 bg-white p-1">
               <button
                 type="button"
                 onClick={() => setActiveTab('overview')}
-                className={`flex-1 rounded-md px-3 py-1.5 text-center text-sm font-medium ${
-                  activeTab === 'overview' ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                className={`flex-1 rounded-full px-3 py-1.5 text-center text-sm font-medium transition-colors ${
+                  activeTab === 'overview' ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {strings.overview.overviewTab}
@@ -82,8 +87,8 @@ export function OverviewScreen() {
               <button
                 type="button"
                 onClick={() => setActiveTab('planning')}
-                className={`flex-1 rounded-md px-3 py-1.5 text-center text-sm font-medium ${
-                  activeTab === 'planning' ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                className={`flex-1 rounded-full px-3 py-1.5 text-center text-sm font-medium transition-colors ${
+                  activeTab === 'planning' ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {strings.overview.planningTab}

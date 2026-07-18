@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
 import { statusDotClasses } from '../../components/menu/statusDotClasses'
 import { groupByDate, UNSCHEDULED_KEY } from '../../components/menu/groupByDate'
 import { formatDayPillLabel, formatLocalTimeZoneLabel, formatTimeInZone, localTimeZone } from '../../lib/datetime'
 import { formatDuration } from '../../lib/duration'
 import { computeFreeTimeBlocks, MIN_FREE_SECONDS_TO_SHOW, type FreeTimeBlock } from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
+import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import { DayTabs } from './DayTabs'
 import type { TripLeg } from './useTripLegs'
@@ -26,7 +28,7 @@ interface TripTimelineProps {
 
 type RailEntry =
   | { kind: 'reservation'; key: string; time: string | null; reservation: Reservation }
-  | { kind: 'travel'; key: string; time: string; durationSeconds: number; tooLongTravel: boolean }
+  | { kind: 'travel'; key: string; time: string; durationSeconds: number; tooLongTravel: boolean; mode: TravelMode }
   | { kind: 'free'; key: string; time: string; durationSeconds: number }
   | { kind: 'tight'; key: string; time: string; durationSeconds: number }
 
@@ -130,6 +132,7 @@ function buildRailEntries(items: Reservation[], freeTimeByFromId: Map<string, Fr
         time: block.start,
         durationSeconds: block.travelSeconds,
         tooLongTravel: block.tooLongTravel,
+        mode: block.mode,
       })
     }
     if (showFree) {
@@ -153,15 +156,16 @@ function renderEntry(entry: RailEntry) {
     case 'travel':
       return (
         <p
-          className={`rounded-xl px-4 py-3 text-sm font-medium ${
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium ${
             entry.tooLongTravel
               ? 'bg-amber-50 text-amber-700'
               : 'bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] text-slate-600'
           }`}
         >
+          <TravelModeIcon mode={entry.mode} className="h-4 w-4 shrink-0" />
           {entry.tooLongTravel
-            ? strings.planning.longTravel(formatDuration(entry.durationSeconds))
-            : strings.planning.travelTime(formatDuration(entry.durationSeconds))}
+            ? strings.planning.longTravel(formatDuration(entry.durationSeconds), entry.mode)
+            : strings.planning.travelTime(formatDuration(entry.durationSeconds), entry.mode)}
         </p>
       )
     case 'free':

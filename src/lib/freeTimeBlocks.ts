@@ -1,5 +1,6 @@
 import type { Reservation } from '../types/reservation'
 import { legKey } from './tripLegs'
+import type { TravelMode } from './travelTime'
 
 export interface FreeTimeBlock {
   fromReservationId: string
@@ -18,12 +19,15 @@ export interface FreeTimeBlock {
   travelSeconds: number
   /** True when travelSeconds meets or exceeds the too-long-travel threshold (TABI-6). */
   tooLongTravel: boolean
+  /** Transport mode used for this leg's travel-time lookup (defaults to DRIVE when no leg was needed). */
+  mode: TravelMode
 }
 
 interface LegDuration {
   fromReservationId: string
   toReservationId: string
   durationSeconds: number | null
+  mode: TravelMode
 }
 
 /** Free blocks shorter than this aren't worth surfacing to the user as "free time". */
@@ -82,6 +86,7 @@ export function computeFreeTimeBlocks(
       durationSeconds: gapMs / 1000 - travelSeconds,
       travelSeconds,
       tooLongTravel: travelSeconds >= maxTravelSeconds,
+      mode: leg?.mode ?? 'DRIVE',
     })
   }
 

@@ -1,3 +1,13 @@
+import type { TravelMode } from './travelTime'
+
+const travelModeVerb: Record<TravelMode, string> = {
+  WALK: 'walk',
+  DRIVE: 'drive',
+  BICYCLE: 'by bike',
+  TRANSIT: 'by transit',
+  TRAIN: 'by train',
+}
+
 export const strings = {
   common: {
     back: 'Back',
@@ -84,11 +94,11 @@ export const strings = {
     emptyTitle: 'Nothing planned yet',
     emptyBody: 'Add reservations to see your day-by-day timeline.',
     freeTime: (duration: string) => `${duration} free`,
-    travelTime: (duration: string) => `${duration} travel`,
+    travelTime: (duration: string, mode: TravelMode) => `${duration} ${travelModeVerb[mode]}`,
     tightConnection: (shortfall: string) => `${shortfall} short on travel time`,
-    longTravel: (duration: string) => `${duration} travel — long leg`,
+    longTravel: (duration: string, mode: TravelMode) => `${duration} ${travelModeVerb[mode]} — long leg`,
     longTravelDay: 'Long travel day',
-    localTimeLabel: (timeZone: string) => `Local time: ${timeZone}`,
+    localTimeLabel: (timeZone: string) => `🕐 Local time: ${timeZone}`,
   },
   menus: {
     overview: 'Overview',
