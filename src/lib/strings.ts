@@ -82,6 +82,8 @@ export const strings = {
     unscheduledLabel: 'Unscheduled',
     emptyTitle: 'Nothing planned yet',
     emptyBody: 'Add reservations to see your day-by-day timeline.',
+    freeTime: (duration: string) => `${duration} free`,
+    tightConnection: (shortfall: string) => `${shortfall} short on travel time`,
   },
   menus: {
     stay: 'Stay',
@@ -101,6 +103,7 @@ export const strings = {
     loading: 'Computing travel times…',
     errorLoading: 'Could not compute travel times for this trip.',
     freeTime: (duration: string) => `${duration} free before next stop`,
+    tightConnection: (shortfall: string) => `Cutting it close — ${shortfall} short on travel time`,
   },
   stayMenu: {
     title: 'Stay',

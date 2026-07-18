@@ -4,12 +4,14 @@ import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatInZone } from '../../lib/datetime'
 import { strings } from '../../lib/strings'
+import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { OverviewMap } from './OverviewMap'
 import { TripLegsSection } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
 import { useTrip } from './useTrip'
+import { useTripLegs } from './useTripLegs'
 import { useTripReservations } from './useTripReservations'
 
 type OverviewTab = 'overview' | 'planning'
@@ -24,6 +26,10 @@ export function OverviewScreen() {
     error: reservationsError,
   } = useTripReservations(tripId ?? '')
   const [activeTab, setActiveTab] = useState<OverviewTab>('overview')
+  const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
+  // Lifted above both TripLegsSection and TripTimeline so switching tabs
+  // doesn't re-trigger a billed Google Routes API call for the same legs.
+  const { legs, loading: legsLoading, error: legsError } = useTripLegs(reservations, modeByLeg)
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -88,7 +94,13 @@ export function OverviewScreen() {
               <>
                 <OverviewMap points={points} />
 
-                <TripLegsSection reservations={reservations} />
+                <TripLegsSection
+                  reservations={reservations}
+                  legs={legs}
+                  loading={legsLoading}
+                  error={legsError}
+                  onModeChange={(key, mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
+                />
 
                 <section>
                   <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -132,7 +144,9 @@ export function OverviewScreen() {
               </>
             )}
 
-            {activeTab === 'planning' && <TripTimeline reservations={reservations} />}
+            {activeTab === 'planning' && (
+              <TripTimeline reservations={reservations} legs={legs} legsLoading={legsLoading} />
+            )}
           </div>
         )}
       </main>

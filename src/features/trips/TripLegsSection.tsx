@@ -1,20 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { TravelModePicker } from '../../components/ui/TravelModePicker'
 import { Spinner } from '../../components/ui/Spinner'
+import { formatDuration, formatDistance } from '../../lib/duration'
 import { computeFreeTimeBlocks } from '../../lib/freeTimeBlocks'
 import { legKey } from '../../lib/tripLegs'
 import type { TravelMode } from '../../lib/travelTime'
 import { strings } from '../../lib/strings'
 import type { Reservation } from '../../types/reservation'
-import { useTripLegs } from './useTripLegs'
+import type { TripLeg } from './useTripLegs'
 
 interface TripLegsSectionProps {
   reservations: Reservation[]
+  legs: TripLeg[]
+  loading: boolean
+  error: string | null
+  onModeChange: (key: string, mode: TravelMode) => void
 }
 
-export function TripLegsSection({ reservations }: TripLegsSectionProps) {
-  const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
-  const { legs, loading, error } = useTripLegs(reservations, modeByLeg)
+const MIN_FREE_SECONDS_TO_SHOW = 5 * 60
+
+export function TripLegsSection({ reservations, legs, loading, error, onModeChange }: TripLegsSectionProps) {
   const freeTimeByLeg = useMemo(() => {
     const blocks = computeFreeTimeBlocks(reservations, legs)
     return new Map(blocks.map((block) => [legKey(block.fromReservationId, block.toReservationId), block]))
@@ -57,16 +62,18 @@ export function TripLegsSection({ reservations }: TripLegsSectionProps) {
                 </p>
                 <div className="mb-2">
                   <p className="text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>
-                  {freeBlock && (
+                  {freeBlock && freeBlock.durationSeconds < 0 && (
+                    <p className="text-xs font-medium text-red-600">
+                      {strings.tripLegs.tightConnection(formatDuration(Math.abs(freeBlock.durationSeconds)))}
+                    </p>
+                  )}
+                  {freeBlock && freeBlock.durationSeconds >= MIN_FREE_SECONDS_TO_SHOW && (
                     <p className="text-xs font-medium text-teal-700">
                       {strings.tripLegs.freeTime(formatDuration(freeBlock.durationSeconds))}
                     </p>
                   )}
                 </div>
-                <TravelModePicker
-                  value={leg.mode}
-                  onChange={(mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
-                />
+                <TravelModePicker value={leg.mode} onChange={(mode) => onModeChange(key, mode)} />
               </li>
             )
           })}
@@ -81,16 +88,4 @@ function formatLeg(durationSeconds: number | null, distanceMeters: number | null
   if (durationSeconds !== null) parts.push(formatDuration(durationSeconds))
   if (distanceMeters !== null) parts.push(formatDistance(distanceMeters))
   return parts.length > 0 ? parts.join(' · ') : '—'
-}
-
-function formatDuration(seconds: number): string {
-  const totalMinutes = Math.round(seconds / 60)
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (hours === 0) return `${minutes} min`
-  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`
-}
-
-function formatDistance(meters: number): string {
-  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`
 }

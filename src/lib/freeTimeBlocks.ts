@@ -8,6 +8,11 @@ export interface FreeTimeBlock {
   start: string
   /** UTC ISO string — when free time ends (next reservation's start, minus travel time). */
   end: string
+  /**
+   * Free seconds remaining after travel time. Negative means travel eats the
+   * whole gap and then some — a tight or impossible connection, not "no
+   * free time" — callers should surface that rather than hide it.
+   */
   durationSeconds: number
 }
 
@@ -25,9 +30,7 @@ interface LegDuration {
  * wall-clock strings, so it stays correct across timezone changes and DST.
  */
 export function computeFreeTimeBlocks(reservations: Reservation[], legs: LegDuration[]): FreeTimeBlock[] {
-  const travelSecondsByLeg = new Map(
-    legs.map((leg) => [legKey(leg.fromReservationId, leg.toReservationId), leg.durationSeconds ?? 0]),
-  )
+  const legByPair = new Map(legs.map((leg) => [legKey(leg.fromReservationId, leg.toReservationId), leg]))
 
   const scheduled = reservations.filter(
     (reservation): reservation is Reservation & { start_at: string } => reservation.start_at !== null,
@@ -42,16 +45,21 @@ export function computeFreeTimeBlocks(reservations: Reservation[], legs: LegDura
     const gapMs = Date.parse(to.start_at) - Date.parse(fromEnd)
     if (gapMs <= 0) continue
 
-    const travelSeconds = travelSecondsByLeg.get(legKey(from.id, to.id)) ?? 0
-    const freeSeconds = gapMs / 1000 - travelSeconds
-    if (freeSeconds <= 0) continue
+    const leg = legByPair.get(legKey(from.id, to.id))
+    // No leg means the pair shares a location or isn't geocoded yet —
+    // buildTripLegs only emits legs that need an actual lookup, so no
+    // travel time is required here. A leg with a null duration means the
+    // lookup ran but came back unusable (e.g. an unparseable route) — that's
+    // "unknown", not "zero", so skip rather than guess and overstate free time.
+    if (leg && leg.durationSeconds === null) continue
+    const travelSeconds = leg?.durationSeconds ?? 0
 
     blocks.push({
       fromReservationId: from.id,
       toReservationId: to.id,
       start: fromEnd,
       end: new Date(Date.parse(to.start_at) - travelSeconds * 1000).toISOString(),
-      durationSeconds: freeSeconds,
+      durationSeconds: gapMs / 1000 - travelSeconds,
     })
   }
 
