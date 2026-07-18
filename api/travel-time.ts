@@ -7,7 +7,7 @@ interface LatLng {
   lng: number
 }
 
-type TravelMode = 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT'
+type TravelMode = 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT' | 'TRAIN'
 
 interface TravelTimeRequestBody {
   origin: LatLng
@@ -41,6 +41,11 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'origin and destination must be { lat, lng }' }, 400)
   }
 
+  // TRAIN isn't a Routes API travelMode on its own — it's TRANSIT narrowed to
+  // rail via transitPreferences, so the "train" spec requirement stays distinct
+  // from general public transit.
+  const isTrain = mode === 'TRAIN'
+
   const routesResponse = await fetch(ROUTES_API_URL, {
     method: 'POST',
     headers: {
@@ -51,8 +56,9 @@ export default async function handler(request: Request): Promise<Response> {
     body: JSON.stringify({
       origin: { location: { latLng: toGoogleLatLng(origin) } },
       destination: { location: { latLng: toGoogleLatLng(destination) } },
-      travelMode: mode,
+      travelMode: isTrain ? 'TRANSIT' : mode,
       ...(mode === 'DRIVE' ? { routingPreference: 'TRAFFIC_AWARE' } : {}),
+      ...(isTrain ? { transitPreferences: { allowedTravelModes: ['TRAIN'] } } : {}),
       ...(departureTime ? { departureTime } : {}),
     }),
   })

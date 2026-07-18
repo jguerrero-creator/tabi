@@ -23,7 +23,8 @@ export function computeAccommodationGaps(
   const covered = new Set<string>()
   for (const reservation of reservations) {
     if (reservation.type !== 'stay' || !reservation.end_at) continue
-    const checkIn = dateOnlyInZone(reservation.start_at, reservation.start_timezone)
+    // Stay reservations always have start_at (DB constraint: only activities may leave it null).
+    const checkIn = dateOnlyInZone(reservation.start_at!, reservation.start_timezone)
     const checkOut = dateOnlyInZone(reservation.end_at, reservation.end_timezone)
     for (let night = checkIn; night < checkOut; night = addDays(night, 1)) {
       covered.add(night)

@@ -71,7 +71,7 @@ function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {trips.map((trip) => (
           <li key={trip.id}>
-            <Link to={`/trips/${trip.id}/stay`} className="block px-4 py-3 hover:bg-slate-50">
+            <Link to={`/trips/${trip.id}`} className="block px-4 py-3 hover:bg-slate-50">
               <p className="text-sm font-medium text-slate-900">{trip.name}</p>
               {trip.destinations.length > 0 && (
                 <p className="text-xs text-slate-500">{trip.destinations.join(', ')}</p>

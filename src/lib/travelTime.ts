@@ -3,7 +3,7 @@ export interface LatLng {
   lng: number
 }
 
-export type TravelMode = 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT'
+export type TravelMode = 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT' | 'TRAIN'
 
 export interface TravelTimeResult {
   durationSeconds: number | null

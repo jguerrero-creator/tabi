@@ -4,7 +4,8 @@
 // See ./README.md.
 
 interface GeocodeRequestBody {
-  address: string
+  address?: string
+  placeId?: string
 }
 
 interface GeocodeResult {
@@ -14,8 +15,20 @@ interface GeocodeResult {
   timezone: string
 }
 
+interface GeocodeCandidate {
+  placeId: string
+  formattedAddress: string
+  lat: number
+  lng: number
+}
+
+type GeocodeResponse =
+  | { status: 'ok'; result: GeocodeResult }
+  | { status: 'ambiguous'; candidates: GeocodeCandidate[] }
+
 const GEOCODE_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
 const TIMEZONE_API_URL = 'https://maps.googleapis.com/maps/api/timezone/json'
+const MAX_CANDIDATES = 5
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
@@ -35,9 +48,14 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Invalid JSON body' }, 400)
   }
 
+  const placeId = body.placeId?.trim()
+  if (placeId) {
+    return resolvePlaceId(placeId, apiKey)
+  }
+
   const address = body.address?.trim()
   if (!address) {
-    return jsonResponse({ error: 'address is required' }, 400)
+    return jsonResponse({ error: 'address or placeId is required' }, 400)
   }
 
   const geocodeUrl = new URL(GEOCODE_API_URL)
@@ -59,6 +77,67 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Failed to geocode address' }, 502)
   }
 
+  const results = geocodeData.results
+  if (!Array.isArray(results) || results.length === 0) {
+    return jsonResponse({ error: 'Address not found' }, 404)
+  }
+
+  if (results.length > 1) {
+    const candidates: GeocodeCandidate[] = results
+      .slice(0, MAX_CANDIDATES)
+      .filter((candidate) => candidate?.place_id && candidate?.geometry?.location)
+      .map((candidate) => ({
+        placeId: candidate.place_id,
+        formattedAddress: candidate.formatted_address ?? address,
+        lat: candidate.geometry.location.lat,
+        lng: candidate.geometry.location.lng,
+      }))
+    if (candidates.length > 1) {
+      const payload: GeocodeResponse = { status: 'ambiguous', candidates }
+      return jsonResponse(payload)
+    }
+  }
+
+  const result = results[0]
+  const location = result?.geometry?.location
+  if (!result || !location) {
+    return jsonResponse({ error: 'Address not found' }, 404)
+  }
+
+  const timezone = await fetchTimezone(location.lat, location.lng, apiKey)
+  if (!timezone) {
+    return jsonResponse({ error: 'Failed to resolve timezone for this location' }, 502)
+  }
+
+  const payload: GeocodeResponse = {
+    status: 'ok',
+    result: {
+      lat: location.lat,
+      lng: location.lng,
+      formattedAddress: result.formatted_address ?? address,
+      timezone,
+    },
+  }
+  return jsonResponse(payload)
+}
+
+async function resolvePlaceId(placeId: string, apiKey: string): Promise<Response> {
+  const geocodeUrl = new URL(GEOCODE_API_URL)
+  geocodeUrl.searchParams.set('place_id', placeId)
+  geocodeUrl.searchParams.set('key', apiKey)
+
+  const geocodeResponse = await fetch(geocodeUrl)
+  if (!geocodeResponse.ok) {
+    console.error('geocode: Geocoding API HTTP error', geocodeResponse.status, await geocodeResponse.text())
+    return jsonResponse({ error: 'Failed to geocode address' }, 502)
+  }
+
+  const geocodeData = await geocodeResponse.json()
+  if (geocodeData.status !== 'OK') {
+    console.error('geocode: Geocoding API status error', geocodeData.status, geocodeData.error_message)
+    return jsonResponse({ error: 'Failed to geocode address' }, 502)
+  }
+
   const result = geocodeData.results?.[0]
   const location = result?.geometry?.location
   if (!result || !location) {
@@ -70,11 +149,14 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Failed to resolve timezone for this location' }, 502)
   }
 
-  const payload: GeocodeResult = {
-    lat: location.lat,
-    lng: location.lng,
-    formattedAddress: result.formatted_address ?? address,
-    timezone,
+  const payload: GeocodeResponse = {
+    status: 'ok',
+    result: {
+      lat: location.lat,
+      lng: location.lng,
+      formattedAddress: result.formatted_address ?? '',
+      timezone,
+    },
   }
   return jsonResponse(payload)
 }

@@ -1,33 +1,34 @@
-import { useMemo } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { MenuHeader } from '../../components/menu/MenuHeader'
+import { MenuListRow } from '../../components/menu/MenuListRow'
+import { MenuSection } from '../../components/menu/MenuSection'
+import { groupByDate, type DateGroup } from '../../components/menu/groupByDate'
 import { Spinner } from '../../components/ui/Spinner'
 import { useTrip } from '../trips/useTrip'
+import { AddReservationModal } from '../reservations/AddReservationModal'
+import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
-import { formatInZone } from '../../lib/datetime'
+import { formatDateHeader, localDateKey } from '../../lib/datetime'
 import type { Reservation } from '../../types/reservation'
 import { computeAccommodationGaps, type AccommodationGap } from './computeAccommodationGaps'
 
 type TimelineEntry =
-  | { kind: 'stay'; sortKey: string; reservation: Reservation }
+  | { kind: 'group'; sortKey: string; group: DateGroup<Reservation> }
   | { kind: 'gap'; sortKey: string; gap: AccommodationGap }
-
-const statusDotClasses: Record<Reservation['status'], string> = {
-  booked: 'bg-emerald-500',
-  to_book: 'bg-amber-500',
-  decide_later: 'bg-slate-400',
-}
 
 export function StayMenuScreen() {
   const { tripId } = useParams<{ tripId: string }>()
-  const navigate = useNavigate()
   const { trip, loading: tripLoading, error: tripError } = useTrip(tripId ?? '')
   const {
     reservations,
     loading: reservationsLoading,
     error: reservationsError,
+    refetch: refetchReservations,
   } = useReservationsByType(tripId ?? '', 'stay')
+  const { createReservation } = useCreateReservation(tripId ?? '')
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -41,20 +42,13 @@ export function StayMenuScreen() {
 
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-4">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label={strings.common.back}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
-        >
-          ←
-        </button>
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">{strings.stayMenu.title}</h1>
-          {trip && <p className="text-xs text-slate-500">{trip.name}</p>}
-        </div>
-      </header>
+      <MenuHeader
+        title={strings.stayMenu.title}
+        subtitle={trip?.name}
+        count={reservations.length}
+        addLabel={strings.stayMenu.addCta}
+        onAdd={() => setShowAddModal(true)}
+      />
 
       <main className="px-4 py-4">
         {loading && (
@@ -82,72 +76,79 @@ export function StayMenuScreen() {
         )}
 
         {!loading && !error && timeline.length > 0 && (
-          <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="space-y-5">
             {timeline.map((entry) =>
-              entry.kind === 'stay' ? (
-                <StayRow key={entry.reservation.id} reservation={entry.reservation} />
+              entry.kind === 'group' ? (
+                <MenuSection key={entry.sortKey} label={entry.group.label}>
+                  {entry.group.items.map((reservation) => (
+                    <MenuListRow
+                      key={reservation.id}
+                      to={`/reservations/${reservation.id}`}
+                      type={reservation.type}
+                      title={reservation.name}
+                      status={reservation.status}
+                      secondaryLabel={checkoutLabel(reservation)}
+                    />
+                  ))}
+                </MenuSection>
               ) : (
-                <GapRow key={entry.sortKey} gap={entry.gap} />
+                <GapSection key={entry.sortKey} gap={entry.gap} />
               ),
             )}
-          </ul>
+          </div>
         )}
       </main>
+
+      {showAddModal && (
+        <AddReservationModal
+          defaultType="hotel"
+          onClose={() => setShowAddModal(false)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function StayRow({ reservation }: { reservation: Reservation }) {
+function GapSection({ gap }: { gap: AccommodationGap }) {
+  const nights = nightsBetween(gap.start, gap.end)
   return (
-    <li>
-      <Link to={`/reservations/${reservation.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
-          <ReservationTypeIcon type={reservation.type} className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-900">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
-            <span className="truncate">{reservation.name}</span>
-          </p>
-          <p className="text-xs text-slate-500">
-            {formatInZone(reservation.start_at, reservation.start_timezone)}
-            {reservation.end_at && ` → ${formatInZone(reservation.end_at, reservation.end_timezone)}`}
-          </p>
-        </div>
-      </Link>
-    </li>
+    <section>
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
+        {strings.stayMenu.gapLabel} · {gap.start} → {gap.end}
+      </h2>
+      <div className="flex items-center gap-3 rounded-xl border-l-4 border-l-red-400 bg-red-50 px-4 py-3">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+        <p className="text-sm font-medium text-red-700">
+          {nights} {nights === 1 ? 'night' : 'nights'} not booked
+        </p>
+      </div>
+    </section>
   )
 }
 
-function GapRow({ gap }: { gap: AccommodationGap }) {
-  const nights = nightsBetween(gap.start, gap.end)
-  return (
-    <li className="flex items-center gap-3 border-l-4 border-l-red-400 bg-red-50 px-4 py-3">
-      <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-red-700">
-          {strings.stayMenu.gapLabel} — {nights} {nights === 1 ? 'night' : 'nights'}
-        </p>
-        <p className="text-xs text-red-600">
-          {gap.start} → {gap.end}
-        </p>
-      </div>
-    </li>
-  )
+function checkoutLabel(reservation: Reservation): string | null {
+  if (!reservation.end_at) return null
+  // Stay reservations always have start_at (DB constraint: only activities may leave it null).
+  const checkIn = localDateKey(reservation.start_at!, reservation.start_timezone)
+  const checkOut = localDateKey(reservation.end_at, reservation.end_timezone)
+  if (checkIn === checkOut) return null
+  return `→ ${formatDateHeader(reservation.end_at, reservation.end_timezone)}`
 }
 
 function buildTimeline(reservations: Reservation[], gaps: AccommodationGap[]): TimelineEntry[] {
+  const groups = groupByDate(reservations, (reservation) => ({
+    at: reservation.start_at,
+    timezone: reservation.start_timezone,
+  }))
+
   const entries: TimelineEntry[] = [
-    ...reservations.map((reservation): TimelineEntry => ({
-      kind: 'stay',
-      sortKey: reservation.start_at,
-      reservation,
-    })),
-    ...gaps.map((gap): TimelineEntry => ({
-      kind: 'gap',
-      sortKey: `${gap.start}T00:00:00Z`,
-      gap,
-    })),
+    ...groups.map((group): TimelineEntry => ({ kind: 'group', sortKey: group.dateKey, group })),
+    ...gaps.map((gap): TimelineEntry => ({ kind: 'gap', sortKey: gap.start, gap })),
   ]
   return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
 }

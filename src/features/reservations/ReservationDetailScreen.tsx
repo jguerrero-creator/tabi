@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { MiniMap } from '../../components/ui/MiniMap'
@@ -7,9 +8,10 @@ import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { formatInZone } from '../../lib/datetime'
-import { fetchGeocode } from '../../lib/geocode'
+import { AddressSelectionCancelledError, resolveAddress, type GeocodeCandidate } from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
+import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
 
 export function ReservationDetailScreen() {
@@ -90,6 +92,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [geocoding, setGeocoding] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   const [name, setName] = useState(reservation.name)
   const [note, setNote] = useState(reservation.note ?? '')
@@ -137,13 +140,19 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       setGeocoding(true)
       patch = {
         ...patch,
-        ...(await geocodeIfChanged('start', startAddress, reservation.start_address)),
+        ...(await geocodeIfChanged('start', startAddress, reservation.start_address, requestPick)),
         ...(reservation.type === 'transport'
-          ? await geocodeIfChanged('end', endAddress, reservation.end_address)
+          ? await geocodeIfChanged('end', endAddress, reservation.end_address, requestPick)
           : {}),
       }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : strings.reservationDetail.geocodeErrorGeneric)
+      setFormError(
+        err instanceof AddressSelectionCancelledError
+          ? strings.addressPicker.selectionRequiredError
+          : err instanceof Error
+            ? err.message
+            : strings.reservationDetail.geocodeErrorGeneric,
+      )
       setGeocoding(false)
       return
     }
@@ -294,6 +303,9 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           </div>
         )}
       </div>
+      {candidates && (
+        <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+      )}
     </ScreenShell>
   )
 }
@@ -302,6 +314,7 @@ async function geocodeIfChanged(
   leg: 'start' | 'end',
   newAddress: string,
   previousAddress: string | null,
+  requestPick: (candidates: GeocodeCandidate[]) => Promise<GeocodeCandidate | null>,
 ): Promise<Partial<Reservation>> {
   const trimmed = newAddress.trim()
   if (trimmed === (previousAddress ?? '')) return {}
@@ -312,7 +325,8 @@ async function geocodeIfChanged(
       : { end_address: null, end_lat: null, end_lng: null, end_timezone: null }
   }
 
-  const geocoded = await fetchGeocode(trimmed)
+  const geocoded = await resolveAddress(trimmed, requestPick)
+  if (!geocoded) return {}
   return leg === 'start'
     ? {
         start_address: geocoded.formattedAddress,
@@ -407,9 +421,9 @@ function Field({
   children: React.ReactNode
 }) {
   return (
-    <div className={className}>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+    <label className={`block ${className}`}>
+      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
       {children}
-    </div>
+    </label>
   )
 }

@@ -29,7 +29,7 @@ export type Database = {
           price_amount: number | null
           price_currency: string | null
           start_address: string | null
-          start_at: string
+          start_at: string | null
           start_lat: number | null
           start_lng: number | null
           start_place_name: string | null
@@ -53,7 +53,7 @@ export type Database = {
           price_amount?: number | null
           price_currency?: string | null
           start_address?: string | null
-          start_at: string
+          start_at?: string | null
           start_lat?: number | null
           start_lng?: number | null
           start_place_name?: string | null
@@ -77,7 +77,7 @@ export type Database = {
           price_amount?: number | null
           price_currency?: string | null
           start_address?: string | null
-          start_at?: string
+          start_at?: string | null
           start_lat?: number | null
           start_lng?: number | null
           start_place_name?: string | null
