@@ -2,6 +2,7 @@ export const strings = {
   common: {
     back: 'Back',
     comingSoon: 'Coming soon',
+    overlapBadge: '↳ Also booked during this period',
   },
   home: {
     title: 'My Trips',
@@ -19,6 +20,7 @@ export const strings = {
     endLabel: 'End date',
     destinationsLabel: 'Destination(s)',
     destinationsPlaceholder: 'e.g. Tokyo, Kyoto',
+    currencyLabel: 'Currency',
     submit: 'Create Trip',
     cancel: 'Cancel',
     errorDateRange: 'End date must be on or after the start date.',
@@ -164,8 +166,13 @@ export const strings = {
     errorStartRequired: 'Start date and time are required.',
     errorEndRequired: 'End date and time are required.',
     errorEndBeforeStart: 'End must be on or after start.',
-    errorOverlap: (name: string) => `These dates overlap with "${name}". Adjust the dates or edit that reservation first.`,
     errorGeneric: 'Something went wrong. Please try again.',
+    overlapConfirmTitle: 'Overlapping dates',
+    overlapConfirmMessage: (name: string) => `This overlaps with "${name}". Is this intended?`,
+    overlapNoteLabel: 'Note (optional)',
+    overlapNotePlaceholder: 'Why do these overlap?',
+    overlapConfirmCta: 'Yes, save anyway',
+    overlapCancelCta: 'Go back',
   },
   addressPicker: {
     title: 'Select an address',

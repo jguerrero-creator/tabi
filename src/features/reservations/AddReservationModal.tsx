@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
 import { AddressSelectionCancelledError, resolveAddress } from '../../lib/geocode'
@@ -57,6 +58,11 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   const [geocoding, setGeocoding] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [overlapConfirm, setOverlapConfirm] = useState<{
+    reservation: Reservation
+    input: Omit<NewReservation, 'trip_id'>
+  } | null>(null)
+  const [overlapNote, setOverlapNote] = useState('')
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
@@ -111,14 +117,6 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       return
     }
 
-    if (startAt && endAt && option.dbType !== 'activity') {
-      const overlapping = findOverlappingReservation({ start_at: startAt, end_at: endAt }, sameTypeReservations)
-      if (overlapping) {
-        setError(strings.addReservation.errorOverlap(overlapping.name))
-        return
-      }
-    }
-
     const input: Omit<NewReservation, 'trip_id'> = {
       type: option.dbType,
       name: name.trim(),
@@ -138,7 +136,20 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       end_timezone: endAt ? endTimezone : null,
     }
 
+    if (startAt && endAt && option.dbType !== 'activity') {
+      const overlapping = findOverlappingReservation({ start_at: startAt, end_at: endAt }, sameTypeReservations)
+      if (overlapping) {
+        setOverlapConfirm({ reservation: overlapping, input })
+        return
+      }
+    }
+
+    await submitReservation(input)
+  }
+
+  async function submitReservation(input: Omit<NewReservation, 'trip_id'>) {
     setSubmitting(true)
+    setError(null)
     try {
       await onCreate(input)
       onClose()
@@ -147,6 +158,25 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleConfirmOverlap() {
+    if (!overlapConfirm) return
+    const trimmedOverlapNote = overlapNote.trim()
+    const input = trimmedOverlapNote
+      ? {
+          ...overlapConfirm.input,
+          note: overlapConfirm.input.note ? `${overlapConfirm.input.note}\n${trimmedOverlapNote}` : trimmedOverlapNote,
+        }
+      : overlapConfirm.input
+    setOverlapConfirm(null)
+    setOverlapNote('')
+    await submitReservation(input)
+  }
+
+  function handleCancelOverlap() {
+    setOverlapConfirm(null)
+    setOverlapNote('')
   }
 
   return (
@@ -271,6 +301,21 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       </div>
       {candidates && (
         <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+      )}
+      {overlapConfirm && (
+        <ConfirmDialog
+          title={strings.addReservation.overlapConfirmTitle}
+          message={strings.addReservation.overlapConfirmMessage(overlapConfirm.reservation.name)}
+          noteLabel={strings.addReservation.overlapNoteLabel}
+          notePlaceholder={strings.addReservation.overlapNotePlaceholder}
+          note={overlapNote}
+          onNoteChange={setOverlapNote}
+          confirmLabel={strings.addReservation.overlapConfirmCta}
+          cancelLabel={strings.addReservation.overlapCancelCta}
+          onConfirm={handleConfirmOverlap}
+          onCancel={handleCancelOverlap}
+          confirming={submitting}
+        />
       )}
     </div>
   )

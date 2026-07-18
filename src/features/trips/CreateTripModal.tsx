@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
+import { CURRENCIES, getDefaultCurrency } from '../../lib/currencies'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
 
@@ -10,6 +11,7 @@ interface CreateTripModalProps {
     start_date: string | null
     end_date: string | null
     destinations: string[]
+    currency: string
   }) => Promise<Trip>
 }
 
@@ -18,6 +20,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [destinations, setDestinations] = useState('')
+  const [currency, setCurrency] = useState(getDefaultCurrency)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,6 +40,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
         start_date: startDate || null,
         end_date: endDate || null,
         destinations: parseDestinations(destinations),
+        currency,
       })
       onClose()
     } catch {
@@ -77,6 +81,23 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
               placeholder={strings.createTrip.destinationsPlaceholder}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
             />
+          </div>
+          <div>
+            <label htmlFor="trip-currency" className="mb-1 block text-sm font-medium text-slate-700">
+              {strings.createTrip.currencyLabel}
+            </label>
+            <select
+              id="trip-currency"
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            >
+              {CURRENCIES.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.code} — {option.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-3">
             <div className="flex-1">

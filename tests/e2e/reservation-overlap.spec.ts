@@ -1,13 +1,14 @@
 import { expect, test } from '@playwright/test'
 import { authenticatedClientFor } from './support/auth'
 
-// TABI-108 — "Détection de chevauchement de dates entre réservations du même
-// type". Spec: on save, block a new reservation whose dates overlap an
-// existing reservation of the same type (Stay/Stay or Transport/Transport),
-// reusing the trip's date-range semantics (half-open — a checkout exactly at
-// another's check-in is not an overlap).
+// TABI-108/109 — overlap detection reuses the trip's date-range semantics
+// (half-open — a checkout exactly at another's check-in is not an overlap).
+// Per the Decision Log, an overlap is never blocked and never silently
+// ignored: saving asks for explicit confirmation (with an optional note).
 
-test('adding a reservation that overlaps an existing same-type reservation is blocked', async ({ page }) => {
+test('adding a reservation that overlaps an existing same-type reservation asks for confirmation', async ({
+  page,
+}) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -55,13 +56,33 @@ test('adding a reservation that overlaps an existing same-type reservation is bl
     await page.getByLabel('End time').fill('11:00')
     await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
 
-    await expect(page.getByText(`These dates overlap with "${existingName}".`)).toBeVisible()
-    // Blocked — modal stays open, no second row was added to the list.
+    await expect(page.getByRole('heading', { name: 'Overlapping dates' })).toBeVisible()
+    await expect(page.getByText(`This overlaps with "${existingName}". Is this intended?`)).toBeVisible()
+    // Not blocked — cancelling ("Go back") returns to the still-open form, nothing saved yet.
+    await page.getByRole('button', { name: 'Go back' }).click()
+    await expect(page.getByRole('heading', { name: 'Overlapping dates' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
     await expect(page.getByText(`E2E overlap candidate ${runId}`)).toHaveCount(0)
 
-    // Back-to-back is not an overlap: check-in exactly at the existing checkout instant.
-    await page.getByLabel('Start date').fill('2026-09-12')
+    // Re-submit and confirm this time: the optional note is appended to the reservation note.
+    await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Overlapping dates' })).toBeVisible()
+    await page.getByLabel('Note (optional)').fill('Two bookings on purpose, boat trip in between.')
+
+    const [insertOverlapResponse] = await Promise.all([
+      page.waitForResponse((res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Yes, save anyway' }).click(),
+    ])
+    expect(insertOverlapResponse.ok()).toBe(true)
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toHaveCount(0)
+    await expect(page.getByText(`E2E overlap candidate ${runId}`)).toBeVisible()
+
+    // Back-to-back is not an overlap: check-in exactly at the confirmed candidate's checkout
+    // instant (which is itself already back-to-back-adjacent to the original seed's checkout).
+    await page.getByRole('button', { name: 'Add reservation' }).click()
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    await page.getByLabel('Address').fill('1 Chome-1-2 Oshiage, Sumida City, Tokyo, Japan')
+    await page.getByLabel('Start date').fill('2026-09-13')
     await page.getByLabel('Start time').fill('11:00')
     await page.getByLabel('End date').fill('2026-09-14')
     await page.getByLabel('End time').fill('10:00')

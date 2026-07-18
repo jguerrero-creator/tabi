@@ -7,6 +7,7 @@ interface CreateTripInput {
   start_date: string | null
   end_date: string | null
   destinations: string[]
+  currency: string
 }
 
 export function useTrips() {
@@ -46,6 +47,7 @@ export function useTrips() {
       start_date: input.start_date,
       end_date: input.end_date,
       destinations: input.destinations,
+      currency: input.currency,
     }
 
     const { data, error: insertError } = await supabase

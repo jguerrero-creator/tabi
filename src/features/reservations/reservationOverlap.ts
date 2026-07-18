@@ -12,13 +12,13 @@ export function findOverlappingReservation(
   candidate: { start_at: string; end_at: string },
   existing: Reservation[],
 ): Reservation | null {
-  const candidateStart = Date.parse(candidate.start_at)
-  const candidateEnd = Date.parse(candidate.end_at)
-
   return (
-    existing.find((other) => {
-      if (!other.start_at || !other.end_at) return false
-      return candidateStart < Date.parse(other.end_at) && Date.parse(other.start_at) < candidateEnd
-    }) ?? null
+    existing.find((other) => other.start_at && other.end_at && rangesOverlap(candidate, { start_at: other.start_at, end_at: other.end_at }))
+    ?? null
   )
+}
+
+/** Half-open range overlap: touching boundaries (checkout == next check-in) don't count. */
+export function rangesOverlap(a: { start_at: string; end_at: string }, b: { start_at: string; end_at: string }): boolean {
+  return Date.parse(a.start_at) < Date.parse(b.end_at) && Date.parse(b.start_at) < Date.parse(a.end_at)
 }

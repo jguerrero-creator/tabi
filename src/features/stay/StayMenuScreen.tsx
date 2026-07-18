@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { MenuSection } from '../../components/menu/MenuSection'
 import { groupByDate, type DateGroup } from '../../components/menu/groupByDate'
+import { nestOverlappingReservations } from '../../components/menu/nestOverlaps'
 import { Spinner } from '../../components/ui/Spinner'
 import { useTrip } from '../trips/useTrip'
 import { AddReservationModal } from '../reservations/AddReservationModal'
@@ -38,7 +39,11 @@ export function StayMenuScreen() {
     return computeAccommodationGaps(trip, reservations)
   }, [trip, reservations])
 
-  const timeline = useMemo(() => buildTimeline(reservations, gaps), [reservations, gaps])
+  const { nestedIds, childrenByMainId } = useMemo(() => nestOverlappingReservations(reservations), [reservations])
+  const timeline = useMemo(
+    () => buildTimeline(reservations.filter((reservation) => !nestedIds.has(reservation.id)), gaps),
+    [reservations, gaps, nestedIds],
+  )
 
   return (
     <>
@@ -81,14 +86,27 @@ export function StayMenuScreen() {
               entry.kind === 'group' ? (
                 <MenuSection key={entry.sortKey} label={entry.group.label}>
                   {entry.group.items.map((reservation) => (
-                    <MenuListRow
-                      key={reservation.id}
-                      to={`/reservations/${reservation.id}`}
-                      type={reservation.type}
-                      title={reservation.name}
-                      status={reservation.status}
-                      secondaryLabel={checkoutLabel(reservation)}
-                    />
+                    <Fragment key={reservation.id}>
+                      <MenuListRow
+                        to={`/reservations/${reservation.id}`}
+                        type={reservation.type}
+                        title={reservation.name}
+                        status={reservation.status}
+                        secondaryLabel={checkoutLabel(reservation)}
+                      />
+                      {(childrenByMainId.get(reservation.id) ?? []).map((nested) => (
+                        <MenuListRow
+                          key={nested.id}
+                          to={`/reservations/${nested.id}`}
+                          type={nested.type}
+                          title={nested.name}
+                          status={nested.status}
+                          secondaryLabel={checkoutLabel(nested)}
+                          nested
+                          overlapBadge={strings.common.overlapBadge}
+                        />
+                      ))}
+                    </Fragment>
                   ))}
                 </MenuSection>
               ) : (
