@@ -41,7 +41,7 @@ export function StayMenuScreen() {
   const timeline = useMemo(() => buildTimeline(reservations, gaps), [reservations, gaps])
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
+    <>
       <MenuHeader
         title={strings.stayMenu.title}
         subtitle={trip?.name}
@@ -110,7 +110,7 @@ export function StayMenuScreen() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 

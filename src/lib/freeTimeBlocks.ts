@@ -14,6 +14,10 @@ export interface FreeTimeBlock {
    * free time" — callers should surface that rather than hide it.
    */
   durationSeconds: number
+  /** Raw travel time for this leg (0 when no leg/geocoding was needed). */
+  travelSeconds: number
+  /** True when travelSeconds meets or exceeds the too-long-travel threshold (TABI-6). */
+  tooLongTravel: boolean
 }
 
 interface LegDuration {
@@ -26,13 +30,26 @@ interface LegDuration {
 export const MIN_FREE_SECONDS_TO_SHOW = 5 * 60
 
 /**
+ * A single leg's travel time at or above this is flagged as "too long" (TABI-6),
+ * regardless of country/transport mode — this is a plain parameter, not a value
+ * tuned for any one region's transport network, so callers can override it
+ * (e.g. from a future per-trip or per-user setting) without touching the
+ * calculation itself.
+ */
+export const DEFAULT_MAX_TRAVEL_SECONDS = 4 * 60 * 60
+
+/**
  * Free time between two consecutive reservations = the gap between them minus
  * the travel time needed to get from one to the other — the core "actual free
  * time, not generic guide time" calculation. All arithmetic is done on UTC
  * instants (`start_at`/`end_at` epoch millis), never on displayed local
  * wall-clock strings, so it stays correct across timezone changes and DST.
  */
-export function computeFreeTimeBlocks(reservations: Reservation[], legs: LegDuration[]): FreeTimeBlock[] {
+export function computeFreeTimeBlocks(
+  reservations: Reservation[],
+  legs: LegDuration[],
+  maxTravelSeconds: number = DEFAULT_MAX_TRAVEL_SECONDS,
+): FreeTimeBlock[] {
   const legByPair = new Map(legs.map((leg) => [legKey(leg.fromReservationId, leg.toReservationId), leg]))
 
   const scheduled = reservations.filter(
@@ -63,6 +80,8 @@ export function computeFreeTimeBlocks(reservations: Reservation[], legs: LegDura
       start: fromEnd,
       end: new Date(Date.parse(to.start_at) - travelSeconds * 1000).toISOString(),
       durationSeconds: gapMs / 1000 - travelSeconds,
+      travelSeconds,
+      tooLongTravel: travelSeconds >= maxTravelSeconds,
     })
   }
 

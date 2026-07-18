@@ -55,7 +55,11 @@ export function TripTimeline({ reservations, legs, legsLoading, legsError }: Tri
   return (
     <div className="space-y-5">
       {groups.map((group) => (
-        <MenuSection key={group.dateKey} label={group.label}>
+        <MenuSection
+          key={group.dateKey}
+          label={group.label}
+          warning={dayHasTooLongTravel(group.items, freeTimeByPair) ? strings.planning.longTravelDay : undefined}
+        >
           {group.items.flatMap((reservation, index) => {
             const rows = [
               <MenuListRow
@@ -70,7 +74,14 @@ export function TripTimeline({ reservations, legs, legsLoading, legsError }: Tri
             const next = group.items[index + 1]
             const block = next ? freeTimeByPair.get(legKey(reservation.id, next.id)) : undefined
             if (block) {
-              rows.push(<FreeTimeRow key={`${reservation.id}-free`} durationSeconds={block.durationSeconds} />)
+              rows.push(
+                <FreeTimeRow
+                  key={`${reservation.id}-free`}
+                  durationSeconds={block.durationSeconds}
+                  travelSeconds={block.travelSeconds}
+                  tooLongTravel={block.tooLongTravel}
+                />,
+              )
             }
             return rows
           })}
@@ -78,6 +89,14 @@ export function TripTimeline({ reservations, legs, legsLoading, legsError }: Tri
       ))}
     </div>
   )
+}
+
+/** A day is flagged as a long-travel day (TABI-6) if any leg within it meets the too-long threshold. */
+function dayHasTooLongTravel(items: Reservation[], freeTimeByPair: Map<string, FreeTimeBlock>): boolean {
+  return items.some((item, index) => {
+    const next = items[index + 1]
+    return next ? (freeTimeByPair.get(legKey(item.id, next.id))?.tooLongTravel ?? false) : false
+  })
 }
 
 function rowLabel(reservation: Reservation): string | null {

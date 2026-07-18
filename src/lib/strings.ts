@@ -1,6 +1,7 @@
 export const strings = {
   common: {
     back: 'Back',
+    comingSoon: 'Coming soon',
   },
   home: {
     title: 'My Trips',
@@ -75,8 +76,6 @@ export const strings = {
     expandMap: 'Expand map',
     needsAttentionTitle: 'Needs attention',
     needsAttentionEmpty: 'Nothing needs attention right now.',
-    menusTitle: 'Menus',
-    comingSoon: 'Coming soon',
   },
   planning: {
     unscheduledLabel: 'Unscheduled',
@@ -84,8 +83,11 @@ export const strings = {
     emptyBody: 'Add reservations to see your day-by-day timeline.',
     freeTime: (duration: string) => `${duration} free`,
     tightConnection: (shortfall: string) => `${shortfall} short on travel time`,
+    longTravel: (duration: string) => `${duration} travel — long leg`,
+    longTravelDay: 'Long travel day',
   },
   menus: {
+    overview: 'Overview',
     stay: 'Stay',
     transport: 'Transport',
     activities: 'Activities',
@@ -104,6 +106,7 @@ export const strings = {
     errorLoading: 'Could not compute travel times for this trip.',
     freeTime: (duration: string) => `${duration} free before next stop`,
     tightConnection: (shortfall: string) => `Cutting it close — ${shortfall} short on travel time`,
+    longTravel: (duration: string) => `${duration} travel — long leg`,
   },
   stayMenu: {
     title: 'Stay',

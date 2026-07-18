@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"💡 Pense à vérifier/mettre à jour le statut de la tâche Notion Backlog correspondante (TABI-xx) si tu as avancé sur du travail suivi dans le backlog.\"}'"
+          }
+        ]
+      }
+    ]
+  }
+}

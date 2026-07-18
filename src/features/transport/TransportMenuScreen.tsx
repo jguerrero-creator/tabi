@@ -38,7 +38,7 @@ export function TransportMenuScreen() {
   )
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
+    <>
       <MenuHeader
         title={strings.transportMenu.title}
         subtitle={trip?.name}
@@ -97,7 +97,7 @@ export function TransportMenuScreen() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 

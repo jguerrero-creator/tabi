@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatInZone } from '../../lib/datetime'
@@ -38,7 +38,7 @@ export function OverviewScreen() {
   const needsAttention = useMemo(() => buildNeedsAttention(reservations), [reservations])
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
+    <>
       <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-4">
         <button
           type="button"
@@ -129,18 +129,6 @@ export function OverviewScreen() {
                     </ul>
                   )}
                 </section>
-
-                <section>
-                  <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {strings.overview.menusTitle}
-                  </h2>
-                  <div className="grid grid-cols-2 gap-2">
-                    <MenuLink to={`/trips/${tripId}/stay`} label={strings.menus.stay} />
-                    <MenuLink to={`/trips/${tripId}/transport`} label={strings.menus.transport} />
-                    <MenuLink to={`/trips/${tripId}/activities`} label={strings.menus.activities} />
-                    <MenuLink label={strings.menus.budget} />
-                  </div>
-                </section>
               </>
             )}
 
@@ -150,28 +138,7 @@ export function OverviewScreen() {
           </div>
         )}
       </main>
-    </div>
-  )
-}
-
-function MenuLink({ to, label }: { to?: string; label: string }) {
-  if (!to) {
-    return (
-      <span
-        title={strings.overview.comingSoon}
-        className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-center text-sm font-medium text-slate-400"
-      >
-        {label}
-      </span>
-    )
-  }
-  return (
-    <Link
-      to={to}
-      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
-    >
-      {label}
-    </Link>
+    </>
   )
 }
 

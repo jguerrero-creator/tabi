@@ -39,7 +39,7 @@ export function ActivitiesMenuScreen() {
   )
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
+    <>
       <MenuHeader
         title={strings.activitiesMenu.title}
         subtitle={trip?.name}
@@ -98,7 +98,7 @@ export function ActivitiesMenuScreen() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 

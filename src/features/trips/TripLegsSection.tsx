@@ -70,6 +70,11 @@ export function TripLegsSection({ reservations, legs, loading, error, onModeChan
                       {strings.tripLegs.freeTime(formatDuration(freeBlock.durationSeconds))}
                     </p>
                   )}
+                  {freeBlock?.tooLongTravel && (
+                    <p className="text-xs font-medium text-amber-700">
+                      {strings.tripLegs.longTravel(formatDuration(freeBlock.travelSeconds))}
+                    </p>
+                  )}
                 </div>
                 <TravelModePicker value={leg.mode} onChange={(mode) => onModeChange(key, mode)} />
               </li>
