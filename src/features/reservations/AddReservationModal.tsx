@@ -6,7 +6,9 @@ import { localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
 import { AddressSelectionCancelledError, resolveAddress } from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { NewReservation, Reservation, ReservationStatus, ReservationType } from '../../types/reservation'
+import { findOverlappingReservation } from './reservationOverlap'
 import { useAddressPicker } from './useAddressPicker'
+import { useReservationsByType } from './useReservationsByType'
 
 type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'activity'
 
@@ -33,12 +35,13 @@ const typeOptions: TypeOption[] = [
 ]
 
 interface AddReservationModalProps {
+  tripId: string
   defaultType?: UiReservationType
   onClose: () => void
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
 
-export function AddReservationModal({ defaultType = 'hotel', onClose, onCreate }: AddReservationModalProps) {
+export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, onCreate }: AddReservationModalProps) {
   const [uiType, setUiType] = useState<UiReservationType>(defaultType)
   const [name, setName] = useState('')
   const [status, setStatus] = useState<ReservationStatus>('to_book')
@@ -57,6 +60,9 @@ export function AddReservationModal({ defaultType = 'hotel', onClose, onCreate }
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
+  // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
+  // whichever type is currently selected so switching type mid-form checks against the right set.
+  const { reservations: sameTypeReservations } = useReservationsByType(tripId, option.dbType)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -103,6 +109,14 @@ export function AddReservationModal({ defaultType = 'hotel', onClose, onCreate }
     if (startAt && endAt && endAt < startAt) {
       setError(strings.addReservation.errorEndBeforeStart)
       return
+    }
+
+    if (startAt && endAt && option.dbType !== 'activity') {
+      const overlapping = findOverlappingReservation({ start_at: startAt, end_at: endAt }, sameTypeReservations)
+      if (overlapping) {
+        setError(strings.addReservation.errorOverlap(overlapping.name))
+        return
+      }
     }
 
     const input: Omit<NewReservation, 'trip_id'> = {

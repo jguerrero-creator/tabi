@@ -89,6 +89,7 @@ export function ActivitiesMenuScreen() {
 
       {showAddModal && (
         <AddReservationModal
+          tripId={tripId ?? ''}
           defaultType="activity"
           onClose={() => setShowAddModal(false)}
           onCreate={async (input) => {

@@ -164,6 +164,7 @@ export const strings = {
     errorStartRequired: 'Start date and time are required.',
     errorEndRequired: 'End date and time are required.',
     errorEndBeforeStart: 'End must be on or after start.',
+    errorOverlap: (name: string) => `These dates overlap with "${name}". Adjust the dates or edit that reservation first.`,
     errorGeneric: 'Something went wrong. Please try again.',
   },
   addressPicker: {
