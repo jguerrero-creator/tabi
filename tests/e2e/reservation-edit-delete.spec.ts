@@ -4,7 +4,8 @@ import { authenticatedClientFor } from './support/auth'
 // TABI-27 — "Édition / suppression d'une réservation". Verifies both halves
 // on the shared detail screen: editing a field persists to the DB and is
 // reflected in the UI, and deleting (after confirming the dialog) removes
-// the row and navigates away.
+// the row and navigates away. Per TABI-85's correction, the form is always
+// editable — there is no separate "Edit" button to unlock it first.
 
 test('a reservation can be edited and deleted from the detail screen', async ({ page }) => {
   await page.goto('/')
@@ -47,9 +48,9 @@ test('a reservation can be edited and deleted from the detail screen', async ({ 
     await page.goto(`/reservations/${reservation.id}`)
     await expect(page.getByRole('heading', { name: `E2E activity ${runId}` })).toBeVisible()
 
-    // Edit: change the name and a note, save, and confirm it persisted (both
-    // in the UI and via a direct re-fetch from the DB).
-    await page.getByRole('button', { name: 'Edit' }).click()
+    // Edit: the form is always editable — no "Edit" button to unlock it first.
+    // Change the name and a note, save, and confirm it persisted (both in the
+    // UI and via a direct re-fetch from the DB).
     const updatedName = `E2E activity EDITED ${runId}`
     await page.getByLabel('Name').fill(updatedName)
     await page.getByLabel('Notes').fill('Edited via e2e test')

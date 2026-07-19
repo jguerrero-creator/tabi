@@ -100,7 +100,6 @@ interface ReservationDetailBodyProps {
 }
 
 function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: ReservationDetailBodyProps) {
-  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -210,7 +209,6 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setSaving(true)
     try {
       await onUpdate(patch)
-      setEditing(false)
     } catch {
       setFormError(strings.reservationDetail.errorGeneric)
     } finally {
@@ -246,9 +244,6 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               </div>
             </div>
             <div className="flex shrink-0 gap-2">
-              <Button variant="secondary" onClick={() => setEditing((v) => !v)} disabled={deleting}>
-                {editing ? strings.reservationDetail.cancel : strings.reservationDetail.edit}
-              </Button>
               <Button variant="secondary" onClick={handleDelete} disabled={deleting}>
                 {strings.reservationDetail.delete}
               </Button>
@@ -266,92 +261,68 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
           <TypeSpecificZone reservation={reservation} />
 
-          {editing ? (
-            <form onSubmit={handleSave} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-              <Field label={strings.reservationDetail.nameLabel}>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-              <div className="flex gap-3">
-                <Field label={strings.reservationDetail.priceLabel} className="flex-1">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={priceAmount}
-                    onChange={(e) => setPriceAmount(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                  />
-                </Field>
-                <Field label="Currency" className="w-24">
-                  <input
-                    value={priceCurrency}
-                    onChange={(e) => setPriceCurrency(e.target.value.toUpperCase())}
-                    maxLength={3}
-                    placeholder="USD"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
-                  />
-                </Field>
-              </div>
-              <Field label={strings.reservationDetail.notesLabel}>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder={strings.reservationDetail.notesPlaceholder}
-                  rows={3}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-              <PlaceAutocompleteField
-                id="reservation-start-address"
-                label={strings.reservationDetail.startAddressLabel}
-                value={startAddress}
-                onTextChange={handleStartAddressChange}
-                onPlaceSelect={handleStartPlaceSelect}
+          <form onSubmit={handleSave} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+            <Field label={strings.reservationDetail.nameLabel}>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
               />
-              {reservation.type === 'transport' && (
-                <PlaceAutocompleteField
-                  id="reservation-end-address"
-                  label={strings.reservationDetail.endAddressLabel}
-                  value={endAddress}
-                  onTextChange={handleEndAddressChange}
-                  onPlaceSelect={handleEndPlaceSelect}
+            </Field>
+            <div className="flex gap-3">
+              <Field label={strings.reservationDetail.priceLabel} className="flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={priceAmount}
+                  onChange={(e) => setPriceAmount(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
-              )}
-              {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <Button type="submit" disabled={saving || geocoding || !name.trim()}>
-                  {strings.reservationDetail.save}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {strings.reservationDetail.priceLabel}
-                </p>
-                <p className="text-sm text-slate-900">
-                  {reservation.price_amount !== null
-                    ? `${reservation.price_amount} ${reservation.price_currency ?? ''}`.trim()
-                    : strings.reservationDetail.noPrice}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {strings.reservationDetail.notesLabel}
-                </p>
-                <p className="whitespace-pre-wrap text-sm text-slate-900">
-                  {reservation.note || strings.reservationDetail.notesPlaceholder}
-                </p>
-              </div>
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              </Field>
+              <Field label="Currency" className="w-24">
+                <input
+                  value={priceCurrency}
+                  onChange={(e) => setPriceCurrency(e.target.value.toUpperCase())}
+                  maxLength={3}
+                  placeholder="USD"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
             </div>
-          )}
+            <Field label={strings.reservationDetail.notesLabel}>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={strings.reservationDetail.notesPlaceholder}
+                rows={3}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
+            <PlaceAutocompleteField
+              id="reservation-start-address"
+              label={strings.reservationDetail.startAddressLabel}
+              value={startAddress}
+              onTextChange={handleStartAddressChange}
+              onPlaceSelect={handleStartPlaceSelect}
+            />
+            {reservation.type === 'transport' && (
+              <PlaceAutocompleteField
+                id="reservation-end-address"
+                label={strings.reservationDetail.endAddressLabel}
+                value={endAddress}
+                onTextChange={handleEndAddressChange}
+                onPlaceSelect={handleEndPlaceSelect}
+              />
+            )}
+            {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="submit" disabled={saving || geocoding || !name.trim()}>
+                {strings.reservationDetail.save}
+              </Button>
+            </div>
+          </form>
         </div>
         {candidates && (
           <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />

@@ -67,7 +67,6 @@ test('reservation type determines the icon and the fields shown on the detail sc
     await expect(page.getByText('Stay', { exact: true })).toBeVisible()
     await expect(page.getByText('Check-in')).toBeVisible()
     await expect(page.getByText('Check-out')).toBeVisible()
-    await page.getByRole('button', { name: 'Edit' }).click()
     await expect(page.getByText('End address')).toHaveCount(0)
     const stayIcon = await page.locator('svg[aria-hidden="true"]').first().innerHTML()
 
@@ -77,7 +76,6 @@ test('reservation type determines the icon and the fields shown on the detail sc
     await expect(page.getByText('Transport', { exact: true })).toBeVisible()
     await expect(page.getByText('Departure')).toBeVisible()
     await expect(page.getByText('Arrival')).toBeVisible()
-    await page.getByRole('button', { name: 'Edit' }).click()
     await expect(page.getByText('End address')).toBeVisible()
     const transportIcon = await page.locator('svg[aria-hidden="true"]').first().innerHTML()
 
@@ -87,7 +85,6 @@ test('reservation type determines the icon and the fields shown on the detail sc
     await expect(page.getByText('Activity', { exact: true })).toBeVisible()
     await expect(page.getByText('Start', { exact: true })).toBeVisible()
     await expect(page.getByText('End', { exact: true })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Edit' }).click()
     await expect(page.getByText('End address')).toHaveCount(0)
     const activityIcon = await page.locator('svg[aria-hidden="true"]').first().innerHTML()
 
