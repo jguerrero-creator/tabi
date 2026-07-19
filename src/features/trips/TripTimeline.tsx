@@ -41,10 +41,18 @@ interface TripTimelineProps {
 }
 
 type RailEntry =
-  | { kind: 'reservation'; key: string; time: string | null; reservation: Reservation }
-  | { kind: 'travel'; key: string; time: string; durationSeconds: number; tooLongTravel: boolean; mode: TravelMode }
-  | { kind: 'free'; key: string; time: string; durationSeconds: number }
-  | { kind: 'tight'; key: string; time: string; durationSeconds: number }
+  | { kind: 'reservation'; key: string; time: string | null; timezone: string | null; reservation: Reservation }
+  | {
+      kind: 'travel'
+      key: string
+      time: string
+      timezone: string | null
+      durationSeconds: number
+      tooLongTravel: boolean
+      mode: TravelMode
+    }
+  | { kind: 'free'; key: string; time: string; timezone: string | null; durationSeconds: number }
+  | { kind: 'tight'; key: string; time: string; timezone: string | null; durationSeconds: number }
 
 /**
  * Orders a trip's reservations chronologically and groups them by local day
@@ -120,7 +128,15 @@ export function TripTimeline({
 
   const railEntries =
     selectedItems.length === 0 && fullDayEdge
-      ? [{ kind: 'free' as const, key: 'day-full', time: fullDayEdge.start, durationSeconds: fullDayEdge.durationSeconds }]
+      ? [
+          {
+            kind: 'free' as const,
+            key: 'day-full',
+            time: fullDayEdge.start,
+            timezone: dayTimezone,
+            durationSeconds: fullDayEdge.durationSeconds,
+          },
+        ]
       : buildRailEntries(selectedItems, freeTimeByFromId, { leading: leadingEdge, trailing: trailingEdge })
 
   return (
@@ -149,7 +165,7 @@ export function TripTimeline({
           {railEntries.map((entry) => (
             <li key={entry.key} className="relative">
               <span className="absolute -left-[4.75rem] top-2 w-14 text-right text-xs font-medium text-slate-500">
-                {entry.time ? formatTimeInZone(entry.time, dayTimezone) : ''}
+                {entry.time ? formatTimeInZone(entry.time, entry.timezone ?? dayTimezone) : ''}
               </span>
               <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
               {renderEntry(entry)}
@@ -224,21 +240,43 @@ function buildRailEntries(
       kind: 'free',
       key: 'day-leading',
       time: dayEdges.leading.start,
+      timezone: items[0]?.start_timezone ?? null,
       durationSeconds: dayEdges.leading.durationSeconds,
     })
   }
 
   items.forEach((reservation, index) => {
-    entries.push({ kind: 'reservation', key: reservation.id, time: reservation.start_at, reservation })
+    // Origin-side timezone: where this reservation actually is when it ends
+    // (or, if it never got an end leg, wherever it started) — the timezone a
+    // departure right after it would be measured in.
+    const originTimezone = reservation.end_timezone ?? reservation.start_timezone
+
+    entries.push({
+      kind: 'reservation',
+      key: reservation.id,
+      time: reservation.start_at,
+      timezone: reservation.start_timezone,
+      reservation,
+    })
 
     const isLastOfDay = index === items.length - 1
+    // Destination-side timezone: the next chronological reservation's own
+    // location — `items` arrives pre-sorted by start_at (server-side query),
+    // so items[index + 1] is reliably "where this leg arrives."
+    const destinationTimezone = items[index + 1]?.start_timezone ?? originTimezone
     // A day's last reservation has no pairwise block at all when it's also
     // the trip's very last scheduled reservation — the trailing edge must
     // still show in that case, so it's handled outside the `block` guard.
     const block = freeTimeByFromId.get(reservation.id)
 
     if (block && block.durationSeconds < 0) {
-      entries.push({ kind: 'tight', key: `${reservation.id}-tight`, time: block.start, durationSeconds: block.durationSeconds })
+      entries.push({
+        kind: 'tight',
+        key: `${reservation.id}-tight`,
+        time: block.start,
+        timezone: originTimezone,
+        durationSeconds: block.durationSeconds,
+      })
       return
     }
 
@@ -249,6 +287,7 @@ function buildRailEntries(
           kind: 'travel',
           key: `${reservation.id}-travel`,
           time: block.start,
+          timezone: originTimezone,
           durationSeconds: block.travelSeconds,
           tooLongTravel: block.tooLongTravel,
           mode: block.mode,
@@ -262,6 +301,7 @@ function buildRailEntries(
           kind: 'free',
           key: `${reservation.id}-free`,
           time: dayEdges.trailing.start,
+          timezone: originTimezone,
           durationSeconds: dayEdges.trailing.durationSeconds,
         })
       }
@@ -270,7 +310,13 @@ function buildRailEntries(
 
     if (block && block.durationSeconds >= MIN_FREE_SECONDS_TO_SHOW) {
       const freeStart = new Date(Date.parse(block.start) + block.travelSeconds * 1000).toISOString()
-      entries.push({ kind: 'free', key: `${reservation.id}-free`, time: freeStart, durationSeconds: block.durationSeconds })
+      entries.push({
+        kind: 'free',
+        key: `${reservation.id}-free`,
+        time: freeStart,
+        timezone: destinationTimezone,
+        durationSeconds: block.durationSeconds,
+      })
     }
   })
 
