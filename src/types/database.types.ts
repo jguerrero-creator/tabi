@@ -101,6 +101,8 @@ export type Database = {
         Row: {
           created_at: string
           currency: string
+          day_end_time: string
+          day_start_time: string
           destinations: string[]
           end_date: string | null
           id: string
@@ -112,6 +114,8 @@ export type Database = {
         Insert: {
           created_at?: string
           currency: string
+          day_end_time?: string
+          day_start_time?: string
           destinations?: string[]
           end_date?: string | null
           id?: string
@@ -123,6 +127,8 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string
+          day_end_time?: string
+          day_start_time?: string
           destinations?: string[]
           end_date?: string | null
           id?: string

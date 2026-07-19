@@ -5,7 +5,13 @@ import { statusDotClasses } from '../../components/menu/statusDotClasses'
 import { groupByDate, UNSCHEDULED_KEY, type DateGroup } from '../../components/menu/groupByDate'
 import { formatDayPillLabel, formatLocalTimeZoneLabel, formatTimeInZone, localTimeZone } from '../../lib/datetime'
 import { formatDuration } from '../../lib/duration'
-import { computeFreeTimeBlocks, MIN_FREE_SECONDS_TO_SHOW, type FreeTimeBlock } from '../../lib/freeTimeBlocks'
+import {
+  computeDayEdgeFreeBlocks,
+  computeFreeTimeBlocks,
+  MIN_FREE_SECONDS_TO_SHOW,
+  type DayEdgeFreeBlock,
+  type FreeTimeBlock,
+} from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
 import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
@@ -89,7 +95,33 @@ export function TripTimeline({
 
   const dayTimezone = selectedItems[0]?.start_timezone ?? localTimeZone()
   const anchorInstant = selectedItems[0]?.start_at
-  const railEntries = buildRailEntries(selectedItems, freeTimeByFromId)
+
+  // The "Unscheduled" pill has no calendar date to bound a day range with,
+  // so day-edge free blocks (TABI-4) only apply to real date tabs.
+  const dayEdges =
+    trip && effectiveSelectedKey !== UNSCHEDULED_KEY
+      ? computeDayEdgeFreeBlocks(
+          [
+            {
+              dateKey: effectiveSelectedKey,
+              timezone: dayTimezone,
+              items: selectedItems.filter(
+                (item): item is Reservation & { start_at: string } => item.start_at !== null,
+              ),
+            },
+          ],
+          trip.day_start_time,
+          trip.day_end_time,
+        )
+      : []
+  const leadingEdge = dayEdges.find((block) => block.position === 'leading')
+  const trailingEdge = dayEdges.find((block) => block.position === 'trailing')
+  const fullDayEdge = dayEdges.find((block) => block.position === 'full-day')
+
+  const railEntries =
+    selectedItems.length === 0 && fullDayEdge
+      ? [{ kind: 'free' as const, key: 'day-full', time: fullDayEdge.start, durationSeconds: fullDayEdge.durationSeconds }]
+      : buildRailEntries(selectedItems, freeTimeByFromId, { leading: leadingEdge, trailing: trailingEdge })
 
   return (
     <div className="space-y-4">
@@ -170,36 +202,78 @@ function dateParts(dateStr: string): [number, number, number] {
   return [year, month - 1, day]
 }
 
-function buildRailEntries(items: Reservation[], freeTimeByFromId: Map<string, FreeTimeBlock>): RailEntry[] {
+/**
+ * Threads reservations, travel legs, and free time into a single ordered
+ * rail. Free time between two same-day reservations still comes from the
+ * whole-trip pairwise `FreeTimeBlock`s (unaffected by day bounds — both ends
+ * are known). The day's own edges (before the first reservation, after the
+ * last) come from `dayEdges` instead (TABI-4): the pairwise block trailing
+ * the day's last reservation may run into a reservation days away, which
+ * would overstate "free time" past the day's own end, so it's replaced by
+ * the day-bounded trailing edge rather than shown alongside it.
+ */
+function buildRailEntries(
+  items: Reservation[],
+  freeTimeByFromId: Map<string, FreeTimeBlock>,
+  dayEdges: { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock },
+): RailEntry[] {
   const entries: RailEntry[] = []
-  for (const reservation of items) {
+
+  if (dayEdges.leading) {
+    entries.push({
+      kind: 'free',
+      key: 'day-leading',
+      time: dayEdges.leading.start,
+      durationSeconds: dayEdges.leading.durationSeconds,
+    })
+  }
+
+  items.forEach((reservation, index) => {
     entries.push({ kind: 'reservation', key: reservation.id, time: reservation.start_at, reservation })
 
+    const isLastOfDay = index === items.length - 1
+    // A day's last reservation has no pairwise block at all when it's also
+    // the trip's very last scheduled reservation — the trailing edge must
+    // still show in that case, so it's handled outside the `block` guard.
     const block = freeTimeByFromId.get(reservation.id)
-    if (!block) continue
 
-    if (block.durationSeconds < 0) {
+    if (block && block.durationSeconds < 0) {
       entries.push({ kind: 'tight', key: `${reservation.id}-tight`, time: block.start, durationSeconds: block.durationSeconds })
-      continue
+      return
     }
 
-    const showTravel = block.tooLongTravel || block.travelSeconds >= MIN_FREE_SECONDS_TO_SHOW
-    const showFree = block.durationSeconds >= MIN_FREE_SECONDS_TO_SHOW
-    if (showTravel) {
-      entries.push({
-        kind: 'travel',
-        key: `${reservation.id}-travel`,
-        time: block.start,
-        durationSeconds: block.travelSeconds,
-        tooLongTravel: block.tooLongTravel,
-        mode: block.mode,
-      })
+    if (block) {
+      const showTravel = block.tooLongTravel || block.travelSeconds >= MIN_FREE_SECONDS_TO_SHOW
+      if (showTravel) {
+        entries.push({
+          kind: 'travel',
+          key: `${reservation.id}-travel`,
+          time: block.start,
+          durationSeconds: block.travelSeconds,
+          tooLongTravel: block.tooLongTravel,
+          mode: block.mode,
+        })
+      }
     }
-    if (showFree) {
+
+    if (isLastOfDay) {
+      if (dayEdges.trailing) {
+        entries.push({
+          kind: 'free',
+          key: `${reservation.id}-free`,
+          time: dayEdges.trailing.start,
+          durationSeconds: dayEdges.trailing.durationSeconds,
+        })
+      }
+      return
+    }
+
+    if (block && block.durationSeconds >= MIN_FREE_SECONDS_TO_SHOW) {
       const freeStart = new Date(Date.parse(block.start) + block.travelSeconds * 1000).toISOString()
       entries.push({ kind: 'free', key: `${reservation.id}-free`, time: freeStart, durationSeconds: block.durationSeconds })
     }
-  }
+  })
+
   return entries
 }
 

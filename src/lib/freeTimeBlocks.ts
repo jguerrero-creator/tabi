@@ -1,4 +1,5 @@
 import type { Reservation } from '../types/reservation'
+import { zonedTimeToUtc } from './datetime'
 import { legKey } from './tripLegs'
 import type { TravelMode } from './travelTime'
 
@@ -91,4 +92,64 @@ export function computeFreeTimeBlocks(
   }
 
   return blocks
+}
+
+export interface DayEdgeFreeBlock {
+  /** Local calendar date this block belongs to (the `groupByDate` dateKey). */
+  dateKey: string
+  position: 'leading' | 'trailing' | 'full-day'
+  /** UTC ISO string. */
+  start: string
+  /** UTC ISO string. */
+  end: string
+  durationSeconds: number
+}
+
+/**
+ * TABI-4: a day's free time isn't just the gaps *between* reservations — it
+ * defaults to the trip's whole day range (`dayStartTime`→`dayEndTime`, e.g.
+ * 08:00→22:00) and subdivides from there. This fills in the two edges
+ * `computeFreeTimeBlocks` can't: before a day's first reservation, after its
+ * last, and the entire range when a day has nothing booked at all. It
+ * deliberately doesn't subtract travel time at these edges — unlike a gap
+ * between two known reservations, there's no next destination yet to travel
+ * to, so the whole edge is free.
+ */
+export function computeDayEdgeFreeBlocks(
+  days: { dateKey: string; timezone: string; items: (Reservation & { start_at: string })[] }[],
+  dayStartTime: string,
+  dayEndTime: string,
+): DayEdgeFreeBlock[] {
+  const blocks: DayEdgeFreeBlock[] = []
+
+  for (const day of days) {
+    const dayStart = zonedTimeToUtc(day.dateKey, dayStartTime, day.timezone)
+    const dayEnd = zonedTimeToUtc(day.dateKey, dayEndTime, day.timezone)
+
+    if (day.items.length === 0) {
+      pushDayEdgeBlock(blocks, day.dateKey, 'full-day', dayStart, dayEnd)
+      continue
+    }
+
+    const sorted = [...day.items].sort((a, b) => a.start_at.localeCompare(b.start_at))
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+
+    pushDayEdgeBlock(blocks, day.dateKey, 'leading', dayStart, first.start_at)
+    pushDayEdgeBlock(blocks, day.dateKey, 'trailing', last.end_at ?? last.start_at, dayEnd)
+  }
+
+  return blocks
+}
+
+function pushDayEdgeBlock(
+  blocks: DayEdgeFreeBlock[],
+  dateKey: string,
+  position: DayEdgeFreeBlock['position'],
+  start: string,
+  end: string,
+) {
+  const durationSeconds = (Date.parse(end) - Date.parse(start)) / 1000
+  if (durationSeconds < MIN_FREE_SECONDS_TO_SHOW) return
+  blocks.push({ dateKey, position, start, end, durationSeconds })
 }

@@ -11,7 +11,7 @@ import { AddReservationModal } from '../reservations/AddReservationModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
-import { formatDateHeader, localDateKey } from '../../lib/datetime'
+import { localDateKey } from '../../lib/datetime'
 import type { Reservation } from '../../types/reservation'
 import { computeAccommodationGaps, type AccommodationGap } from './computeAccommodationGaps'
 
@@ -143,7 +143,7 @@ function GapSection({ gap }: { gap: AccommodationGap }) {
       <div className="flex items-center gap-3 rounded-xl border-l-4 border-l-red-400 bg-red-50 px-4 py-3">
         <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
         <p className="text-sm font-medium text-red-700">
-          {nights} {nights === 1 ? 'night' : 'nights'} not booked
+          {strings.stayMenu.nightsCount(nights)} not booked
         </p>
       </div>
     </section>
@@ -156,7 +156,9 @@ function checkoutLabel(reservation: Reservation): string | null {
   const checkIn = localDateKey(reservation.start_at!, reservation.start_timezone)
   const checkOut = localDateKey(reservation.end_at, reservation.end_timezone)
   if (checkIn === checkOut) return null
-  return `→ ${formatDateHeader(reservation.end_at, reservation.end_timezone)}`
+  // Derived from stored start_at/end_at, never from how the reservation was entered
+  // (manual checkout date vs. the nights field, TABI-112) — one calculation either way.
+  return strings.stayMenu.nightsCount(nightsBetween(checkIn, checkOut))
 }
 
 function buildTimeline(reservations: Reservation[], gaps: AccommodationGap[]): TimelineEntry[] {

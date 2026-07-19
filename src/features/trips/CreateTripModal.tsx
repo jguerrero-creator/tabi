@@ -4,6 +4,9 @@ import { CURRENCIES, getDefaultCurrency } from '../../lib/currencies'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
 
+const DEFAULT_DAY_START_TIME = '08:00'
+const DEFAULT_DAY_END_TIME = '22:00'
+
 interface CreateTripModalProps {
   onClose: () => void
   onCreate: (input: {
@@ -12,6 +15,8 @@ interface CreateTripModalProps {
     end_date: string | null
     destinations: string[]
     currency: string
+    day_start_time: string
+    day_end_time: string
   }) => Promise<Trip>
 }
 
@@ -21,6 +26,8 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
   const [endDate, setEndDate] = useState('')
   const [destinations, setDestinations] = useState('')
   const [currency, setCurrency] = useState(getDefaultCurrency)
+  const [dayStartTime, setDayStartTime] = useState(DEFAULT_DAY_START_TIME)
+  const [dayEndTime, setDayEndTime] = useState(DEFAULT_DAY_END_TIME)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,6 +36,11 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
 
     if (startDate && endDate && endDate < startDate) {
       setError(strings.createTrip.errorDateRange)
+      return
+    }
+
+    if (dayEndTime <= dayStartTime) {
+      setError(strings.createTrip.errorDayRange)
       return
     }
 
@@ -41,6 +53,8 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
         end_date: endDate || null,
         destinations: parseDestinations(destinations),
         currency,
+        day_start_time: dayStartTime,
+        day_end_time: dayEndTime,
       })
       onClose()
     } catch {
@@ -124,6 +138,38 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
               />
             </div>
+          </div>
+
+          <div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label htmlFor="trip-day-start" className="mb-1 block text-sm font-medium text-slate-700">
+                  {strings.createTrip.dayStartLabel}
+                </label>
+                <input
+                  id="trip-day-start"
+                  type="time"
+                  required
+                  value={dayStartTime}
+                  onChange={(event) => setDayStartTime(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </div>
+              <div className="flex-1">
+                <label htmlFor="trip-day-end" className="mb-1 block text-sm font-medium text-slate-700">
+                  {strings.createTrip.dayEndLabel}
+                </label>
+                <input
+                  id="trip-day-end"
+                  type="time"
+                  required
+                  value={dayEndTime}
+                  onChange={(event) => setDayEndTime(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{strings.createTrip.dayRangeHint}</p>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

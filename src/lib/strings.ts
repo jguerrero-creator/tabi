@@ -31,9 +31,13 @@ export const strings = {
     destinationsLabel: 'Destination(s)',
     destinationsPlaceholder: 'e.g. Tokyo, Kyoto',
     currencyLabel: 'Currency',
+    dayStartLabel: 'Day starts at',
+    dayEndLabel: 'Day ends at',
+    dayRangeHint: "Bounds each day's free time — adjust if you're an early riser or night owl.",
     submit: 'Create Trip',
     cancel: 'Cancel',
     errorDateRange: 'End date must be on or after the start date.',
+    errorDayRange: 'Day end time must be after day start time.',
     errorGeneric: 'Something went wrong. Please try again.',
   },
   sections: {
@@ -131,6 +135,7 @@ export const strings = {
     emptyBody: 'This trip has no accommodation reservations.',
     setDatesHint: 'Set trip start and end dates to see coverage gaps.',
     gapLabel: 'Not booked',
+    nightsCount: (nights: number) => `${nights} ${nights === 1 ? 'night' : 'nights'}`,
     addCta: 'Add reservation',
   },
   transportMenu: {
