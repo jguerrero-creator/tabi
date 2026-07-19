@@ -18,6 +18,8 @@ interface TravelTimeRequestBody {
 
 const ROUTES_API_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes'
 
+export const config = { runtime: 'edge' }
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)

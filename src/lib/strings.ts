@@ -29,7 +29,7 @@ export const strings = {
     startLabel: 'Start date',
     endLabel: 'End date',
     destinationsLabel: 'Destination(s)',
-    destinationsPlaceholder: 'e.g. Tokyo, Kyoto',
+    destinationsPlaceholder: 'Search countries…',
     currencyLabel: 'Currency',
     dayStartLabel: 'Day starts at',
     dayEndLabel: 'Day ends at',
@@ -108,6 +108,9 @@ export const strings = {
     transport: 'Transport',
     activities: 'Activities',
     budget: 'Budget',
+  },
+  sidebar: {
+    allTrips: 'All trips',
   },
   travelMode: {
     DRIVE: 'Drive',

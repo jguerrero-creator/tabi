@@ -19,7 +19,7 @@ export function MenuHeader({ title, subtitle, count, addLabel, onAdd }: MenuHead
         type="button"
         onClick={() => navigate(`/trips/${tripId}`)}
         aria-label={strings.common.back}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 lg:hidden"
       >
         ←
       </button>

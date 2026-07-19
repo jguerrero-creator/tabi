@@ -1,28 +1,19 @@
 import { Link, useLocation } from 'react-router-dom'
 import { strings } from '../../lib/strings'
 import { ReservationTypeIcon } from '../ui/ReservationTypeIcon'
-import type { ReservationType } from '../../types/reservation'
+import { tripNavTabs } from './tripNavTabs'
 
 interface BottomNavProps {
   tripId: string
 }
 
-type NavTab = 'overview' | ReservationType
-
-const tabs: { tab: NavTab; label: string; path: (tripId: string) => string }[] = [
-  { tab: 'overview', label: strings.menus.overview, path: (tripId) => `/trips/${tripId}` },
-  { tab: 'stay', label: strings.menus.stay, path: (tripId) => `/trips/${tripId}/stay` },
-  { tab: 'transport', label: strings.menus.transport, path: (tripId) => `/trips/${tripId}/transport` },
-  { tab: 'activity', label: strings.menus.activities, path: (tripId) => `/trips/${tripId}/activities` },
-]
-
 export function BottomNav({ tripId }: BottomNavProps) {
   const { pathname } = useLocation()
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-lg border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-lg border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
       <div className="flex">
-        {tabs.map(({ tab, label, path }) => {
+        {tripNavTabs.map(({ tab, label, path }) => {
           const to = path(tripId)
           const active = tab === 'overview' ? pathname === to : pathname.startsWith(to)
           return (
@@ -55,7 +46,7 @@ export function BottomNav({ tripId }: BottomNavProps) {
   )
 }
 
-function OverviewIcon({ className }: { className: string }) {
+export function OverviewIcon({ className }: { className: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -74,7 +65,7 @@ function OverviewIcon({ className }: { className: string }) {
   )
 }
 
-function BudgetIcon({ className }: { className: string }) {
+export function BudgetIcon({ className }: { className: string }) {
   return (
     <svg
       viewBox="0 0 24 24"

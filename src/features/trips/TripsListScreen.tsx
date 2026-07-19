@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
+import { countryName } from '../../lib/countries'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
 import { CreateTripModal } from './CreateTripModal'
@@ -74,7 +75,9 @@ function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
             <Link to={`/trips/${trip.id}`} className="block px-4 py-3 hover:bg-slate-50">
               <p className="text-sm font-medium text-slate-900">{trip.name}</p>
               {trip.destinations.length > 0 && (
-                <p className="text-xs text-slate-500">{trip.destinations.join(', ')}</p>
+                <p className="text-xs text-slate-500">
+                  {trip.destinations.map((code) => countryName(code) ?? code).join(', ')}
+                </p>
               )}
               <p className="text-xs text-slate-500">{formatDateRange(trip.start_date, trip.end_date)}</p>
             </Link>

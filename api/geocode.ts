@@ -30,6 +30,8 @@ const GEOCODE_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
 const TIMEZONE_API_URL = 'https://maps.googleapis.com/maps/api/timezone/json'
 const MAX_CANDIDATES = 5
 
+export const config = { runtime: 'edge' }
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)

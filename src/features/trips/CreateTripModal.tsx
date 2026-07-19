@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
+import { CountryMultiSelect } from '../../components/ui/CountryMultiSelect'
 import { CURRENCIES, getDefaultCurrency } from '../../lib/currencies'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
@@ -24,7 +25,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [destinations, setDestinations] = useState('')
+  const [destinations, setDestinations] = useState<string[]>([])
   const [currency, setCurrency] = useState(getDefaultCurrency)
   const [dayStartTime, setDayStartTime] = useState(DEFAULT_DAY_START_TIME)
   const [dayEndTime, setDayEndTime] = useState(DEFAULT_DAY_END_TIME)
@@ -51,7 +52,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
         name: name.trim(),
         start_date: startDate || null,
         end_date: endDate || null,
-        destinations: parseDestinations(destinations),
+        destinations,
         currency,
         day_start_time: dayStartTime,
         day_end_time: dayEndTime,
@@ -83,19 +84,13 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
             />
           </div>
-          <div>
-            <label htmlFor="trip-destinations" className="mb-1 block text-sm font-medium text-slate-700">
-              {strings.createTrip.destinationsLabel}
-            </label>
-            <input
-              id="trip-destinations"
-              type="text"
-              value={destinations}
-              onChange={(event) => setDestinations(event.target.value)}
-              placeholder={strings.createTrip.destinationsPlaceholder}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-            />
-          </div>
+          <CountryMultiSelect
+            id="trip-destinations"
+            label={strings.createTrip.destinationsLabel}
+            value={destinations}
+            onChange={setDestinations}
+            placeholder={strings.createTrip.destinationsPlaceholder}
+          />
           <div>
             <label htmlFor="trip-currency" className="mb-1 block text-sm font-medium text-slate-700">
               {strings.createTrip.currencyLabel}
@@ -188,9 +183,3 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
   )
 }
 
-function parseDestinations(input: string): string[] {
-  return input
-    .split(',')
-    .map((destination) => destination.trim())
-    .filter((destination) => destination.length > 0)
-}

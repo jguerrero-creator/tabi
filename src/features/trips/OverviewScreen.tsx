@@ -74,7 +74,7 @@ export function OverviewScreen() {
 
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-4">
+      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-4 lg:hidden">
         <button
           type="button"
           onClick={() => navigate('/')}
@@ -109,7 +109,7 @@ export function OverviewScreen() {
 
         {!loading && !error && (
           <div className="space-y-5">
-            <div className="flex rounded-full border border-slate-200 bg-white p-1">
+            <div className="flex rounded-full border border-slate-200 bg-white p-1 lg:hidden">
               <button
                 type="button"
                 onClick={() => setActiveTab('overview')}
