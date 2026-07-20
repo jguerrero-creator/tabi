@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      reminders: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          title: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          title: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          title?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservations: {
         Row: {
           created_at: string
@@ -35,6 +70,9 @@ export type Database = {
           start_place_name: string | null
           start_timezone: string | null
           status: Database["public"]["Enums"]["reservation_status"]
+          transport_subtype:
+            | Database["public"]["Enums"]["transport_subtype"]
+            | null
           trip_id: string
           type: Database["public"]["Enums"]["reservation_type"]
           updated_at: string
@@ -59,6 +97,9 @@ export type Database = {
           start_place_name?: string | null
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          transport_subtype?:
+            | Database["public"]["Enums"]["transport_subtype"]
+            | null
           trip_id: string
           type: Database["public"]["Enums"]["reservation_type"]
           updated_at?: string
@@ -83,6 +124,9 @@ export type Database = {
           start_place_name?: string | null
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          transport_subtype?:
+            | Database["public"]["Enums"]["transport_subtype"]
+            | null
           trip_id?: string
           type?: Database["public"]["Enums"]["reservation_type"]
           updated_at?: string
@@ -196,6 +240,7 @@ export type Database = {
     Enums: {
       reservation_status: "booked" | "to_book" | "decide_later"
       reservation_type: "stay" | "transport" | "activity"
+      transport_subtype: "point_to_point" | "at_disposal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -325,6 +370,7 @@ export const Constants = {
     Enums: {
       reservation_status: ["booked", "to_book", "decide_later"],
       reservation_type: ["stay", "transport", "activity"],
+      transport_subtype: ["point_to_point", "at_disposal"],
     },
   },
 } as const

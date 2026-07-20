@@ -301,7 +301,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             </Field>
             <PlaceAutocompleteField
               id="reservation-start-address"
-              label={strings.reservationDetail.startAddressLabel}
+              label={
+                reservation.transport_subtype === 'at_disposal'
+                  ? strings.reservationDetail.startAddressLabelAtDisposal
+                  : strings.reservationDetail.startAddressLabel
+              }
               value={startAddress}
               onTextChange={handleStartAddressChange}
               onPlaceSelect={handleStartPlaceSelect}
@@ -309,7 +313,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             {reservation.type === 'transport' && (
               <PlaceAutocompleteField
                 id="reservation-end-address"
-                label={strings.reservationDetail.endAddressLabel}
+                label={
+                  reservation.transport_subtype === 'at_disposal'
+                    ? strings.reservationDetail.endAddressLabelAtDisposal
+                    : strings.reservationDetail.endAddressLabel
+                }
                 value={endAddress}
                 onTextChange={handleEndAddressChange}
                 onPlaceSelect={handleEndPlaceSelect}
@@ -368,7 +376,10 @@ async function geocodeIfChanged(
 }
 
 function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
-  const legLabels = strings.reservationLegLabels[reservation.type]
+  const legLabels =
+    reservation.transport_subtype === 'at_disposal'
+      ? strings.reservationLegLabelsAtDisposal
+      : strings.reservationLegLabels[reservation.type]
 
   if (reservation.type === 'transport') {
     return (

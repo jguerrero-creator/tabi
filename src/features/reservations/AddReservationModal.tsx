@@ -14,7 +14,13 @@ import {
   type GeocodeResult,
 } from '../../lib/geocode'
 import { strings } from '../../lib/strings'
-import type { NewReservation, Reservation, ReservationStatus, ReservationType } from '../../types/reservation'
+import type {
+  NewReservation,
+  Reservation,
+  ReservationStatus,
+  ReservationType,
+  TransportSubtype,
+} from '../../types/reservation'
 import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
 import { findOverlappingReservation } from './reservationOverlap'
@@ -25,28 +31,66 @@ const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefine
 
 type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
-type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'activity'
+type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'car_rental' | 'activity'
 
 interface TypeOption {
   value: UiReservationType
   dbType: ReservationType
+  transportSubtype: TransportSubtype | null
   requiresEndAddress: boolean
   requiresStart: boolean
   requiresEnd: boolean
 }
 
 const typeOptions: TypeOption[] = [
-  { value: 'hotel', dbType: 'stay', requiresEndAddress: false, requiresStart: true, requiresEnd: true },
-  { value: 'flight', dbType: 'transport', requiresEndAddress: true, requiresStart: true, requiresEnd: true },
-  { value: 'train', dbType: 'transport', requiresEndAddress: true, requiresStart: true, requiresEnd: true },
   {
-    value: 'local_transport',
+    value: 'hotel',
+    dbType: 'stay',
+    transportSubtype: null,
+    requiresEndAddress: false,
+    requiresStart: true,
+    requiresEnd: true,
+  },
+  {
+    value: 'flight',
     dbType: 'transport',
+    transportSubtype: 'point_to_point',
     requiresEndAddress: true,
     requiresStart: true,
     requiresEnd: true,
   },
-  { value: 'activity', dbType: 'activity', requiresEndAddress: false, requiresStart: false, requiresEnd: false },
+  {
+    value: 'train',
+    dbType: 'transport',
+    transportSubtype: 'point_to_point',
+    requiresEndAddress: true,
+    requiresStart: true,
+    requiresEnd: true,
+  },
+  {
+    value: 'local_transport',
+    dbType: 'transport',
+    transportSubtype: 'point_to_point',
+    requiresEndAddress: true,
+    requiresStart: true,
+    requiresEnd: true,
+  },
+  {
+    value: 'car_rental',
+    dbType: 'transport',
+    transportSubtype: 'at_disposal',
+    requiresEndAddress: true,
+    requiresStart: true,
+    requiresEnd: true,
+  },
+  {
+    value: 'activity',
+    dbType: 'activity',
+    transportSubtype: null,
+    requiresEndAddress: false,
+    requiresStart: false,
+    requiresEnd: false,
+  },
 ]
 
 interface AddReservationModalProps {
@@ -222,6 +266,7 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
 
     const input: Omit<NewReservation, 'trip_id'> = {
       type: option.dbType,
+      transport_subtype: option.transportSubtype,
       name: name.trim(),
       status,
       note: note.trim() || null,
@@ -322,9 +367,11 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
             <PlaceAutocompleteField
               id="start-address"
               label={
-                option.requiresEndAddress
-                  ? strings.addReservation.startAddressLabelTransport
-                  : strings.addReservation.startAddressLabel
+                option.transportSubtype === 'at_disposal'
+                  ? strings.addReservation.startAddressLabelAtDisposal
+                  : option.requiresEndAddress
+                    ? strings.addReservation.startAddressLabelTransport
+                    : strings.addReservation.startAddressLabel
               }
               value={startAddress}
               onTextChange={handleStartAddressChange}
@@ -334,7 +381,11 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
             {option.requiresEndAddress && (
               <PlaceAutocompleteField
                 id="end-address"
-                label={strings.addReservation.endAddressLabel}
+                label={
+                  option.transportSubtype === 'at_disposal'
+                    ? strings.addReservation.endAddressLabelAtDisposal
+                    : strings.addReservation.endAddressLabel
+                }
                 value={endAddress}
                 onTextChange={handleEndAddressChange}
                 onPlaceSelect={handleEndPlaceSelect}

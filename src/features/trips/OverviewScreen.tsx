@@ -1,18 +1,23 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { groupByDate, UNSCHEDULED_KEY } from '../../components/menu/groupByDate'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatInZone, formatTripDateRange } from '../../lib/datetime'
+import { formatDayPillLabel, formatInZone, formatTripDateRange } from '../../lib/datetime'
 import { strings } from '../../lib/strings'
 import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
+import type { TripDayLocation } from '../../types/dayLocation'
+import type { Reminder } from '../../types/reminder'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { OverviewMap } from './OverviewMap'
+import { RemindersSection } from './RemindersSection'
 import { TripLegsSection } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
 import { useTrip } from './useTrip'
 import { useTripDayLocations } from './useTripDayLocations'
 import { useTripLegs } from './useTripLegs'
+import { useTripReminders } from './useTripReminders'
 import { useTripReservations } from './useTripReservations'
 
 type OverviewTab = 'overview' | 'planning'
@@ -67,12 +72,16 @@ export function OverviewScreen() {
   // doesn't re-trigger a billed Google Routes API call for the same legs.
   const { legs, loading: legsLoading, error: legsError } = useTripLegs(reservations, modeByLeg)
   const { locationsByDate: dayLocationsByKey, saveDayLocation, clearDayLocation } = useTripDayLocations(tripId ?? '')
+  const { reminders, createReminder, deleteReminder } = useTripReminders(tripId ?? '')
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
 
-  const points = useMemo(() => buildMapPoints(reservations), [reservations])
-  const needsAttention = useMemo(() => buildNeedsAttention(reservations), [reservations])
+  const points = useMemo(
+    () => buildMapPoints(reservations, dayLocationsByKey),
+    [reservations, dayLocationsByKey],
+  )
+  const needsAttention = useMemo(() => buildNeedsAttention(reservations, reminders), [reservations, reminders])
 
   return (
     <>
@@ -154,23 +163,45 @@ export function OverviewScreen() {
                     </p>
                   ) : (
                     <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                      {needsAttention.map((reservation) => (
-                        <MenuListRow
-                          key={reservation.id}
-                          to={`/reservations/${reservation.id}`}
-                          type={reservation.type}
-                          title={reservation.name}
-                          status={reservation.status}
-                          secondaryLabel={
-                            reservation.start_at
-                              ? formatInZone(reservation.start_at, reservation.start_timezone)
-                              : null
-                          }
-                        />
-                      ))}
+                      {needsAttention.map((item) =>
+                        item.kind === 'reservation' ? (
+                          <MenuListRow
+                            key={item.reservation.id}
+                            to={`/reservations/${item.reservation.id}`}
+                            type={item.reservation.type}
+                            title={item.reservation.name}
+                            status={item.reservation.status}
+                            secondaryLabel={
+                              item.reservation.start_at
+                                ? formatInZone(item.reservation.start_at, item.reservation.start_timezone)
+                                : null
+                            }
+                          />
+                        ) : (
+                          <li
+                            key={item.reminder.id}
+                            className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-slate-900">{item.reminder.title}</p>
+                              <p className="text-xs text-slate-500">{formatDayPillLabel(item.reminder.date)}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => deleteReminder(item.reminder.id)}
+                              aria-label={strings.reminders.remove}
+                              className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            >
+                              ✕
+                            </button>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   )}
                 </section>
+
+                <RemindersSection onCreate={createReminder} />
               </>
             )}
 
@@ -195,7 +226,46 @@ export function OverviewScreen() {
   )
 }
 
-function buildMapPoints(reservations: Reservation[]): MapPoint[] {
+/**
+ * Per day, prefers geocoded reservations over the day's planned location
+ * (TABI-115) — a planned location is only an approximate stand-in for a day
+ * with nothing booked yet, so a real reservation always wins once it exists.
+ * Days with neither are simply absent from the map rather than plotted as a
+ * gap. Unscheduled reservations aren't tied to a day (no planned-location
+ * fallback applies to them) but their own geocoded points still show.
+ */
+function buildMapPoints(reservations: Reservation[], dayLocationsByKey: Map<string, TripDayLocation>): MapPoint[] {
+  const groups = groupByDate(reservations, (reservation) => ({
+    at: reservation.start_at,
+    timezone: reservation.start_timezone,
+  }))
+  const groupsByKey = new Map(groups.map((group) => [group.dateKey, group]))
+
+  const dayKeys = new Set([
+    ...dayLocationsByKey.keys(),
+    ...groups.map((group) => group.dateKey).filter((key) => key !== UNSCHEDULED_KEY),
+  ])
+
+  const points: MapPoint[] = []
+  for (const dayKey of dayKeys) {
+    const dayPoints = reservationPoints(groupsByKey.get(dayKey)?.items ?? [])
+    if (dayPoints.length > 0) {
+      points.push(...dayPoints)
+      continue
+    }
+    const plannedLocation = dayLocationsByKey.get(dayKey)
+    if (plannedLocation) {
+      points.push({ lat: plannedLocation.lat, lng: plannedLocation.lng, label: plannedLocation.place_name })
+    }
+  }
+
+  const unscheduledItems = groupsByKey.get(UNSCHEDULED_KEY)?.items ?? []
+  points.push(...reservationPoints(unscheduledItems))
+
+  return points
+}
+
+function reservationPoints(reservations: Reservation[]): MapPoint[] {
   const points: MapPoint[] = []
   for (const reservation of reservations) {
     if (reservation.start_lat !== null && reservation.start_lng !== null) {
@@ -216,8 +286,24 @@ function buildMapPoints(reservations: Reservation[]): MapPoint[] {
   return points
 }
 
-function buildNeedsAttention(reservations: Reservation[]): Reservation[] {
-  return reservations
-    .filter((reservation) => reservation.status === 'to_book')
-    .sort((a, b) => (a.start_at ?? '￿').localeCompare(b.start_at ?? '￿'))
+type AttentionItem =
+  | { kind: 'reservation'; sortKey: string; reservation: Reservation }
+  | { kind: 'reminder'; sortKey: string; reminder: Reminder }
+
+/**
+ * Combines "to book" reservations with reminders (TABI-104) into one
+ * urgency-sorted action list (TABI-53) — no full duplicate of every
+ * reservation, just what actually needs the user's attention. Sorted as
+ * plain strings: a reminder's `date` (YYYY-MM-DD) is always a prefix of a
+ * same-day reservation's full `start_at` timestamp, so it naturally sorts
+ * just before same-day bookings rather than needing a separate tie-break.
+ */
+function buildNeedsAttention(reservations: Reservation[], reminders: Reminder[]): AttentionItem[] {
+  const items: AttentionItem[] = [
+    ...reservations
+      .filter((reservation) => reservation.status === 'to_book')
+      .map((reservation): AttentionItem => ({ kind: 'reservation', sortKey: reservation.start_at ?? '￿', reservation })),
+    ...reminders.map((reminder): AttentionItem => ({ kind: 'reminder', sortKey: reminder.date, reminder })),
+  ]
+  return items.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
 }

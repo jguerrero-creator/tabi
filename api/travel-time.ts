@@ -72,8 +72,12 @@ export default async function handler(request: Request): Promise<Response> {
 
   const data = await routesResponse.json()
   const route = data.routes?.[0]
+  // No route isn't a request failure — it's a legitimate "unusable" result (e.g. Transit
+  // coverage gaps in some regions/Google Cloud projects, confirmed against Google's own
+  // developer forum). Same "unknown, not zero" null-duration convention callers already
+  // handle for a malformed route below, rather than a distinct error path per mode/region.
   if (!route) {
-    return jsonResponse({ error: 'No route found' }, 404)
+    return jsonResponse({ durationSeconds: null, distanceMeters: null })
   }
 
   return jsonResponse({

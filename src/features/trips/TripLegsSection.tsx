@@ -59,7 +59,11 @@ export function TripLegsSection({ reservations, legs, loading, error, onModeChan
                   {from?.name ?? '—'} → {to?.name ?? '—'}
                 </p>
                 <div className="mb-2">
-                  <p className="text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>
+                  {leg.durationSeconds === null && isTransitMode(leg.mode) ? (
+                    <p className="text-xs font-medium text-amber-700">{strings.tripLegs.noTransitRoute}</p>
+                  ) : (
+                    <p className="text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>
+                  )}
                   {freeBlock && freeBlock.durationSeconds < 0 && (
                     <p className="text-xs font-medium text-red-600">
                       {strings.tripLegs.tightConnection(formatDuration(Math.abs(freeBlock.durationSeconds)))}
@@ -91,4 +95,9 @@ function formatLeg(durationSeconds: number | null, distanceMeters: number | null
   if (durationSeconds !== null) parts.push(formatDuration(durationSeconds))
   if (distanceMeters !== null) parts.push(formatDistance(distanceMeters))
   return parts.length > 0 ? parts.join(' · ') : '—'
+}
+
+/** TRAIN is TRANSIT narrowed to rail (see api/travel-time.ts) — both hit the same no-route gap. */
+function isTransitMode(mode: TravelMode): boolean {
+  return mode === 'TRANSIT' || mode === 'TRAIN'
 }

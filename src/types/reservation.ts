@@ -5,3 +5,4 @@ export type NewReservation = Database['public']['Tables']['reservations']['Inser
 export type ReservationUpdate = Database['public']['Tables']['reservations']['Update']
 export type ReservationType = Database['public']['Enums']['reservation_type']
 export type ReservationStatus = Database['public']['Enums']['reservation_status']
+export type TransportSubtype = Database['public']['Enums']['transport_subtype']
