@@ -15,7 +15,7 @@ export function TripsListScreen() {
   const { upcoming, past } = useMemo(() => splitByDate(trips), [trips])
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
+    <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-5xl">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4">
         <h1 className="text-lg font-semibold text-slate-900">{strings.home.title}</h1>
         <button
@@ -28,7 +28,7 @@ export function TripsListScreen() {
         </button>
       </header>
 
-      <main className="px-4 py-4">
+      <main className="px-4 py-4 lg:px-8">
         {loading && (
           <div className="flex flex-col items-center gap-2 py-16 text-slate-500">
             <Spinner />
@@ -69,9 +69,9 @@ function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
   return (
     <section>
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
-      <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {trips.map((trip) => (
-          <li key={trip.id}>
+          <li key={trip.id} className="lg:overflow-hidden lg:rounded-xl lg:border lg:border-slate-200 lg:bg-white">
             <Link to={`/trips/${trip.id}`} className="block px-4 py-3 hover:bg-slate-50">
               <p className="text-sm font-medium text-slate-900">{trip.name}</p>
               {trip.destinations.length > 0 && (

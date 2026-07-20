@@ -97,6 +97,53 @@ export type Database = {
           },
         ]
       }
+      trip_day_locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          date: string
+          id: string
+          lat: number
+          lng: number
+          place_name: string
+          timezone: string | null
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          lat: number
+          lng: number
+          place_name: string
+          timezone?: string | null
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          lat?: number
+          lng?: number
+          place_name?: string
+          timezone?: string | null
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_day_locations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
           created_at: string

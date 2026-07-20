@@ -201,4 +201,14 @@ export const strings = {
     cancel: 'Cancel',
     selectionRequiredError: 'Please select an address from the list, or edit your search.',
   },
+  dayLocation: {
+    addCta: '+ Add planned location',
+    label: 'Planned location',
+    placeholder: 'City or area',
+    save: 'Save',
+    cancel: 'Cancel',
+    remove: 'Remove',
+    geocoding: 'Locating…',
+    errorGeneric: 'Could not save this location. Please try again.',
+  },
 } as const

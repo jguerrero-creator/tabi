@@ -11,6 +11,7 @@ import { OverviewMap } from './OverviewMap'
 import { TripLegsSection } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
 import { useTrip } from './useTrip'
+import { useTripDayLocations } from './useTripDayLocations'
 import { useTripLegs } from './useTripLegs'
 import { useTripReservations } from './useTripReservations'
 
@@ -65,6 +66,7 @@ export function OverviewScreen() {
   // Lifted above both TripLegsSection and TripTimeline so switching tabs
   // doesn't re-trigger a billed Google Routes API call for the same legs.
   const { legs, loading: legsLoading, error: legsError } = useTripLegs(reservations, modeByLeg)
+  const { locationsByDate: dayLocationsByKey, saveDayLocation, clearDayLocation } = useTripDayLocations(tripId ?? '')
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -181,6 +183,9 @@ export function OverviewScreen() {
                 legsError={legsError}
                 selectedDayKey={selectedDayKey}
                 onSelectDay={setSelectedDayKey}
+                dayLocationsByKey={dayLocationsByKey}
+                onSaveDayLocation={saveDayLocation}
+                onClearDayLocation={clearDayLocation}
               />
             )}
           </div>
