@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          plan: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          plan?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reminders: {
         Row: {
           created_at: string
@@ -70,6 +91,7 @@ export type Database = {
           start_place_name: string | null
           start_timezone: string | null
           status: Database["public"]["Enums"]["reservation_status"]
+          stay_subtype: Database["public"]["Enums"]["stay_subtype"] | null
           transport_subtype:
             | Database["public"]["Enums"]["transport_subtype"]
             | null
@@ -97,6 +119,7 @@ export type Database = {
           start_place_name?: string | null
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          stay_subtype?: Database["public"]["Enums"]["stay_subtype"] | null
           transport_subtype?:
             | Database["public"]["Enums"]["transport_subtype"]
             | null
@@ -124,6 +147,7 @@ export type Database = {
           start_place_name?: string | null
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          stay_subtype?: Database["public"]["Enums"]["stay_subtype"] | null
           transport_subtype?:
             | Database["public"]["Enums"]["transport_subtype"]
             | null
@@ -243,6 +267,7 @@ export type Database = {
     Enums: {
       reservation_status: "booked" | "to_book" | "decide_later"
       reservation_type: "stay" | "transport" | "activity"
+      stay_subtype: "hotel" | "camping" | "airbnb" | "ryokan" | "other"
       transport_subtype: "point_to_point" | "at_disposal"
     }
     CompositeTypes: {
@@ -373,6 +398,7 @@ export const Constants = {
     Enums: {
       reservation_status: ["booked", "to_book", "decide_later"],
       reservation_type: ["stay", "transport", "activity"],
+      stay_subtype: ["hotel", "camping", "airbnb", "ryokan", "other"],
       transport_subtype: ["point_to_point", "at_disposal"],
     },
   },

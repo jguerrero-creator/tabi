@@ -20,6 +20,7 @@ import {
 } from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
+import { transportRouteName } from './transportRouteName'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
 
@@ -115,6 +116,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
   const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(null)
 
+  // TABI-122: point-to-point transport has no free-text name — it's derived from the route.
+  const isAutoNamedTransport =
+    reservation.type === 'transport' && reservation.transport_subtype === 'point_to_point'
+
   const points: MapPoint[] = []
   if (reservation.start_lat !== null && reservation.start_lng !== null) {
     points.push({
@@ -137,6 +142,19 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
   async function handleStatusChange(status: ReservationStatus) {
     await onUpdate({ status })
+  }
+
+  // Preview-only: the resolved place name is only known once an address has been
+  // re-geocoded (startPlace/endPlace); until then, fall back to the reservation's
+  // existing place name as long as the address text hasn't been edited.
+  function previewLegPlaceName(
+    resolved: ResolvedPlace | null,
+    currentAddress: string,
+    originalAddress: string | null,
+    originalPlaceName: string | null,
+  ): string | null {
+    if (resolved) return resolved.placeName
+    return currentAddress.trim() === (originalAddress ?? '').trim() ? originalPlaceName : null
   }
 
   function handleStartAddressChange(text: string) {
@@ -178,7 +196,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setFormError(null)
 
     let patch: Partial<Reservation> = {
-      name: name.trim(),
+      ...(isAutoNamedTransport ? {} : { name: name.trim() }),
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
       price_currency: priceCurrency.trim() || null,
@@ -186,12 +204,20 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
     try {
       setGeocoding(true)
-      patch = {
-        ...patch,
-        ...(await geocodeIfChanged('start', startAddress, reservation.start_address, requestPick, startPlace)),
-        ...(reservation.type === 'transport'
+      const startPatch = await geocodeIfChanged('start', startAddress, reservation.start_address, requestPick, startPlace)
+      const endPatch =
+        reservation.type === 'transport'
           ? await geocodeIfChanged('end', endAddress, reservation.end_address, requestPick, endPlace)
-          : {}),
+          : {}
+      patch = { ...patch, ...startPatch, ...endPatch }
+
+      if (isAutoNamedTransport) {
+        patch.name = transportRouteName(
+          'start_place_name' in startPatch ? (startPatch.start_place_name ?? null) : reservation.start_place_name,
+          'start_address' in startPatch ? (startPatch.start_address ?? null) : reservation.start_address,
+          'end_place_name' in endPatch ? (endPatch.end_place_name ?? null) : reservation.end_place_name,
+          'end_address' in endPatch ? (endPatch.end_address ?? null) : reservation.end_address,
+        )
       }
     } catch (err) {
       setFormError(
@@ -262,14 +288,28 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           <TypeSpecificZone reservation={reservation} />
 
           <form onSubmit={handleSave} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <Field label={strings.reservationDetail.nameLabel}>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
+            {isAutoNamedTransport ? (
+              <div>
+                <p className="mb-1 text-sm font-medium text-slate-700">{strings.reservationDetail.nameLabel}</p>
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  {transportRouteName(
+                    previewLegPlaceName(startPlace, startAddress, reservation.start_address, reservation.start_place_name),
+                    startAddress.trim() || null,
+                    previewLegPlaceName(endPlace, endAddress, reservation.end_address, reservation.end_place_name),
+                    endAddress.trim() || null,
+                  )}
+                </p>
+              </div>
+            ) : (
+              <Field label={strings.reservationDetail.nameLabel}>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+            )}
             <div className="flex gap-3">
               <Field label={strings.reservationDetail.priceLabel} className="flex-1">
                 <input
@@ -326,7 +366,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
             {formError && <p className="text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <Button type="submit" disabled={saving || geocoding || !name.trim()}>
+              <Button type="submit" disabled={saving || geocoding || (!isAutoNamedTransport && !name.trim())}>
                 {strings.reservationDetail.save}
               </Button>
             </div>

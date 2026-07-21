@@ -55,6 +55,12 @@ export function TripsListScreen() {
             <TripSection title={strings.sections.past} trips={past} onEdit={setEditingTrip} />
           </div>
         )}
+
+        <footer className="py-8 text-center">
+          <Link to="/privacy" className="text-xs text-slate-400 underline hover:text-slate-600">
+            {strings.home.privacyLink}
+          </Link>
+        </footer>
       </main>
 
       {showCreateModal && (

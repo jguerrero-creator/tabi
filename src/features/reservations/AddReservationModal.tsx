@@ -1,8 +1,8 @@
 import { APIProvider } from '@vis.gl/react-google-maps'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
-import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { FormSheet } from '../../components/ui/FormSheet'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
 import { StatusPicker } from '../../components/ui/StatusPicker'
@@ -19,11 +19,13 @@ import type {
   Reservation,
   ReservationStatus,
   ReservationType,
+  StaySubtype,
   TransportSubtype,
 } from '../../types/reservation'
 import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
 import { findOverlappingReservation } from './reservationOverlap'
+import { transportRouteName } from './transportRouteName'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservationsByType } from './useReservationsByType'
 
@@ -93,6 +95,8 @@ const typeOptions: TypeOption[] = [
   },
 ]
 
+const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
+
 interface AddReservationModalProps {
   tripId: string
   defaultType?: UiReservationType
@@ -105,6 +109,7 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   // TABI-126: the add sheet inherits its type from the menu it was opened from (Stay/Transport/
   // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
   const [typeExpanded, setTypeExpanded] = useState(false)
+  const [staySubtype, setStaySubtype] = useState<StaySubtype>('hotel')
   const [name, setName] = useState('')
   const [status, setStatus] = useState<ReservationStatus>('to_book')
   const [startAddress, setStartAddress] = useState('')
@@ -131,6 +136,8 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
+  // TABI-122: point-to-point transport has no free-text name — it's derived from the route.
+  const isAutoNamedTransport = option.transportSubtype === 'point_to_point'
   // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
   // whichever type is currently selected so switching type mid-form checks against the right set.
   const { reservations: sameTypeReservations, loading: sameTypeLoading } = useReservationsByType(
@@ -211,7 +218,7 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
     event.preventDefault()
     setError(null)
 
-    if (!name.trim()) {
+    if (!isAutoNamedTransport && !name.trim()) {
       setError(strings.addReservation.errorNameRequired)
       return
     }
@@ -267,10 +274,20 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       return
     }
 
+    const resolvedName = isAutoNamedTransport
+      ? transportRouteName(
+          startGeo?.placeName ?? null,
+          startGeo?.formattedAddress ?? (startAddress.trim() || null),
+          endGeo?.placeName ?? null,
+          endGeo?.formattedAddress ?? (endAddress.trim() || null),
+        )
+      : name.trim()
+
     const input: Omit<NewReservation, 'trip_id'> = {
       type: option.dbType,
       transport_subtype: option.transportSubtype,
-      name: name.trim(),
+      stay_subtype: option.dbType === 'stay' ? staySubtype : null,
+      name: resolvedName,
       status,
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
@@ -334,220 +351,271 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
 
   return (
     <APIProvider apiKey={mapsApiKey ?? ''}>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-        <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">{strings.addReservation.title}</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {typeExpanded ? (
-              <Field label={strings.addReservation.typeLabel}>
-                <select
-                  value={uiType}
-                  onChange={(event) => setUiType(event.target.value as UiReservationType)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                >
-                  {typeOptions.map((candidate) => (
-                    <option key={candidate.value} value={candidate.value}>
-                      {strings.addReservation.types[candidate.value]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ) : (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-900">{strings.addReservation.types[uiType]}</span>
-                <button
-                  type="button"
-                  onClick={() => setTypeExpanded(true)}
-                  className="text-sm text-teal-700 underline"
-                >
-                  {strings.addReservation.changeTypeToggle}
-                </button>
-              </div>
-            )}
-
-            <Field label={strings.addReservation.nameLabel}>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder={strings.addReservation.namePlaceholder}
-                required
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-
-            <div>
-              <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
-              <StatusPicker value={status} onChange={setStatus} />
-            </div>
-
-            <PlaceAutocompleteField
-              id="start-address"
-              label={
-                option.transportSubtype === 'at_disposal'
-                  ? strings.addReservation.startAddressLabelAtDisposal
-                  : option.requiresEndAddress
-                    ? strings.addReservation.startAddressLabelTransport
-                    : strings.addReservation.startAddressLabel
-              }
-              value={startAddress}
-              onTextChange={handleStartAddressChange}
-              onPlaceSelect={handleStartPlaceSelect}
-            />
-
-            {option.requiresEndAddress && (
-              <PlaceAutocompleteField
-                id="end-address"
-                label={
-                  option.transportSubtype === 'at_disposal'
-                    ? strings.addReservation.endAddressLabelAtDisposal
-                    : strings.addReservation.endAddressLabel
-                }
-                value={endAddress}
-                onTextChange={handleEndAddressChange}
-                onPlaceSelect={handleEndPlaceSelect}
-              />
-            )}
-
-            <DateTimeField
-              legend={strings.addReservation.startLabel}
-              date={startDate}
-              time={startTime}
-              onDateChange={setStartDate}
-              onTimeChange={setStartTime}
-              required={option.requiresStart}
-            />
-
-            {option.dbType === 'stay' && !manualEndDate ? (
-              <div className="space-y-2">
-                <div className="flex gap-3">
-                  <Field label={strings.addReservation.nightsLabel} className="w-20">
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={nights}
-                      onChange={(event) => setNights(event.target.value)}
-                      required={option.requiresEnd}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                    />
-                  </Field>
-                  <fieldset className="flex-1">
-                    <legend className="mb-1 block text-sm font-medium text-slate-700">
-                      {strings.addReservation.endLabel}
-                    </legend>
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        aria-label={`${strings.addReservation.endLabel} date`}
-                        value={endDate}
-                        disabled
-                        className="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-500"
-                      />
-                      <input
-                        type="time"
-                        aria-label={`${strings.addReservation.endLabel} time`}
-                        value={endTime}
-                        onChange={(event) => setEndTime(event.target.value)}
-                        required={option.requiresEnd}
-                        className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                      />
-                    </div>
-                  </fieldset>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setManualEndDate(true)}
-                  className="text-sm text-teal-700 underline"
-                >
-                  {strings.addReservation.manualCheckoutToggle}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <DateTimeField
-                  legend={strings.addReservation.endLabel}
-                  date={endDate}
-                  time={endTime}
-                  onDateChange={setEndDate}
-                  onTimeChange={setEndTime}
-                  required={option.requiresEnd}
-                />
-                {option.dbType === 'stay' && (
-                  <button
-                    type="button"
-                    onClick={() => setManualEndDate(false)}
-                    className="text-sm text-teal-700 underline"
-                  >
-                    {strings.addReservation.nightsCheckoutToggle}
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <Field label={strings.addReservation.priceLabel} className="flex-1">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={priceAmount}
-                  onChange={(event) => setPriceAmount(event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-              <Field label={strings.addReservation.currencyLabel} className="w-24">
-                <input
-                  value={priceCurrency}
-                  onChange={(event) => setPriceCurrency(event.target.value.toUpperCase())}
-                  maxLength={3}
-                  placeholder="USD"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
-                />
-              </Field>
-            </div>
-
-            <Field label={strings.addReservation.notesLabel}>
-              <textarea
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder={strings.addReservation.notesPlaceholder}
-                rows={3}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-
-            {geocoding && <p className="text-sm text-slate-500">{strings.addReservation.geocoding}</p>}
-            {error && <p className="text-sm text-red-600">{error}</p>}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-                {strings.addReservation.cancel}
-              </Button>
-              <Button type="submit" disabled={submitting || geocoding}>
-                {strings.addReservation.submit}
-              </Button>
-            </div>
-          </form>
-        </div>
-        {candidates && (
-          <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+      <FormSheet
+        title={strings.addReservation.title}
+        onSubmit={handleSubmit}
+        onClose={onClose}
+        cancelLabel={strings.addReservation.cancel}
+        submitLabel={strings.addReservation.submit}
+        submitting={submitting}
+        submitDisabled={geocoding}
+      >
+        {typeExpanded ? (
+          <Field label={strings.addReservation.typeLabel}>
+            <select
+              value={uiType}
+              onChange={(event) => setUiType(event.target.value as UiReservationType)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            >
+              {typeOptions.map((candidate) => (
+                <option key={candidate.value} value={candidate.value}>
+                  {strings.addReservation.types[candidate.value]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-900">{strings.addReservation.types[uiType]}</span>
+            <button
+              type="button"
+              onClick={() => setTypeExpanded(true)}
+              className="text-sm text-teal-700 underline"
+            >
+              {strings.addReservation.changeTypeToggle}
+            </button>
+          </div>
         )}
-        {overlapConfirm && (
-          <ConfirmDialog
-            title={strings.addReservation.overlapConfirmTitle}
-            message={strings.addReservation.overlapConfirmMessage(overlapConfirm.reservation.name)}
-            noteLabel={strings.addReservation.overlapNoteLabel}
-            notePlaceholder={strings.addReservation.overlapNotePlaceholder}
-            note={overlapNote}
-            onNoteChange={setOverlapNote}
-            confirmLabel={strings.addReservation.overlapConfirmCta}
-            cancelLabel={strings.addReservation.overlapCancelCta}
-            onConfirm={handleConfirmOverlap}
-            onCancel={handleCancelOverlap}
-            confirming={submitting}
+
+        {option.dbType === 'stay' && (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">
+              {strings.addReservation.staySubtypeLabel}
+            </p>
+            <StaySubtypePicker value={staySubtype} onChange={setStaySubtype} />
+          </div>
+        )}
+
+        {isAutoNamedTransport ? (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.nameLabel}</p>
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              {startAddress.trim() || endAddress.trim()
+                ? transportRouteName(
+                    startPlace?.placeName ?? null,
+                    startAddress.trim() || null,
+                    endPlace?.placeName ?? null,
+                    endAddress.trim() || null,
+                  )
+                : strings.addReservation.nameAutoGeneratedPlaceholder}
+            </p>
+          </div>
+        ) : (
+          <Field label={strings.addReservation.nameLabel}>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={strings.addReservation.namePlaceholder}
+              required
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            />
+          </Field>
+        )}
+
+        <div>
+          <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
+          <StatusPicker value={status} onChange={setStatus} />
+        </div>
+
+        <PlaceAutocompleteField
+          id="start-address"
+          label={
+            option.transportSubtype === 'at_disposal'
+              ? strings.addReservation.startAddressLabelAtDisposal
+              : option.requiresEndAddress
+                ? strings.addReservation.startAddressLabelTransport
+                : strings.addReservation.startAddressLabel
+          }
+          value={startAddress}
+          onTextChange={handleStartAddressChange}
+          onPlaceSelect={handleStartPlaceSelect}
+        />
+
+        {option.requiresEndAddress && (
+          <PlaceAutocompleteField
+            id="end-address"
+            label={
+              option.transportSubtype === 'at_disposal'
+                ? strings.addReservation.endAddressLabelAtDisposal
+                : strings.addReservation.endAddressLabel
+            }
+            value={endAddress}
+            onTextChange={handleEndAddressChange}
+            onPlaceSelect={handleEndPlaceSelect}
           />
         )}
-      </div>
+
+        <DateTimeField
+          legend={strings.addReservation.startLabel}
+          date={startDate}
+          time={startTime}
+          onDateChange={setStartDate}
+          onTimeChange={setStartTime}
+          required={option.requiresStart}
+        />
+
+        {option.dbType === 'stay' && !manualEndDate ? (
+          <div className="space-y-2">
+            <div className="flex gap-3">
+              <Field label={strings.addReservation.nightsLabel} className="w-20">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={nights}
+                  onChange={(event) => setNights(event.target.value)}
+                  required={option.requiresEnd}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+              </Field>
+              <fieldset className="flex-1">
+                <legend className="mb-1 block text-sm font-medium text-slate-700">
+                  {strings.addReservation.endLabel}
+                </legend>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    aria-label={`${strings.addReservation.endLabel} date`}
+                    value={endDate}
+                    disabled
+                    className="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-500"
+                  />
+                  <input
+                    type="time"
+                    aria-label={`${strings.addReservation.endLabel} time`}
+                    value={endTime}
+                    onChange={(event) => setEndTime(event.target.value)}
+                    required={option.requiresEnd}
+                    className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </div>
+              </fieldset>
+            </div>
+            <button
+              type="button"
+              onClick={() => setManualEndDate(true)}
+              className="text-sm text-teal-700 underline"
+            >
+              {strings.addReservation.manualCheckoutToggle}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <DateTimeField
+              legend={strings.addReservation.endLabel}
+              date={endDate}
+              time={endTime}
+              onDateChange={setEndDate}
+              onTimeChange={setEndTime}
+              required={option.requiresEnd}
+            />
+            {option.dbType === 'stay' && (
+              <button
+                type="button"
+                onClick={() => setManualEndDate(false)}
+                className="text-sm text-teal-700 underline"
+              >
+                {strings.addReservation.nightsCheckoutToggle}
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Field label={strings.addReservation.priceLabel} className="flex-1">
+            <input
+              type="number"
+              step="0.01"
+              value={priceAmount}
+              onChange={(event) => setPriceAmount(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            />
+          </Field>
+          <Field label={strings.addReservation.currencyLabel} className="w-24">
+            <input
+              value={priceCurrency}
+              onChange={(event) => setPriceCurrency(event.target.value.toUpperCase())}
+              maxLength={3}
+              placeholder="USD"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
+            />
+          </Field>
+        </div>
+
+        <Field label={strings.addReservation.notesLabel}>
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder={strings.addReservation.notesPlaceholder}
+            rows={3}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+          />
+        </Field>
+
+        {geocoding && <p className="text-sm text-slate-500">{strings.addReservation.geocoding}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </FormSheet>
+      {candidates && (
+        <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+      )}
+      {overlapConfirm && (
+        <ConfirmDialog
+          title={strings.addReservation.overlapConfirmTitle}
+          message={strings.addReservation.overlapConfirmMessage(overlapConfirm.reservation.name)}
+          noteLabel={strings.addReservation.overlapNoteLabel}
+          notePlaceholder={strings.addReservation.overlapNotePlaceholder}
+          note={overlapNote}
+          onNoteChange={setOverlapNote}
+          confirmLabel={strings.addReservation.overlapConfirmCta}
+          cancelLabel={strings.addReservation.overlapCancelCta}
+          onConfirm={handleConfirmOverlap}
+          onCancel={handleCancelOverlap}
+          confirming={submitting}
+        />
+      )}
     </APIProvider>
+  )
+}
+
+function StaySubtypePicker({
+  value,
+  onChange,
+}: {
+  value: StaySubtype
+  onChange: (subtype: StaySubtype) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      {staySubtypeOptions.map((subtype) => {
+        const selected = subtype === value
+        return (
+          <button
+            key={subtype}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(subtype)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.staySubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
