@@ -3,6 +3,11 @@ import { ReservationTypeIcon } from '../ui/ReservationTypeIcon'
 import { statusDotClasses } from './statusDotClasses'
 import type { ReservationStatus, ReservationType } from '../../types/reservation'
 
+export interface MenuRowFlag {
+  label: string
+  tone: 'warning' | 'positive'
+}
+
 interface MenuListRowProps {
   to: string
   type: ReservationType
@@ -11,9 +16,24 @@ interface MenuListRowProps {
   secondaryLabel?: string | null
   nested?: boolean
   overlapBadge?: string
+  flags?: MenuRowFlag[]
 }
 
-export function MenuListRow({ to, type, title, status, secondaryLabel, nested, overlapBadge }: MenuListRowProps) {
+const flagToneClasses: Record<MenuRowFlag['tone'], string> = {
+  warning: 'bg-amber-100 text-amber-700',
+  positive: 'bg-emerald-100 text-emerald-700',
+}
+
+export function MenuListRow({
+  to,
+  type,
+  title,
+  status,
+  secondaryLabel,
+  nested,
+  overlapBadge,
+  flags,
+}: MenuListRowProps) {
   return (
     <li>
       <Link
@@ -30,6 +50,18 @@ export function MenuListRow({ to, type, title, status, secondaryLabel, nested, o
           </p>
           {secondaryLabel && <p className="text-xs text-slate-500">{secondaryLabel}</p>}
           {overlapBadge && <p className="text-[11px] text-slate-400">{overlapBadge}</p>}
+          {flags && flags.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {flags.map((flag) => (
+                <span
+                  key={flag.label}
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${flagToneClasses[flag.tone]}`}
+                >
+                  {flag.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </Link>
     </li>

@@ -111,6 +111,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [note, setNote] = useState(reservation.note ?? '')
   const [priceAmount, setPriceAmount] = useState(reservation.price_amount?.toString() ?? '')
   const [priceCurrency, setPriceCurrency] = useState(reservation.price_currency ?? '')
+  const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(reservation.stay_parking_included)
+  const [checkInDeadline, setCheckInDeadline] = useState(reservation.stay_check_in_deadline?.slice(0, 5) ?? '')
   const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
   const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
@@ -200,6 +202,12 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
       price_currency: priceCurrency.trim() || null,
+      ...(reservation.type === 'stay'
+        ? {
+            stay_parking_included: parkingIncluded,
+            stay_check_in_deadline: checkInDeadline || null,
+          }
+        : {}),
     }
 
     try {
@@ -309,6 +317,24 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
               </Field>
+            )}
+            {reservation.type === 'stay' && (
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <p className="mb-1 text-sm font-medium text-slate-700">
+                    {strings.reservationDetail.parkingLabel}
+                  </p>
+                  <ParkingPicker value={parkingIncluded} onChange={setParkingIncluded} />
+                </div>
+                <Field label={strings.reservationDetail.checkInDeadlineLabel} className="w-32">
+                  <input
+                    type="time"
+                    value={checkInDeadline}
+                    onChange={(e) => setCheckInDeadline(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+              </div>
             )}
             <div className="flex gap-3">
               <Field label={strings.reservationDetail.priceLabel} className="flex-1">
@@ -460,6 +486,41 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
           timezone={reservation.end_timezone}
         />
       )}
+      {reservation.type === 'stay' && (
+        <StayFlags
+          parkingIncluded={reservation.stay_parking_included}
+          checkInDeadline={reservation.stay_check_in_deadline}
+        />
+      )}
+    </div>
+  )
+}
+
+function StayFlags({
+  parkingIncluded,
+  checkInDeadline,
+}: {
+  parkingIncluded: boolean | null
+  checkInDeadline: string | null
+}) {
+  if (parkingIncluded === null && !checkInDeadline) return null
+  return (
+    <div className="flex flex-wrap gap-2 pt-1">
+      {checkInDeadline && (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+          {strings.stayMenu.checkInDeadlineFlag(checkInDeadline.slice(0, 5))}
+        </span>
+      )}
+      {parkingIncluded === false && (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+          {strings.stayMenu.noParkingFlag}
+        </span>
+      )}
+      {parkingIncluded === true && (
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+          {strings.stayMenu.parkingIncludedFlag}
+        </span>
+      )}
     </div>
   )
 }
@@ -501,5 +562,42 @@ function Field({
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
       {children}
     </label>
+  )
+}
+
+function ParkingPicker({
+  value,
+  onChange,
+}: {
+  value: boolean | null
+  onChange: (included: boolean) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex gap-2">
+      {(
+        [
+          [true, strings.reservationDetail.parkingYes],
+          [false, strings.reservationDetail.parkingNo],
+        ] as const
+      ).map(([option, label]) => {
+        const selected = value === option
+        return (
+          <button
+            key={String(option)}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
   )
 }

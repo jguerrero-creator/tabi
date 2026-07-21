@@ -110,6 +110,8 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
   const [typeExpanded, setTypeExpanded] = useState(false)
   const [staySubtype, setStaySubtype] = useState<StaySubtype>('hotel')
+  const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
+  const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState('')
   const [status, setStatus] = useState<ReservationStatus>('to_book')
   const [startAddress, setStartAddress] = useState('')
@@ -287,6 +289,8 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
       type: option.dbType,
       transport_subtype: option.transportSubtype,
       stay_subtype: option.dbType === 'stay' ? staySubtype : null,
+      stay_parking_included: option.dbType === 'stay' ? parkingIncluded : null,
+      stay_check_in_deadline: option.dbType === 'stay' && checkInDeadline ? checkInDeadline : null,
       name: resolvedName,
       status,
       note: note.trim() || null,
@@ -393,6 +397,23 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
               {strings.addReservation.staySubtypeLabel}
             </p>
             <StaySubtypePicker value={staySubtype} onChange={setStaySubtype} />
+          </div>
+        )}
+
+        {option.dbType === 'stay' && (
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.parkingLabel}</p>
+              <ParkingPicker value={parkingIncluded} onChange={setParkingIncluded} />
+            </div>
+            <Field label={strings.addReservation.checkInDeadlineLabel} className="w-32">
+              <input
+                type="time"
+                value={checkInDeadline}
+                onChange={(event) => setCheckInDeadline(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
           </div>
         )}
 
@@ -612,6 +633,43 @@ function StaySubtypePicker({
             }`}
           >
             {strings.addReservation.staySubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ParkingPicker({
+  value,
+  onChange,
+}: {
+  value: boolean | null
+  onChange: (included: boolean) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex gap-2">
+      {(
+        [
+          [true, strings.addReservation.parkingYes],
+          [false, strings.addReservation.parkingNo],
+        ] as const
+      ).map(([option, label]) => {
+        const selected = value === option
+        return (
+          <button
+            key={String(option)}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {label}
           </button>
         )
       })}

@@ -91,6 +91,8 @@ export type Database = {
           start_place_name: string | null
           start_timezone: string | null
           status: Database["public"]["Enums"]["reservation_status"]
+          stay_check_in_deadline: string | null
+          stay_parking_included: boolean | null
           stay_subtype: Database["public"]["Enums"]["stay_subtype"] | null
           transport_subtype:
             | Database["public"]["Enums"]["transport_subtype"]
@@ -119,6 +121,8 @@ export type Database = {
           start_place_name?: string | null
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          stay_check_in_deadline?: string | null
+          stay_parking_included?: boolean | null
           stay_subtype?: Database["public"]["Enums"]["stay_subtype"] | null
           transport_subtype?:
             | Database["public"]["Enums"]["transport_subtype"]
@@ -147,6 +151,8 @@ export type Database = {
           start_place_name?: string | null
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          stay_check_in_deadline?: string | null
+          stay_parking_included?: boolean | null
           stay_subtype?: Database["public"]["Enums"]["stay_subtype"] | null
           transport_subtype?:
             | Database["public"]["Enums"]["transport_subtype"]

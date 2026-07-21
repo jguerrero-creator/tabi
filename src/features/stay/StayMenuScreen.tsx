@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
-import { MenuListRow } from '../../components/menu/MenuListRow'
+import { MenuListRow, type MenuRowFlag } from '../../components/menu/MenuListRow'
 import { MenuSection } from '../../components/menu/MenuSection'
 import { groupByDate, type DateGroup } from '../../components/menu/groupByDate'
 import { nestOverlappingReservations } from '../../components/menu/nestOverlaps'
@@ -93,6 +93,7 @@ export function StayMenuScreen() {
                         title={reservation.name}
                         status={reservation.status}
                         secondaryLabel={checkoutLabel(reservation)}
+                        flags={stayFlags(reservation)}
                       />
                       {(childrenByMainId.get(reservation.id) ?? []).map((nested) => (
                         <MenuListRow
@@ -104,6 +105,7 @@ export function StayMenuScreen() {
                           secondaryLabel={checkoutLabel(nested)}
                           nested
                           overlapBadge={strings.common.overlapBadge}
+                          flags={stayFlags(nested)}
                         />
                       ))}
                     </Fragment>
@@ -159,6 +161,22 @@ function checkoutLabel(reservation: Reservation): string | null {
   // Derived from stored start_at/end_at, never from how the reservation was entered
   // (manual checkout date vs. the nights field, TABI-112) — one calculation either way.
   return strings.stayMenu.nightsCount(nightsBetween(checkIn, checkOut))
+}
+
+function stayFlags(reservation: Reservation): MenuRowFlag[] {
+  const flags: MenuRowFlag[] = []
+  if (reservation.stay_check_in_deadline) {
+    flags.push({
+      label: strings.stayMenu.checkInDeadlineFlag(reservation.stay_check_in_deadline.slice(0, 5)),
+      tone: 'warning',
+    })
+  }
+  if (reservation.stay_parking_included === false) {
+    flags.push({ label: strings.stayMenu.noParkingFlag, tone: 'warning' })
+  } else if (reservation.stay_parking_included === true) {
+    flags.push({ label: strings.stayMenu.parkingIncludedFlag, tone: 'positive' })
+  }
+  return flags
 }
 
 function buildTimeline(reservations: Reservation[], gaps: AccommodationGap[]): TimelineEntry[] {
