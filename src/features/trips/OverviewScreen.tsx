@@ -68,10 +68,14 @@ export function OverviewScreen() {
   )
 
   const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
+  const { locationsByDate: dayLocationsByKey, saveDayLocation, clearDayLocation } = useTripDayLocations(tripId ?? '')
   // Lifted above both TripLegsSection and TripTimeline so switching tabs
   // doesn't re-trigger a billed Google Routes API call for the same legs.
-  const { legs, loading: legsLoading, error: legsError } = useTripLegs(reservations, modeByLeg)
-  const { locationsByDate: dayLocationsByKey, saveDayLocation, clearDayLocation } = useTripDayLocations(tripId ?? '')
+  const {
+    legs,
+    loading: legsLoading,
+    error: legsError,
+  } = useTripLegs(reservations, dayLocationsByKey, modeByLeg)
   const { reminders, createReminder, deleteReminder } = useTripReminders(tripId ?? '')
 
   const loading = tripLoading || reservationsLoading

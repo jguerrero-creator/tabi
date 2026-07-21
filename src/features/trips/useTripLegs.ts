@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { findActiveStay } from '../stay/computeAccommodationGaps'
 import { buildTripLegs, legKey } from '../../lib/tripLegs'
-import { fetchTravelTime, type TravelMode } from '../../lib/travelTime'
+import { fetchTravelTime, type LatLng, type TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
+import type { TripDayLocation } from '../../types/dayLocation'
 
 export interface TripLeg {
   fromReservationId: string
@@ -18,13 +20,19 @@ const defaultMode: TravelMode = 'DRIVE'
  * Each leg defaults to driving; pass a mode override keyed by `legKey(fromId, toId)`
  * to compute that leg with a different transport mode instead.
  */
-export function useTripLegs(reservations: Reservation[], modeByLeg: Record<string, TravelMode> = {}) {
+export function useTripLegs(
+  reservations: Reservation[],
+  dayLocationsByDate: Map<string, TripDayLocation>,
+  modeByLeg: Record<string, TravelMode> = {},
+) {
   const [legs, setLegs] = useState<TripLeg[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const legInputs = buildTripLegs(reservations)
+    const legInputs = buildTripLegs(reservations, (dateKey) =>
+      resolveCoveredDayAnchor(dateKey, reservations, dayLocationsByDate),
+    )
     if (legInputs.length === 0) {
       setLegs([])
       setError(null)
@@ -38,6 +46,15 @@ export function useTripLegs(reservations: Reservation[], modeByLeg: Record<strin
     Promise.all(
       legInputs.map(async (leg) => {
         const mode = modeByLeg[legKey(leg.fromReservationId, leg.toReservationId)] ?? defaultMode
+        if (!leg.origin) {
+          return {
+            fromReservationId: leg.fromReservationId,
+            toReservationId: leg.toReservationId,
+            mode,
+            durationSeconds: null,
+            distanceMeters: null,
+          }
+        }
         const result = await fetchTravelTime(leg.origin, leg.destination, mode, leg.departureTime)
         return {
           fromReservationId: leg.fromReservationId,
@@ -61,7 +78,20 @@ export function useTripLegs(reservations: Reservation[], modeByLeg: Record<strin
     return () => {
       cancelled = true
     }
-  }, [reservations, modeByLeg])
+  }, [reservations, dayLocationsByDate, modeByLeg])
 
   return { legs, loading, error }
+}
+
+function resolveCoveredDayAnchor(
+  dateKey: string,
+  reservations: Reservation[],
+  dayLocationsByDate: Map<string, TripDayLocation>,
+): LatLng | null {
+  const dayLocation = dayLocationsByDate.get(dateKey)
+  if (dayLocation) return { lat: dayLocation.lat, lng: dayLocation.lng }
+
+  const activeStay = findActiveStay(dateKey, reservations)
+  if (!activeStay || activeStay.start_lat === null || activeStay.start_lng === null) return null
+  return { lat: activeStay.start_lat, lng: activeStay.start_lng }
 }

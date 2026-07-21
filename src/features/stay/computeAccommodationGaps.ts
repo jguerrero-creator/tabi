@@ -48,6 +48,18 @@ export function computeAccommodationGaps(
   return gaps
 }
 
+/** The Stay reservation covering a given local calendar date (check-in ≤ date < check-out), if any. */
+export function findActiveStay(dateKey: string, reservations: Reservation[]): Reservation | null {
+  return (
+    reservations.find((reservation) => {
+      if (reservation.type !== 'stay' || !reservation.start_at || !reservation.end_at) return false
+      const checkIn = dateOnlyInZone(reservation.start_at, reservation.start_timezone)
+      const checkOut = dateOnlyInZone(reservation.end_at, reservation.end_timezone)
+      return dateKey >= checkIn && dateKey < checkOut
+    }) ?? null
+  )
+}
+
 export function addDays(dateStr: string, days: number): string {
   const date = new Date(`${dateStr}T00:00:00Z`)
   date.setUTCDate(date.getUTCDate() + days)
