@@ -10,6 +10,7 @@ interface CreateTripInput {
   currency: string
   day_start_time: string
   day_end_time: string
+  note?: string | null
 }
 
 export function useTrips() {
@@ -52,6 +53,7 @@ export function useTrips() {
       currency: input.currency,
       day_start_time: input.day_start_time,
       day_end_time: input.day_end_time,
+      note: input.note ?? null,
     }
 
     const { data, error: insertError } = await supabase
@@ -66,7 +68,30 @@ export function useTrips() {
     return data
   }, [])
 
-  return { trips, loading, error, createTrip, refetch: fetchTrips }
+  const updateTrip = useCallback(async (tripId: string, input: CreateTripInput) => {
+    const { data, error: updateError } = await supabase
+      .from('trips')
+      .update({
+        name: input.name,
+        start_date: input.start_date,
+        end_date: input.end_date,
+        destinations: input.destinations,
+        currency: input.currency,
+        day_start_time: input.day_start_time,
+        day_end_time: input.day_end_time,
+        note: input.note ?? null,
+      })
+      .eq('id', tripId)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
+
+    setTrips((current) => current.map((trip) => (trip.id === tripId ? data : trip)).sort(compareByStartDate))
+    return data
+  }, [])
+
+  return { trips, loading, error, createTrip, updateTrip, refetch: fetchTrips }
 }
 
 function compareByStartDate(a: Trip, b: Trip) {

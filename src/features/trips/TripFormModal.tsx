@@ -8,27 +8,33 @@ import type { Trip } from '../../types/trip'
 const DEFAULT_DAY_START_TIME = '08:00'
 const DEFAULT_DAY_END_TIME = '22:00'
 
-interface CreateTripModalProps {
-  onClose: () => void
-  onCreate: (input: {
-    name: string
-    start_date: string | null
-    end_date: string | null
-    destinations: string[]
-    currency: string
-    day_start_time: string
-    day_end_time: string
-  }) => Promise<Trip>
+export interface TripFormValues {
+  name: string
+  start_date: string | null
+  end_date: string | null
+  destinations: string[]
+  currency: string
+  day_start_time: string
+  day_end_time: string
+  note: string | null
 }
 
-export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
-  const [name, setName] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [destinations, setDestinations] = useState<string[]>([])
-  const [currency, setCurrency] = useState(getDefaultCurrency)
-  const [dayStartTime, setDayStartTime] = useState(DEFAULT_DAY_START_TIME)
-  const [dayEndTime, setDayEndTime] = useState(DEFAULT_DAY_END_TIME)
+interface TripFormModalProps {
+  trip?: Trip
+  onClose: () => void
+  onSubmit: (input: TripFormValues) => Promise<Trip>
+}
+
+export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
+  const isEditing = trip !== undefined
+  const [name, setName] = useState(trip?.name ?? '')
+  const [startDate, setStartDate] = useState(trip?.start_date ?? '')
+  const [endDate, setEndDate] = useState(trip?.end_date ?? '')
+  const [destinations, setDestinations] = useState<string[]>(trip?.destinations ?? [])
+  const [currency, setCurrency] = useState(() => trip?.currency ?? getDefaultCurrency())
+  const [dayStartTime, setDayStartTime] = useState(trip?.day_start_time.slice(0, 5) ?? DEFAULT_DAY_START_TIME)
+  const [dayEndTime, setDayEndTime] = useState(trip?.day_end_time.slice(0, 5) ?? DEFAULT_DAY_END_TIME)
+  const [note, setNote] = useState(trip?.note ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,7 +54,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
     setSubmitting(true)
     setError(null)
     try {
-      await onCreate({
+      await onSubmit({
         name: name.trim(),
         start_date: startDate || null,
         end_date: endDate || null,
@@ -56,6 +62,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
         currency,
         day_start_time: dayStartTime,
         day_end_time: dayEndTime,
+        note: note.trim() || null,
       })
       onClose()
     } catch {
@@ -68,7 +75,9 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 sm:rounded-2xl">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">{strings.createTrip.title}</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">
+          {isEditing ? strings.editTrip.title : strings.createTrip.title}
+        </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="trip-name" className="mb-1 block text-sm font-medium text-slate-700">
@@ -167,6 +176,20 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
             <p className="mt-1 text-xs text-slate-500">{strings.createTrip.dayRangeHint}</p>
           </div>
 
+          <div>
+            <label htmlFor="trip-note" className="mb-1 block text-sm font-medium text-slate-700">
+              {strings.createTrip.notesLabel}
+            </label>
+            <textarea
+              id="trip-note"
+              rows={3}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder={strings.createTrip.notesPlaceholder}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            />
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
@@ -174,7 +197,7 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
               {strings.createTrip.cancel}
             </Button>
             <Button type="submit" disabled={submitting || !name.trim()}>
-              {strings.createTrip.submit}
+              {isEditing ? strings.editTrip.submit : strings.createTrip.submit}
             </Button>
           </div>
         </form>
@@ -182,4 +205,3 @@ export function CreateTripModal({ onClose, onCreate }: CreateTripModalProps) {
     </div>
   )
 }
-

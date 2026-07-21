@@ -5,12 +5,13 @@ import { Spinner } from '../../components/ui/Spinner'
 import { countryName } from '../../lib/countries'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
-import { CreateTripModal } from './CreateTripModal'
+import { TripFormModal } from './TripFormModal'
 import { useTrips } from './useTrips'
 
 export function TripsListScreen() {
-  const { trips, loading, error, createTrip } = useTrips()
+  const { trips, loading, error, createTrip, updateTrip } = useTrips()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
 
   const { upcoming, past } = useMemo(() => splitByDate(trips), [trips])
 
@@ -50,20 +51,36 @@ export function TripsListScreen() {
 
         {!loading && !error && trips.length > 0 && (
           <div className="space-y-6">
-            <TripSection title={strings.sections.upcoming} trips={upcoming} />
-            <TripSection title={strings.sections.past} trips={past} />
+            <TripSection title={strings.sections.upcoming} trips={upcoming} onEdit={setEditingTrip} />
+            <TripSection title={strings.sections.past} trips={past} onEdit={setEditingTrip} />
           </div>
         )}
       </main>
 
       {showCreateModal && (
-        <CreateTripModal onClose={() => setShowCreateModal(false)} onCreate={createTrip} />
+        <TripFormModal onClose={() => setShowCreateModal(false)} onSubmit={createTrip} />
+      )}
+
+      {editingTrip && (
+        <TripFormModal
+          trip={editingTrip}
+          onClose={() => setEditingTrip(null)}
+          onSubmit={(input) => updateTrip(editingTrip.id, input)}
+        />
       )}
     </div>
   )
 }
 
-function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
+function TripSection({
+  title,
+  trips,
+  onEdit,
+}: {
+  title: string
+  trips: Trip[]
+  onEdit: (trip: Trip) => void
+}) {
   if (trips.length === 0) return null
 
   return (
@@ -71,8 +88,11 @@ function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid lg:grid-cols-3 lg:gap-4 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {trips.map((trip) => (
-          <li key={trip.id} className="lg:overflow-hidden lg:rounded-xl lg:border lg:border-slate-200 lg:bg-white">
-            <Link to={`/trips/${trip.id}`} className="block px-4 py-3 hover:bg-slate-50">
+          <li
+            key={trip.id}
+            className="flex items-center lg:overflow-hidden lg:rounded-xl lg:border lg:border-slate-200 lg:bg-white"
+          >
+            <Link to={`/trips/${trip.id}`} className="block flex-1 px-4 py-3 hover:bg-slate-50">
               <p className="text-sm font-medium text-slate-900">{trip.name}</p>
               {trip.destinations.length > 0 && (
                 <p className="text-xs text-slate-500">
@@ -81,6 +101,14 @@ function TripSection({ title, trips }: { title: string; trips: Trip[] }) {
               )}
               <p className="text-xs text-slate-500">{formatDateRange(trip.start_date, trip.end_date)}</p>
             </Link>
+            <button
+              type="button"
+              onClick={() => onEdit(trip)}
+              aria-label={strings.editTrip.editCta}
+              className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              ✎
+            </button>
           </li>
         ))}
       </ul>

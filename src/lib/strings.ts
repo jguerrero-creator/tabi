@@ -34,11 +34,18 @@ export const strings = {
     dayStartLabel: 'Day starts at',
     dayEndLabel: 'Day ends at',
     dayRangeHint: "Bounds each day's free time — adjust if you're an early riser or night owl.",
+    notesLabel: 'Notes',
+    notesPlaceholder: 'Trip expectations, goals, anything worth remembering…',
     submit: 'Create Trip',
     cancel: 'Cancel',
     errorDateRange: 'End date must be on or after the start date.',
     errorDayRange: 'Day end time must be after day start time.',
     errorGeneric: 'Something went wrong. Please try again.',
+  },
+  editTrip: {
+    title: 'Edit Trip',
+    editCta: 'Edit trip',
+    submit: 'Save Changes',
   },
   sections: {
     upcoming: 'Upcoming',
