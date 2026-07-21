@@ -6,7 +6,7 @@ import { FormSheet } from '../../components/ui/FormSheet'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
 import { StatusPicker } from '../../components/ui/StatusPicker'
-import { localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
+import { localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
 import {
   AddressSelectionCancelledError,
   fetchGeocodeByPlaceId,
@@ -100,11 +100,26 @@ const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan
 interface AddReservationModalProps {
   tripId: string
   defaultType?: UiReservationType
+  /**
+   * Seeds the start date/time from a free-time block on the timeline (TABI-54)
+   * — the block's own real-location timezone, not the browser's, since
+   * `initialTimezone` also stands in for `startTimezone` below until a real
+   * address is geocoded.
+   */
+  initialStartAt?: string | null
+  initialTimezone?: string | null
   onClose: () => void
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
 
-export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, onCreate }: AddReservationModalProps) {
+export function AddReservationModal({
+  tripId,
+  defaultType = 'hotel',
+  initialStartAt = null,
+  initialTimezone = null,
+  onClose,
+  onCreate,
+}: AddReservationModalProps) {
   const [uiType, setUiType] = useState<UiReservationType>(defaultType)
   // TABI-126: the add sheet inherits its type from the menu it was opened from (Stay/Transport/
   // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
@@ -118,8 +133,12 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
   const [endAddress, setEndAddress] = useState('')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
   const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(null)
-  const [startDate, setStartDate] = useState('')
-  const [startTime, setStartTime] = useState('')
+  const [startDate, setStartDate] = useState(() =>
+    initialStartAt ? localDateKey(initialStartAt, initialTimezone) : '',
+  )
+  const [startTime, setStartTime] = useState(() =>
+    initialStartAt ? localTimeKey(initialStartAt, initialTimezone) : '',
+  )
   const [endDate, setEndDate] = useState('')
   const [endTime, setEndTime] = useState('')
   const [nights, setNights] = useState('')
@@ -265,7 +284,7 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
     }
     setGeocoding(false)
 
-    const startTimezone = startGeo?.timezone ?? localTimeZone()
+    const startTimezone = startGeo?.timezone ?? initialTimezone ?? localTimeZone()
     const endTimezone = option.requiresEndAddress ? (endGeo?.timezone ?? startTimezone) : startTimezone
 
     const startAt = startDate && startTime ? zonedTimeToUtc(startDate, startTime, startTimezone) : null

@@ -116,6 +116,7 @@ export const strings = {
     longTravel: (duration: string, mode: TravelMode) => `${duration} ${travelModeVerb[mode]} — long leg`,
     longTravelDay: 'Long travel day',
     localTimeLabel: (timeZone: string) => `🕐 Local time: ${timeZone}`,
+    addAtFreeTime: 'Add something here',
   },
   menus: {
     overview: 'Overview',

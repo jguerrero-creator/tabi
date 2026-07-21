@@ -27,6 +27,16 @@ export function localDateKey(isoUtc: string, timeZone: string | null): string {
   }).format(new Date(isoUtc))
 }
 
+/** "HH:MM" 24-hour value for a controlled `<input type="time">`, mirroring `localDateKey`'s date counterpart. */
+export function localTimeKey(isoUtc: string, timeZone: string | null): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timeZone ?? 'UTC',
+    hourCycle: 'h23',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(isoUtc))
+}
+
 export function formatDateHeader(isoUtc: string, timeZone: string | null): string {
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',

@@ -10,6 +10,8 @@ import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { Reminder } from '../../types/reminder'
 import type { MapPoint } from '../../components/ui/MiniMap'
+import { AddReservationModal } from '../reservations/AddReservationModal'
+import { useCreateReservation } from '../reservations/useCreateReservation'
 import { OverviewMap } from './OverviewMap'
 import { RemindersSection } from './RemindersSection'
 import { TripLegsSection } from './TripLegsSection'
@@ -30,7 +32,14 @@ export function OverviewScreen() {
     reservations,
     loading: reservationsLoading,
     error: reservationsError,
+    refetch: refetchReservations,
   } = useTripReservations(tripId ?? '')
+  const { createReservation } = useCreateReservation(tripId ?? '')
+  // TABI-54: "+" on a free-time timeline block opens the shared Add sheet
+  // (defaulted to Activity, the one type with no required address/price)
+  // pre-seeded with that block's own start time/timezone instead of asking
+  // the user to re-derive it.
+  const [quickAddBlock, setQuickAddBlock] = useState<{ startAt: string; timezone: string | null } | null>(null)
   // TABI-131: tab + selected day live in the URL (not local state) so that
   // navigating to a reservation's detail screen and back restores Planning
   // and its selected day instead of remounting to the Overview default.
@@ -221,11 +230,27 @@ export function OverviewScreen() {
                 dayLocationsByKey={dayLocationsByKey}
                 onSaveDayLocation={saveDayLocation}
                 onClearDayLocation={clearDayLocation}
+                onAddAtFreeBlock={setQuickAddBlock}
               />
             )}
           </div>
         )}
       </main>
+
+      {quickAddBlock && (
+        <AddReservationModal
+          tripId={tripId ?? ''}
+          defaultType="activity"
+          initialStartAt={quickAddBlock.startAt}
+          initialTimezone={quickAddBlock.timezone}
+          onClose={() => setQuickAddBlock(null)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+        />
+      )}
     </>
   )
 }

@@ -45,6 +45,8 @@ interface DayColumnProps {
   dayLocation?: TripDayLocation | null
   onSaveDayLocation?: (input: DayLocationInput) => Promise<void>
   onClearDayLocation?: () => Promise<void>
+  /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
+  onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
   className?: string
 }
 
@@ -58,6 +60,7 @@ export function DayColumn({
   dayLocation,
   onSaveDayLocation,
   onClearDayLocation,
+  onAddAtFreeBlock,
   className,
 }: DayColumnProps) {
   const dayTimezone = items[0]?.start_timezone ?? localTimeZone()
@@ -114,7 +117,7 @@ export function DayColumn({
                 {entry.time ? formatTimeInZone(entry.time, entry.timezone ?? dayTimezone) : ''}
               </span>
               <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
-              {renderEntry(entry)}
+              {renderEntry(entry, onAddAtFreeBlock)}
             </li>
           ))}
         </ul>
@@ -228,7 +231,10 @@ function buildRailEntries(
   return entries
 }
 
-function renderEntry(entry: RailEntry) {
+function renderEntry(
+  entry: RailEntry,
+  onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void,
+) {
   switch (entry.kind) {
     case 'reservation':
       return <ReservationCard reservation={entry.reservation} />
@@ -255,9 +261,20 @@ function renderEntry(entry: RailEntry) {
       )
     case 'free':
       return (
-        <p className="rounded-xl border-2 border-dashed border-teal-200 bg-white px-4 py-3 text-sm font-medium text-teal-700">
-          {strings.planning.freeTime(formatDuration(entry.durationSeconds))}
-        </p>
+        <div className="flex items-center justify-between gap-2 rounded-xl border-2 border-dashed border-teal-200 bg-white px-4 py-3 text-sm font-medium text-teal-700">
+          <span>{strings.planning.freeTime(formatDuration(entry.durationSeconds))}</span>
+          {onAddAtFreeBlock && (
+            <button
+              type="button"
+              onClick={() => onAddAtFreeBlock({ startAt: entry.time, timezone: entry.timezone })}
+              aria-label={strings.planning.addAtFreeTime}
+              title={strings.planning.addAtFreeTime}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 hover:bg-teal-200"
+            >
+              +
+            </button>
+          )}
+        </div>
       )
   }
 }

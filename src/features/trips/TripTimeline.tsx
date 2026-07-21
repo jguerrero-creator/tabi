@@ -40,6 +40,8 @@ interface TripTimelineProps {
   dayLocationsByKey: Map<string, TripDayLocation>
   onSaveDayLocation: (dateKey: string, input: DayLocationInput) => Promise<void>
   onClearDayLocation: (dateKey: string) => Promise<void>
+  /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
+  onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
 }
 
 type DayEdges = { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }
@@ -63,6 +65,7 @@ export function TripTimeline({
   dayLocationsByKey,
   onSaveDayLocation,
   onClearDayLocation,
+  onAddAtFreeBlock,
 }: TripTimelineProps) {
   const groups = groupByDate(
     reservations,
@@ -108,6 +111,7 @@ export function TripTimeline({
           freeTimeByFromId={freeTimeByFromId}
           edges={dayEdgesByKey.get(effectiveSelectedKey) ?? {}}
           dayLocation={dayLocationsByKey.get(effectiveSelectedKey)}
+          onAddAtFreeBlock={onAddAtFreeBlock}
           onSaveDayLocation={
             effectiveSelectedKey === UNSCHEDULED_KEY
               ? undefined
@@ -129,6 +133,7 @@ export function TripTimeline({
             freeTimeByFromId={freeTimeByFromId}
             edges={dayEdgesByKey.get(day.key) ?? {}}
             dayLocation={dayLocationsByKey.get(day.key)}
+            onAddAtFreeBlock={onAddAtFreeBlock}
             onSaveDayLocation={
               day.key === UNSCHEDULED_KEY ? undefined : (input) => onSaveDayLocation(day.key, input)
             }
