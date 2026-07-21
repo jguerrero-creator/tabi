@@ -44,11 +44,13 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
     await page.getByRole('button', { name: 'Add reservation' }).click()
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
 
-    // Default sub-type (Flight) shows point-to-point labels.
+    // Default sub-type (Flight) shows point-to-point labels. The type selector is collapsed by
+    // default (TABI-126) — it inherits Flight from the Transport menu without re-asking.
     await expect(page.getByLabel('Departure address')).toBeVisible()
     await expect(page.getByLabel('Arrival address')).toBeVisible()
 
     // Switching to Vehicle rental swaps the fields shown for pickup/drop-off.
+    await page.getByRole('button', { name: 'Change type' }).click()
     await page.getByLabel('Type').selectOption('car_rental')
     await expect(page.getByLabel('Pickup city')).toBeVisible()
     await expect(page.getByLabel('Drop-off city')).toBeVisible()

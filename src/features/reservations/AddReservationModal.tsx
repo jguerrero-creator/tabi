@@ -102,6 +102,9 @@ interface AddReservationModalProps {
 
 export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, onCreate }: AddReservationModalProps) {
   const [uiType, setUiType] = useState<UiReservationType>(defaultType)
+  // TABI-126: the add sheet inherits its type from the menu it was opened from (Stay/Transport/
+  // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
+  const [typeExpanded, setTypeExpanded] = useState(false)
   const [name, setName] = useState('')
   const [status, setStatus] = useState<ReservationStatus>('to_book')
   const [startAddress, setStartAddress] = useState('')
@@ -335,19 +338,32 @@ export function AddReservationModal({ tripId, defaultType = 'hotel', onClose, on
         <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">{strings.addReservation.title}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label={strings.addReservation.typeLabel}>
-              <select
-                value={uiType}
-                onChange={(event) => setUiType(event.target.value as UiReservationType)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              >
-                {typeOptions.map((candidate) => (
-                  <option key={candidate.value} value={candidate.value}>
-                    {strings.addReservation.types[candidate.value]}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {typeExpanded ? (
+              <Field label={strings.addReservation.typeLabel}>
+                <select
+                  value={uiType}
+                  onChange={(event) => setUiType(event.target.value as UiReservationType)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                >
+                  {typeOptions.map((candidate) => (
+                    <option key={candidate.value} value={candidate.value}>
+                      {strings.addReservation.types[candidate.value]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-900">{strings.addReservation.types[uiType]}</span>
+                <button
+                  type="button"
+                  onClick={() => setTypeExpanded(true)}
+                  className="text-sm text-teal-700 underline"
+                >
+                  {strings.addReservation.changeTypeToggle}
+                </button>
+              </div>
+            )}
 
             <Field label={strings.addReservation.nameLabel}>
               <input

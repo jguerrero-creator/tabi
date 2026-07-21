@@ -162,6 +162,7 @@ export const strings = {
   addReservation: {
     title: 'Add Reservation',
     typeLabel: 'Type',
+    changeTypeToggle: 'Change type',
     types: {
       hotel: 'Hotel',
       flight: 'Flight',
