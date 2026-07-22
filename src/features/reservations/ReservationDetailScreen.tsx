@@ -377,6 +377,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               value={startAddress}
               onTextChange={handleStartAddressChange}
               onPlaceSelect={handleStartPlaceSelect}
+              citiesOnly={reservation.transport_subtype === 'at_disposal'}
             />
             {reservation.type === 'transport' && (
               <PlaceAutocompleteField
@@ -389,6 +390,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 value={endAddress}
                 onTextChange={handleEndAddressChange}
                 onPlaceSelect={handleEndPlaceSelect}
+                citiesOnly={reservation.transport_subtype === 'at_disposal'}
               />
             )}
             {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}

@@ -159,6 +159,9 @@ export function AddReservationModal({
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
   // TABI-122: point-to-point transport has no free-text name — it's derived from the route.
   const isAutoNamedTransport = option.transportSubtype === 'point_to_point'
+  // TABI-123: vehicle rental is a duration, not a route — city-level pickup/drop-off and a
+  // date range, not the point-to-point flow's exact address + departure/arrival time.
+  const isAtDisposal = option.transportSubtype === 'at_disposal'
   // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
   // whichever type is currently selected so switching type mid-form checks against the right set.
   const { reservations: sameTypeReservations, loading: sameTypeLoading } = useReservationsByType(
@@ -243,7 +246,7 @@ export function AddReservationModal({
       setError(strings.addReservation.errorNameRequired)
       return
     }
-    if (option.requiresStart && (!startDate || !startTime)) {
+    if (option.requiresStart && (!startDate || (!isAtDisposal && !startTime))) {
       setError(strings.addReservation.errorStartRequired)
       return
     }
@@ -253,7 +256,7 @@ export function AddReservationModal({
           setError(strings.addReservation.errorNightsRequired)
           return
         }
-      } else if (!endDate || !endTime) {
+      } else if (!endDate || (!isAtDisposal && !endTime)) {
         setError(strings.addReservation.errorEndRequired)
         return
       }
@@ -287,8 +290,12 @@ export function AddReservationModal({
     const startTimezone = startGeo?.timezone ?? initialTimezone ?? localTimeZone()
     const endTimezone = option.requiresEndAddress ? (endGeo?.timezone ?? startTimezone) : startTimezone
 
-    const startAt = startDate && startTime ? zonedTimeToUtc(startDate, startTime, startTimezone) : null
-    const endAt = endDate && endTime ? zonedTimeToUtc(endDate, endTime, endTimezone) : null
+    // Vehicle rental collects a date range, not exact times (TABI-123) — anchor to midday so
+    // the stored timestamp never drifts to an adjacent calendar day across timezone conversion.
+    const effectiveStartTime = isAtDisposal ? '12:00' : startTime
+    const effectiveEndTime = isAtDisposal ? '12:00' : endTime
+    const startAt = startDate && effectiveStartTime ? zonedTimeToUtc(startDate, effectiveStartTime, startTimezone) : null
+    const endAt = endDate && effectiveEndTime ? zonedTimeToUtc(endDate, effectiveEndTime, endTimezone) : null
 
     if (startAt && endAt && endAt < startAt) {
       setError(strings.addReservation.errorEndBeforeStart)
@@ -470,7 +477,7 @@ export function AddReservationModal({
         <PlaceAutocompleteField
           id="start-address"
           label={
-            option.transportSubtype === 'at_disposal'
+            isAtDisposal
               ? strings.addReservation.startAddressLabelAtDisposal
               : option.requiresEndAddress
                 ? strings.addReservation.startAddressLabelTransport
@@ -479,30 +486,41 @@ export function AddReservationModal({
           value={startAddress}
           onTextChange={handleStartAddressChange}
           onPlaceSelect={handleStartPlaceSelect}
+          citiesOnly={isAtDisposal}
         />
 
         {option.requiresEndAddress && (
           <PlaceAutocompleteField
             id="end-address"
             label={
-              option.transportSubtype === 'at_disposal'
+              isAtDisposal
                 ? strings.addReservation.endAddressLabelAtDisposal
                 : strings.addReservation.endAddressLabel
             }
             value={endAddress}
             onTextChange={handleEndAddressChange}
             onPlaceSelect={handleEndPlaceSelect}
+            citiesOnly={isAtDisposal}
           />
         )}
 
-        <DateTimeField
-          legend={strings.addReservation.startLabel}
-          date={startDate}
-          time={startTime}
-          onDateChange={setStartDate}
-          onTimeChange={setStartTime}
-          required={option.requiresStart}
-        />
+        {isAtDisposal ? (
+          <DateField
+            legend={strings.addReservation.startLabel}
+            date={startDate}
+            onDateChange={setStartDate}
+            required={option.requiresStart}
+          />
+        ) : (
+          <DateTimeField
+            legend={strings.addReservation.startLabel}
+            date={startDate}
+            time={startTime}
+            onDateChange={setStartDate}
+            onTimeChange={setStartTime}
+            required={option.requiresStart}
+          />
+        )}
 
         {option.dbType === 'stay' && !manualEndDate ? (
           <div className="space-y-2">
@@ -551,14 +569,23 @@ export function AddReservationModal({
           </div>
         ) : (
           <div className="space-y-2">
-            <DateTimeField
-              legend={strings.addReservation.endLabel}
-              date={endDate}
-              time={endTime}
-              onDateChange={setEndDate}
-              onTimeChange={setEndTime}
-              required={option.requiresEnd}
-            />
+            {isAtDisposal ? (
+              <DateField
+                legend={strings.addReservation.endLabel}
+                date={endDate}
+                onDateChange={setEndDate}
+                required={option.requiresEnd}
+              />
+            ) : (
+              <DateTimeField
+                legend={strings.addReservation.endLabel}
+                date={endDate}
+                time={endTime}
+                onDateChange={setEndDate}
+                onTimeChange={setEndTime}
+                required={option.requiresEnd}
+              />
+            )}
             {option.dbType === 'stay' && (
               <button
                 type="button"
@@ -710,6 +737,32 @@ function Field({
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
       {children}
     </label>
+  )
+}
+
+function DateField({
+  legend,
+  date,
+  onDateChange,
+  required,
+}: {
+  legend: string
+  date: string
+  onDateChange: (value: string) => void
+  required: boolean
+}) {
+  return (
+    <fieldset className="flex-1">
+      <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
+      <input
+        type="date"
+        aria-label={`${legend} date`}
+        value={date}
+        onChange={(event) => onDateChange(event.target.value)}
+        required={required}
+        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+      />
+    </fieldset>
   )
 }
 

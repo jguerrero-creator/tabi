@@ -20,6 +20,8 @@ interface PlaceAutocompleteFieldProps {
   placeholder?: string
   required?: boolean
   className?: string
+  /** Restricts suggestions to city/locality-level places (TABI-123 vehicle rental pickup/drop-off) instead of exact addresses. */
+  citiesOnly?: boolean
 }
 
 export function PlaceAutocompleteField({
@@ -31,6 +33,7 @@ export function PlaceAutocompleteField({
   placeholder,
   required,
   className = '',
+  citiesOnly,
 }: PlaceAutocompleteFieldProps) {
   if (!mapsApiKey) {
     return (
@@ -60,6 +63,7 @@ export function PlaceAutocompleteField({
       placeholder={placeholder}
       required={required}
       className={className}
+      citiesOnly={citiesOnly}
     />
   )
 }
@@ -73,6 +77,7 @@ function PlaceAutocompleteFieldWithPlaces({
   placeholder,
   required,
   className,
+  citiesOnly,
 }: PlaceAutocompleteFieldProps) {
   const placesLib = useMapsLibrary('places')
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompleteSuggestion[]>([])
@@ -138,6 +143,7 @@ function PlaceAutocompleteFieldWithPlaces({
       const { suggestions: results } = await currentPlacesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: text,
         sessionToken: sessionTokenRef.current,
+        ...(citiesOnly ? { includedPrimaryTypes: ['(cities)'] } : {}),
       })
       if (requestId !== requestIdRef.current) return
       setSuggestions(results)
