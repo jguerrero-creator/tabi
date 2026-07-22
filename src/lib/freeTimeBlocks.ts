@@ -28,7 +28,7 @@ interface LegDuration {
   fromReservationId: string
   toReservationId: string
   durationSeconds: number | null
-  mode: TravelMode
+  mode: TravelMode | null
 }
 
 /** Free blocks shorter than this aren't worth surfacing to the user as "free time". */

@@ -59,7 +59,9 @@ export function TripLegsSection({ reservations, legs, loading, error, onModeChan
                   {from?.name ?? '—'} → {to?.name ?? '—'}
                 </p>
                 <div className="mb-2">
-                  {leg.durationSeconds === null && isTransitMode(leg.mode) ? (
+                  {leg.mode === null ? (
+                    <p className="text-xs text-slate-500">{strings.tripLegs.selectMode}</p>
+                  ) : leg.durationSeconds === null && isTransitMode(leg.mode) ? (
                     <p className="text-xs font-medium text-amber-700">{strings.tripLegs.noTransitRoute}</p>
                   ) : (
                     <p className="text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>

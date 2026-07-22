@@ -8,17 +8,15 @@ import type { TripDayLocation } from '../../types/dayLocation'
 export interface TripLeg {
   fromReservationId: string
   toReservationId: string
-  mode: TravelMode
+  mode: TravelMode | null
   durationSeconds: number | null
   distanceMeters: number | null
 }
 
-const defaultMode: TravelMode = 'DRIVE'
-
 /**
  * Computes travel time between each consecutive pair of a trip's reservations.
- * Each leg defaults to driving; pass a mode override keyed by `legKey(fromId, toId)`
- * to compute that leg with a different transport mode instead.
+ * A leg has no mode until the user picks one (TABI-154); pass a mode override
+ * keyed by `legKey(fromId, toId)` to compute that leg with a chosen transport mode.
  */
 export function useTripLegs(
   reservations: Reservation[],
@@ -45,8 +43,8 @@ export function useTripLegs(
 
     Promise.all(
       legInputs.map(async (leg) => {
-        const mode = modeByLeg[legKey(leg.fromReservationId, leg.toReservationId)] ?? defaultMode
-        if (!leg.origin) {
+        const mode = modeByLeg[legKey(leg.fromReservationId, leg.toReservationId)] ?? null
+        if (!leg.origin || !mode) {
           return {
             fromReservationId: leg.fromReservationId,
             toReservationId: leg.toReservationId,

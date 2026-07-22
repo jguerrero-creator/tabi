@@ -4,7 +4,7 @@ import type { TravelMode } from '../../lib/travelTime'
 const options: TravelMode[] = ['DRIVE', 'WALK', 'BICYCLE', 'TRANSIT', 'TRAIN']
 
 interface TravelModePickerProps {
-  value: TravelMode
+  value: TravelMode | null
   onChange: (mode: TravelMode) => void
   disabled?: boolean
 }
