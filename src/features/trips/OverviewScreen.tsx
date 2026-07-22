@@ -18,6 +18,7 @@ import { TripLegsSection } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
 import { useTrip } from './useTrip'
 import { useTripDayLocations } from './useTripDayLocations'
+import { useTripDayNotes } from './useTripDayNotes'
 import { useTripLegs } from './useTripLegs'
 import { useTripReminders } from './useTripReminders'
 import { useTripReservations } from './useTripReservations'
@@ -78,6 +79,7 @@ export function OverviewScreen() {
 
   const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
   const { locationsByDate: dayLocationsByKey, saveDayLocation, clearDayLocation } = useTripDayLocations(tripId ?? '')
+  const { notesByDate: dayNotesByKey, saveDayNote, clearDayNote } = useTripDayNotes(tripId ?? '')
   // Lifted above both TripLegsSection and TripTimeline so switching tabs
   // doesn't re-trigger a billed Google Routes API call for the same legs.
   const {
@@ -230,6 +232,9 @@ export function OverviewScreen() {
                 dayLocationsByKey={dayLocationsByKey}
                 onSaveDayLocation={saveDayLocation}
                 onClearDayLocation={clearDayLocation}
+                dayNotesByKey={dayNotesByKey}
+                onSaveDayNote={saveDayNote}
+                onClearDayNote={clearDayNote}
                 onAddAtFreeBlock={setQuickAddBlock}
               />
             )}

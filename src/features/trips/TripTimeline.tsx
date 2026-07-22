@@ -10,6 +10,7 @@ import { strings } from '../../lib/strings'
 import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
+import type { TripDayNote } from '../../types/dayNote'
 import { DayColumn } from './DayColumn'
 import { DayTabs } from './DayTabs'
 import type { TripLeg } from './useTripLegs'
@@ -40,6 +41,10 @@ interface TripTimelineProps {
   dayLocationsByKey: Map<string, TripDayLocation>
   onSaveDayLocation: (dateKey: string, input: DayLocationInput) => Promise<void>
   onClearDayLocation: (dateKey: string) => Promise<void>
+  /** Day notes (TABI-56), keyed by date — absent for the "Unscheduled" pseudo-day. */
+  dayNotesByKey: Map<string, TripDayNote>
+  onSaveDayNote: (dateKey: string, note: string) => Promise<void>
+  onClearDayNote: (dateKey: string) => Promise<void>
   /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
   onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
 }
@@ -65,6 +70,9 @@ export function TripTimeline({
   dayLocationsByKey,
   onSaveDayLocation,
   onClearDayLocation,
+  dayNotesByKey,
+  onSaveDayNote,
+  onClearDayNote,
   onAddAtFreeBlock,
 }: TripTimelineProps) {
   const groups = groupByDate(
@@ -120,6 +128,15 @@ export function TripTimeline({
           onClearDayLocation={
             effectiveSelectedKey === UNSCHEDULED_KEY ? undefined : () => onClearDayLocation(effectiveSelectedKey)
           }
+          dayNote={dayNotesByKey.get(effectiveSelectedKey)}
+          onSaveDayNote={
+            effectiveSelectedKey === UNSCHEDULED_KEY
+              ? undefined
+              : (note) => onSaveDayNote(effectiveSelectedKey, note)
+          }
+          onClearDayNote={
+            effectiveSelectedKey === UNSCHEDULED_KEY ? undefined : () => onClearDayNote(effectiveSelectedKey)
+          }
         />
       </div>
 
@@ -138,6 +155,9 @@ export function TripTimeline({
               day.key === UNSCHEDULED_KEY ? undefined : (input) => onSaveDayLocation(day.key, input)
             }
             onClearDayLocation={day.key === UNSCHEDULED_KEY ? undefined : () => onClearDayLocation(day.key)}
+            dayNote={dayNotesByKey.get(day.key)}
+            onSaveDayNote={day.key === UNSCHEDULED_KEY ? undefined : (note) => onSaveDayNote(day.key, note)}
+            onClearDayNote={day.key === UNSCHEDULED_KEY ? undefined : () => onClearDayNote(day.key)}
             className="w-80 shrink-0 snap-start"
           />
         ))}

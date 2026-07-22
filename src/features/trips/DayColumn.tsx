@@ -13,6 +13,8 @@ import { strings } from '../../lib/strings'
 import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
+import type { TripDayNote } from '../../types/dayNote'
+import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
 import type { DayLocationInput } from './useTripDayLocations'
 
@@ -45,6 +47,10 @@ interface DayColumnProps {
   dayLocation?: TripDayLocation | null
   onSaveDayLocation?: (input: DayLocationInput) => Promise<void>
   onClearDayLocation?: () => Promise<void>
+  /** Day-level note (TABI-56) — same "Unscheduled" pseudo-day omission as dayLocation above. */
+  dayNote?: TripDayNote | null
+  onSaveDayNote?: (note: string) => Promise<void>
+  onClearDayNote?: () => Promise<void>
   /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
   onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
   className?: string
@@ -60,6 +66,9 @@ export function DayColumn({
   dayLocation,
   onSaveDayLocation,
   onClearDayLocation,
+  dayNote,
+  onSaveDayNote,
+  onClearDayNote,
   onAddAtFreeBlock,
   className,
 }: DayColumnProps) {
@@ -96,14 +105,21 @@ export function DayColumn({
         )}
       </div>
 
-      {onSaveDayLocation && onClearDayLocation && (
-        <DayPlannedLocation
-          dayKey={dayKey}
-          location={dayLocation ?? null}
-          onSave={onSaveDayLocation}
-          onClear={onClearDayLocation}
-        />
-      )}
+      {(onSaveDayLocation && onClearDayLocation) || (onSaveDayNote && onClearDayNote) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {onSaveDayLocation && onClearDayLocation && (
+            <DayPlannedLocation
+              dayKey={dayKey}
+              location={dayLocation ?? null}
+              onSave={onSaveDayLocation}
+              onClear={onClearDayLocation}
+            />
+          )}
+          {onSaveDayNote && onClearDayNote && (
+            <DayNote dayKey={dayKey} note={dayNote ?? null} onSave={onSaveDayNote} onClear={onClearDayNote} />
+          )}
+        </div>
+      ) : null}
 
       {railEntries.length === 0 ? (
         <p className="ml-14 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
