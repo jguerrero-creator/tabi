@@ -11,7 +11,7 @@ import { AddReservationModal } from '../reservations/AddReservationModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
-import { localDateKey } from '../../lib/datetime'
+import { localDateKey, formatDateRangeLabel, formatTimeOnly } from '../../lib/datetime'
 import type { Reservation } from '../../types/reservation'
 import { computeAccommodationGaps, type AccommodationGap } from './computeAccommodationGaps'
 
@@ -140,7 +140,7 @@ function GapSection({ gap }: { gap: AccommodationGap }) {
   return (
     <section>
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
-        {strings.stayMenu.gapLabel} · {gap.start} → {gap.end}
+        {strings.stayMenu.gapLabel} · {formatDateRangeLabel(gap.start, gap.end)}
       </h2>
       <div className="flex items-center gap-3 rounded-xl border-l-4 border-l-red-400 bg-red-50 px-4 py-3">
         <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
@@ -167,7 +167,7 @@ function stayFlags(reservation: Reservation): MenuRowFlag[] {
   const flags: MenuRowFlag[] = []
   if (reservation.stay_check_in_deadline) {
     flags.push({
-      label: strings.stayMenu.checkInDeadlineFlag(reservation.stay_check_in_deadline.slice(0, 5)),
+      label: strings.stayMenu.checkInDeadlineFlag(formatTimeOnly(reservation.stay_check_in_deadline)),
       tone: 'warning',
     })
   }

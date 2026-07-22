@@ -3,6 +3,7 @@ export function formatInZone(isoUtc: string, timeZone: string | null): string {
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    hourCycle: 'h23',
     timeZone: timeZone ?? 'UTC',
   }).format(date)
 }
@@ -10,6 +11,7 @@ export function formatInZone(isoUtc: string, timeZone: string | null): string {
 export function formatTimeInZone(isoUtc: string, timeZone: string | null): string {
   return new Intl.DateTimeFormat('en-US', {
     timeStyle: 'short',
+    hourCycle: 'h23',
     timeZone: timeZone ?? 'UTC',
   }).format(new Date(isoUtc))
 }
@@ -52,6 +54,29 @@ export function formatDayPillLabel(dateKey: string): string {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
     new Date(Date.UTC(year, month - 1, day)),
   )
+}
+
+/**
+ * "Mon, Jul 20 → Wed, Jul 22" label for a plain calendar-date range (no time/timezone
+ * component, e.g. an accommodation gap) — anchors to UTC midnight for the same reason as
+ * `formatDayPillLabel`.
+ */
+export function formatDateRangeLabel(startDate: string, endDate: string): string {
+  const format = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number)
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(year, month - 1, day)))
+  }
+  return `${format(startDate)} → ${format(endDate)}`
+}
+
+/** "HH:MM" from a DB `time` column value (already 24h, no timezone conversion needed). */
+export function formatTimeOnly(dbTime: string): string {
+  return dbTime.slice(0, 5)
 }
 
 /**
