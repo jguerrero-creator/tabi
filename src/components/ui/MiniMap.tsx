@@ -16,13 +16,14 @@ export interface MapPoint {
 interface MiniMapProps {
   points: MapPoint[]
   className?: string
+  heightClassName?: string
 }
 
-export function MiniMap({ points, className = '' }: MiniMapProps) {
+export function MiniMap({ points, className = '', heightClassName = 'h-40' }: MiniMapProps) {
   if (!mapsApiKey || points.length === 0) {
     return (
       <div
-        className={`flex h-40 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm text-slate-400 ${className}`}
+        className={`flex ${heightClassName} w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm text-slate-400 ${className}`}
       >
         {strings.reservationDetail.mapUnavailable}
       </div>
@@ -32,7 +33,7 @@ export function MiniMap({ points, className = '' }: MiniMapProps) {
   const center = points.length === 2 ? midpoint(points[0], points[1]) : points[0]
 
   return (
-    <div className={`h-40 w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
+    <div className={`${heightClassName} w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
       <APIProvider apiKey={mapsApiKey}>
         <Map
           defaultCenter={center}

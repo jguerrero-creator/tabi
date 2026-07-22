@@ -134,7 +134,7 @@ export function OverviewScreen() {
         )}
 
         {!loading && !error && (
-          <div className="space-y-5">
+          <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 lg:space-y-0">
             <div className="flex rounded-full border border-slate-200 bg-white p-1 lg:hidden">
               <button
                 type="button"
@@ -158,85 +158,91 @@ export function OverviewScreen() {
 
             {activeTab === 'overview' && (
               <>
-                <OverviewMap points={points} />
+                <div className="lg:sticky lg:top-6 lg:order-2">
+                  <OverviewMap points={points} />
+                </div>
 
-                <TripLegsSection
-                  reservations={reservations}
-                  legs={legs}
-                  loading={legsLoading}
-                  error={legsError}
-                  onModeChange={(key, mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
-                />
+                <div className="space-y-5 lg:order-1">
+                  <TripLegsSection
+                    reservations={reservations}
+                    legs={legs}
+                    loading={legsLoading}
+                    error={legsError}
+                    onModeChange={(key, mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
+                  />
 
-                <section>
-                  <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {strings.overview.needsAttentionTitle}
-                  </h2>
-                  {needsAttention.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-                      {strings.overview.needsAttentionEmpty}
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                      {needsAttention.map((item) =>
-                        item.kind === 'reservation' ? (
-                          <MenuListRow
-                            key={item.reservation.id}
-                            to={`/reservations/${item.reservation.id}`}
-                            type={item.reservation.type}
-                            title={item.reservation.name}
-                            status={item.reservation.status}
-                            secondaryLabel={
-                              item.reservation.start_at
-                                ? formatInZone(item.reservation.start_at, item.reservation.start_timezone)
-                                : null
-                            }
-                          />
-                        ) : (
-                          <li
-                            key={item.reminder.id}
-                            className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-slate-900">{item.reminder.title}</p>
-                              <p className="text-xs text-slate-500">{formatDayPillLabel(item.reminder.date)}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => deleteReminder(item.reminder.id)}
-                              aria-label={strings.reminders.remove}
-                              className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  <section>
+                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {strings.overview.needsAttentionTitle}
+                    </h2>
+                    {needsAttention.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
+                        {strings.overview.needsAttentionEmpty}
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        {needsAttention.map((item) =>
+                          item.kind === 'reservation' ? (
+                            <MenuListRow
+                              key={item.reservation.id}
+                              to={`/reservations/${item.reservation.id}`}
+                              type={item.reservation.type}
+                              title={item.reservation.name}
+                              status={item.reservation.status}
+                              secondaryLabel={
+                                item.reservation.start_at
+                                  ? formatInZone(item.reservation.start_at, item.reservation.start_timezone)
+                                  : null
+                              }
+                            />
+                          ) : (
+                            <li
+                              key={item.reminder.id}
+                              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                             >
-                              ✕
-                            </button>
-                          </li>
-                        ),
-                      )}
-                    </ul>
-                  )}
-                </section>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-900">{item.reminder.title}</p>
+                                <p className="text-xs text-slate-500">{formatDayPillLabel(item.reminder.date)}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => deleteReminder(item.reminder.id)}
+                                aria-label={strings.reminders.remove}
+                                className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                              >
+                                ✕
+                              </button>
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                    )}
+                  </section>
 
-                <RemindersSection onCreate={createReminder} />
+                  <RemindersSection onCreate={createReminder} />
+                </div>
               </>
             )}
 
             {activeTab === 'planning' && (
-              <TripTimeline
-                trip={trip}
-                reservations={reservations}
-                legs={legs}
-                legsLoading={legsLoading}
-                legsError={legsError}
-                selectedDayKey={selectedDayKey}
-                onSelectDay={setSelectedDayKey}
-                dayLocationsByKey={dayLocationsByKey}
-                onSaveDayLocation={saveDayLocation}
-                onClearDayLocation={clearDayLocation}
-                dayNotesByKey={dayNotesByKey}
-                onSaveDayNote={saveDayNote}
-                onClearDayNote={clearDayNote}
-                onAddAtFreeBlock={setQuickAddBlock}
-              />
+              <div className="lg:col-span-2">
+                <TripTimeline
+                  trip={trip}
+                  reservations={reservations}
+                  legs={legs}
+                  legsLoading={legsLoading}
+                  legsError={legsError}
+                  selectedDayKey={selectedDayKey}
+                  onSelectDay={setSelectedDayKey}
+                  dayLocationsByKey={dayLocationsByKey}
+                  onSaveDayLocation={saveDayLocation}
+                  onClearDayLocation={clearDayLocation}
+                  dayNotesByKey={dayNotesByKey}
+                  onSaveDayNote={saveDayNote}
+                  onClearDayNote={clearDayNote}
+                  onAddAtFreeBlock={setQuickAddBlock}
+                />
+              </div>
             )}
           </div>
         )}

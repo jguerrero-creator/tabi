@@ -16,7 +16,7 @@ export function OverviewMap({ points }: OverviewMapProps) {
 
   return (
     <div className="relative">
-      <MiniMap points={points} />
+      <MiniMap points={points} heightClassName="h-40 lg:h-[calc(100vh-8rem)]" />
       {canExpand && (
         <button
           type="button"
