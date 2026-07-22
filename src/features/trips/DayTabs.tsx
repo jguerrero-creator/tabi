@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { statusTextClasses } from '../../components/menu/statusDotClasses'
-import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { ReservationTypeIcon, VehicleRentalIcon } from '../../components/ui/ReservationTypeIcon'
 import { strings } from '../../lib/strings'
 import type { ReservationStatus } from '../../types/reservation'
 
@@ -9,6 +9,8 @@ export interface DayTab {
   label: string
   /** The Stay reservation's status covering this day, or null if no accommodation is booked (TABI-143). */
   stayStatus: ReservationStatus | null
+  /** The at-disposal vehicle rental's status covering this day, or null if none (TABI-143, added 20/07). */
+  vehicleRentalStatus: ReservationStatus | null
   /** Total reservations + activities (+ manual blocks, once TABI-143's dependency exists) planned this day. */
   itemCount: number
 }
@@ -67,6 +69,14 @@ export function DayTabs({ days, selectedKey, onSelect }: DayTabsProps) {
               {day.stayStatus && (
                 <span title={strings.planning.dayPillStayStatus(day.stayStatus)} className="shrink-0">
                   <ReservationTypeIcon type="stay" className={`h-3.5 w-3.5 ${statusTextClasses[day.stayStatus]}`} />
+                </span>
+              )}
+              {day.vehicleRentalStatus && (
+                <span
+                  title={strings.planning.dayPillVehicleRentalStatus(day.vehicleRentalStatus)}
+                  className="shrink-0"
+                >
+                  <VehicleRentalIcon className={`h-3.5 w-3.5 ${statusTextClasses[day.vehicleRentalStatus]}`} />
                 </span>
               )}
               {day.itemCount > 0 && (

@@ -130,6 +130,7 @@ export const strings = {
     localTimeLabel: (timeZone: string) => `🕐 Local time: ${timeZone}`,
     addAtFreeTime: 'Add something here',
     dayPillStayStatus: (status: ReservationStatus) => `Accommodation: ${strings.status[status]}`,
+    dayPillVehicleRentalStatus: (status: ReservationStatus) => `Vehicle rental: ${strings.status[status]}`,
     dayPillItemCount: (count: number) => `${count} planned item${count === 1 ? '' : 's'}`,
   },
   menus: {

@@ -8,6 +8,7 @@ import {
 } from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
 import { findActiveStay } from '../stay/computeAccommodationGaps'
+import { findActiveVehicleRental } from '../transport/findActiveVehicleRental'
 import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
@@ -175,8 +176,9 @@ export function TripTimeline({
  * defensively (e.g. a trip edited after items were added), and the
  * "Unscheduled" pill is only shown when it's actually got items.
  *
- * Each pill also carries the day's accommodation status and total item count
- * (TABI-143), computed here once for every day rather than re-derived per pill.
+ * Each pill also carries the day's accommodation status, at-disposal vehicle
+ * rental status, and total item count (TABI-143), computed here once for
+ * every day rather than re-derived per pill.
  */
 function buildDayTabs(
   trip: Trip | null,
@@ -191,10 +193,12 @@ function buildDayTabs(
   const days = dateKeys.map((key) => {
     const items = groupsByKey.get(key)?.items ?? []
     const activeStay = findActiveStay(key, reservations)
+    const activeRental = findActiveVehicleRental(key, reservations)
     return {
       key,
       label: formatDayPillLabel(key),
       stayStatus: activeStay?.status ?? null,
+      vehicleRentalStatus: activeRental?.status ?? null,
       itemCount: countDayItems(items, activeStay),
     }
   })
@@ -205,6 +209,7 @@ function buildDayTabs(
       key: unscheduledGroup.dateKey,
       label: unscheduledGroup.label,
       stayStatus: null,
+      vehicleRentalStatus: null,
       itemCount: unscheduledGroup.items.length,
     })
   }

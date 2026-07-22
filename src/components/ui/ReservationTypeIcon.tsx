@@ -41,3 +41,24 @@ export function ReservationTypeIcon({ type, className = 'h-5 w-5' }: Reservation
     </svg>
   )
 }
+
+/** Distinct from the generic `transport` (plane) icon — flags a day covered by an at-disposal vehicle rental (TABI-143). */
+export function VehicleRentalIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 16V9.5a1 1 0 0 1 .6-.9L6 7.5l2-3.5h8l2 3.5 2.4 1.1a1 1 0 0 1 .6.9V16" />
+      <path d="M3 16h18" />
+      <circle cx="7.5" cy="16" r="1.75" />
+      <circle cx="16.5" cy="16" r="1.75" />
+    </svg>
+  )
+}
