@@ -13,6 +13,32 @@ interface GeocodeResult {
   lng: number
   formattedAddress: string
   timezone: string
+  city: string | null
+}
+
+interface AddressComponent {
+  long_name: string
+  types: string[]
+}
+
+// Priority-ordered, type-driven — never a per-country lookup (see CLAUDE.md's
+// country-agnostic principle). `locality` covers most places; `postal_town` is
+// Google's stand-in for it in the UK/Japan; the admin-area levels are the closest
+// fallback for locations without a locality (rural addresses, small islands, etc.).
+const CITY_COMPONENT_TYPES = [
+  'locality',
+  'postal_town',
+  'administrative_area_level_2',
+  'administrative_area_level_1',
+]
+
+function extractCity(components: AddressComponent[] | undefined): string | null {
+  if (!Array.isArray(components)) return null
+  for (const type of CITY_COMPONENT_TYPES) {
+    const match = components.find((component) => component.types?.includes(type))
+    if (match) return match.long_name
+  }
+  return null
 }
 
 interface GeocodeCandidate {
@@ -118,6 +144,7 @@ export default async function handler(request: Request): Promise<Response> {
       lng: location.lng,
       formattedAddress: result.formatted_address ?? address,
       timezone,
+      city: extractCity(result.address_components),
     },
   }
   return jsonResponse(payload)
@@ -158,6 +185,7 @@ async function resolvePlaceId(placeId: string, apiKey: string): Promise<Response
       lng: location.lng,
       formattedAddress: result.formatted_address ?? '',
       timezone,
+      city: extractCity(result.address_components),
     },
   }
   return jsonResponse(payload)

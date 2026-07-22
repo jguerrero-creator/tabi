@@ -254,6 +254,11 @@ export const strings = {
     outOfPeriodConfirmMessage: "This falls outside the trip's current dates. Extend the trip to cover it, or keep it as is?",
     outOfPeriodExtendCta: 'Extend trip dates',
     outOfPeriodKeepCta: 'Keep as is',
+    locationMismatchConfirmTitle: 'Different city than planned',
+    locationMismatchConfirmMessage: (reservationCity: string, plannedCity: string, dayLabel: string) =>
+      `This reservation is in ${reservationCity}, but you planned ${plannedCity} for ${dayLabel}. Is that intended?`,
+    locationMismatchConfirmCta: 'Yes, save anyway',
+    locationMismatchCancelCta: 'Go back',
   },
   addressPicker: {
     title: 'Select an address',

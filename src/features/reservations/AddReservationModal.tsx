@@ -6,7 +6,7 @@ import { FormSheet } from '../../components/ui/FormSheet'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
 import { StatusPicker } from '../../components/ui/StatusPicker'
-import { localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
+import { formatDayPillLabel, localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
 import {
   AddressSelectionCancelledError,
   fetchGeocodeByPlaceId,
@@ -24,6 +24,8 @@ import type {
 } from '../../types/reservation'
 import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
+import { useTripDayLocations } from '../trips/useTripDayLocations'
+import { findLocationMismatch, type LocationMismatch } from './locationMismatch'
 import { findOverlappingReservation } from './reservationOverlap'
 import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, isOutsideTripPeriod } from './tripPeriod'
@@ -158,6 +160,10 @@ export function AddReservationModal({
   const [outOfPeriodConfirm, setOutOfPeriodConfirm] = useState<{
     input: Omit<NewReservation, 'trip_id'>
   } | null>(null)
+  const [locationMismatchConfirm, setLocationMismatchConfirm] = useState<{
+    input: Omit<NewReservation, 'trip_id'>
+    mismatch: LocationMismatch
+  } | null>(null)
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
@@ -173,6 +179,7 @@ export function AddReservationModal({
     option.dbType,
   )
   const { trip, loading: tripLoading, updateDates: updateTripDates } = useTrip(tripId)
+  const { locationsByDate: dayLocationsByDate } = useTripDayLocations(tripId)
 
   // TABI-111: prefill the start date with the trip's first night not yet covered by a Stay
   // reservation (reusing the accommodation coverage-gap logic) — or the trip's own start date
@@ -333,11 +340,13 @@ export function AddReservationModal({
       start_lng: startGeo?.lng ?? null,
       start_place_name: startGeo?.placeName ?? null,
       start_timezone: startAt ? startTimezone : null,
+      start_city: startGeo?.city ?? null,
       end_address: option.requiresEndAddress ? (endGeo?.formattedAddress ?? (endAddress.trim() || null)) : null,
       end_lat: option.requiresEndAddress ? (endGeo?.lat ?? null) : null,
       end_lng: option.requiresEndAddress ? (endGeo?.lng ?? null) : null,
       end_place_name: option.requiresEndAddress ? (endGeo?.placeName ?? null) : null,
       end_timezone: endAt ? endTimezone : null,
+      end_city: option.requiresEndAddress ? (endGeo?.city ?? null) : null,
     }
 
     if (startAt && endAt && option.dbType !== 'activity') {
@@ -356,6 +365,18 @@ export function AddReservationModal({
   async function proceedAfterOverlapCheck(input: Omit<NewReservation, 'trip_id'>) {
     if (trip && isOutsideTripPeriod(input, trip)) {
       setOutOfPeriodConfirm({ input })
+      return
+    }
+    await proceedAfterOutOfPeriodCheck(input)
+  }
+
+  // TABI-116: checked last — once dates are settled, compare the reservation's city against
+  // the planned location of each day it covers. A mismatch is never blocking either, just
+  // surfaced so the traveler can confirm it's intentional.
+  async function proceedAfterOutOfPeriodCheck(input: Omit<NewReservation, 'trip_id'>) {
+    const mismatch = findLocationMismatch(input, dayLocationsByDate)
+    if (mismatch) {
+      setLocationMismatchConfirm({ input, mismatch })
       return
     }
     await submitReservation(input)
@@ -407,14 +428,25 @@ export function AddReservationModal({
       return
     }
     setOutOfPeriodConfirm(null)
-    await submitReservation(input)
+    await proceedAfterOutOfPeriodCheck(input)
   }
 
   async function handleKeepDatesAsIs() {
     if (!outOfPeriodConfirm) return
     const { input } = outOfPeriodConfirm
     setOutOfPeriodConfirm(null)
+    await proceedAfterOutOfPeriodCheck(input)
+  }
+
+  async function handleConfirmLocationMismatch() {
+    if (!locationMismatchConfirm) return
+    const { input } = locationMismatchConfirm
+    setLocationMismatchConfirm(null)
     await submitReservation(input)
+  }
+
+  function handleCancelLocationMismatch() {
+    setLocationMismatchConfirm(null)
   }
 
   return (
@@ -696,6 +728,21 @@ export function AddReservationModal({
           onConfirm={handleExtendTrip}
           secondaryLabel={strings.addReservation.outOfPeriodKeepCta}
           onSecondary={handleKeepDatesAsIs}
+          confirming={submitting}
+        />
+      )}
+      {locationMismatchConfirm && (
+        <ConfirmDialog
+          title={strings.addReservation.locationMismatchConfirmTitle}
+          message={strings.addReservation.locationMismatchConfirmMessage(
+            locationMismatchConfirm.mismatch.reservationCity,
+            locationMismatchConfirm.mismatch.plannedCity,
+            formatDayPillLabel(locationMismatchConfirm.mismatch.dayKey),
+          )}
+          confirmLabel={strings.addReservation.locationMismatchConfirmCta}
+          onConfirm={handleConfirmLocationMismatch}
+          cancelLabel={strings.addReservation.locationMismatchCancelCta}
+          onCancel={handleCancelLocationMismatch}
           confirming={submitting}
         />
       )}

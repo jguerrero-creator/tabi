@@ -422,8 +422,15 @@ async function geocodeIfChanged(
 
   if (!trimmed) {
     return leg === 'start'
-      ? { start_address: null, start_lat: null, start_lng: null, start_timezone: null, start_place_name: null }
-      : { end_address: null, end_lat: null, end_lng: null, end_timezone: null, end_place_name: null }
+      ? {
+          start_address: null,
+          start_lat: null,
+          start_lng: null,
+          start_timezone: null,
+          start_place_name: null,
+          start_city: null,
+        }
+      : { end_address: null, end_lat: null, end_lng: null, end_timezone: null, end_place_name: null, end_city: null }
   }
 
   const geocoded = cached ?? (await resolveAddress(trimmed, requestPick))
@@ -435,6 +442,7 @@ async function geocodeIfChanged(
         start_lng: geocoded.lng,
         start_timezone: geocoded.timezone,
         start_place_name: cached?.placeName ?? null,
+        start_city: geocoded.city,
       }
     : {
         end_address: geocoded.formattedAddress,
@@ -442,6 +450,7 @@ async function geocodeIfChanged(
         end_lng: geocoded.lng,
         end_timezone: geocoded.timezone,
         end_place_name: cached?.placeName ?? null,
+        end_city: geocoded.city,
       }
 }
 

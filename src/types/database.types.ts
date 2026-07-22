@@ -75,6 +75,7 @@ export type Database = {
           created_at: string
           end_address: string | null
           end_at: string | null
+          end_city: string | null
           end_lat: number | null
           end_lng: number | null
           end_place_name: string | null
@@ -86,6 +87,7 @@ export type Database = {
           price_currency: string | null
           start_address: string | null
           start_at: string | null
+          start_city: string | null
           start_lat: number | null
           start_lng: number | null
           start_place_name: string | null
@@ -105,6 +107,7 @@ export type Database = {
           created_at?: string
           end_address?: string | null
           end_at?: string | null
+          end_city?: string | null
           end_lat?: number | null
           end_lng?: number | null
           end_place_name?: string | null
@@ -116,6 +119,7 @@ export type Database = {
           price_currency?: string | null
           start_address?: string | null
           start_at?: string | null
+          start_city?: string | null
           start_lat?: number | null
           start_lng?: number | null
           start_place_name?: string | null
@@ -135,6 +139,7 @@ export type Database = {
           created_at?: string
           end_address?: string | null
           end_at?: string | null
+          end_city?: string | null
           end_lat?: number | null
           end_lng?: number | null
           end_place_name?: string | null
@@ -146,6 +151,7 @@ export type Database = {
           price_currency?: string | null
           start_address?: string | null
           start_at?: string | null
+          start_city?: string | null
           start_lat?: number | null
           start_lng?: number | null
           start_place_name?: string | null
@@ -174,6 +180,7 @@ export type Database = {
       trip_day_locations: {
         Row: {
           address: string | null
+          city: string | null
           created_at: string
           date: string
           id: string
@@ -186,6 +193,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          city?: string | null
           created_at?: string
           date: string
           id?: string
@@ -198,6 +206,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          city?: string | null
           created_at?: string
           date?: string
           id?: string

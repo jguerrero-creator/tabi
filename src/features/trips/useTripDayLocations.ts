@@ -8,6 +8,7 @@ export interface DayLocationInput {
   lat: number
   lng: number
   timezone: string | null
+  city: string | null
 }
 
 /**
@@ -50,6 +51,7 @@ export function useTripDayLocations(tripId: string) {
             lat: input.lat,
             lng: input.lng,
             timezone: input.timezone,
+            city: input.city,
           },
           { onConflict: 'trip_id,date' },
         )

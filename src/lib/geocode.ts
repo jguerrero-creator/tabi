@@ -3,6 +3,7 @@ export interface GeocodeResult {
   lng: number
   formattedAddress: string
   timezone: string
+  city: string | null
 }
 
 export interface GeocodeCandidate {

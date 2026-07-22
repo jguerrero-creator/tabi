@@ -78,6 +78,7 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
         lat: pendingPlace.lat,
         lng: pendingPlace.lng,
         timezone: pendingPlace.timezone,
+        city: pendingPlace.city,
       })
       return
     }
@@ -94,6 +95,7 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
         lat: resolved.lat,
         lng: resolved.lng,
         timezone: resolved.timezone,
+        city: resolved.city,
       })
     } catch (err) {
       setError(
