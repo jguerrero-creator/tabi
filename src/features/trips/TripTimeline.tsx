@@ -7,12 +7,13 @@ import {
   type FreeTimeBlock,
 } from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
+import { findActiveStay } from '../stay/computeAccommodationGaps'
 import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
 import { DayColumn } from './DayColumn'
-import { DayTabs } from './DayTabs'
+import { DayTabs, type DayTab } from './DayTabs'
 import type { TripLeg } from './useTripLegs'
 import type { DayLocationInput } from './useTripDayLocations'
 
@@ -93,7 +94,7 @@ export function TripTimeline({
       : computeFreeTimeBlocks(reservations, legs).map((block) => [block.fromReservationId, block]),
   )
 
-  const days = buildDayTabs(trip, groups)
+  const days = buildDayTabs(trip, groups, groupsByKey, reservations)
 
   if (days.length === 0) {
     return (
@@ -173,20 +174,54 @@ export function TripTimeline({
  * Reservation dates outside the trip's own range are still included
  * defensively (e.g. a trip edited after items were added), and the
  * "Unscheduled" pill is only shown when it's actually got items.
+ *
+ * Each pill also carries the day's accommodation status and total item count
+ * (TABI-143), computed here once for every day rather than re-derived per pill.
  */
-function buildDayTabs(trip: Trip | null, groups: DateGroup<Reservation>[]): { key: string; label: string }[] {
+function buildDayTabs(
+  trip: Trip | null,
+  groups: DateGroup<Reservation>[],
+  groupsByKey: Map<string, DateGroup<Reservation>>,
+  reservations: Reservation[],
+): DayTab[] {
   const rangeKeys = tripDateRangeKeys(trip?.start_date ?? null, trip?.end_date ?? null)
   const scheduledGroupKeys = groups.map((group) => group.dateKey).filter((key) => key !== UNSCHEDULED_KEY)
   const dateKeys = Array.from(new Set([...rangeKeys, ...scheduledGroupKeys])).sort()
 
-  const days = dateKeys.map((key) => ({ key, label: formatDayPillLabel(key) }))
+  const days = dateKeys.map((key) => {
+    const items = groupsByKey.get(key)?.items ?? []
+    const activeStay = findActiveStay(key, reservations)
+    return {
+      key,
+      label: formatDayPillLabel(key),
+      stayStatus: activeStay?.status ?? null,
+      itemCount: countDayItems(items, activeStay),
+    }
+  })
 
   const unscheduledGroup = groups.find((group) => group.dateKey === UNSCHEDULED_KEY)
   if (unscheduledGroup) {
-    days.push({ key: unscheduledGroup.dateKey, label: unscheduledGroup.label })
+    days.push({
+      key: unscheduledGroup.dateKey,
+      label: unscheduledGroup.label,
+      stayStatus: null,
+      itemCount: unscheduledGroup.items.length,
+    })
   }
 
   return days
+}
+
+/**
+ * A multi-night Stay is only bucketed under its check-in day by groupByDate
+ * (grouped by start_at), so a day it merely covers wouldn't otherwise count
+ * it — `activeStay` fills that gap. Guarded against double-counting on the
+ * check-in day itself, where the stay is already present in `items`.
+ */
+function countDayItems(items: Reservation[], activeStay: Reservation | null): number {
+  if (!activeStay) return items.length
+  const alreadyCounted = items.some((item) => item.id === activeStay.id)
+  return alreadyCounted ? items.length : items.length + 1
 }
 
 /** Trip `start_date`/`end_date` are plain calendar dates; anchor to UTC midnight per day, same reasoning as `formatTripDateRange`. */

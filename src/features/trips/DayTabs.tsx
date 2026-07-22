@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
+import { statusTextClasses } from '../../components/menu/statusDotClasses'
+import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { strings } from '../../lib/strings'
+import type { ReservationStatus } from '../../types/reservation'
+
+export interface DayTab {
+  key: string
+  label: string
+  /** The Stay reservation's status covering this day, or null if no accommodation is booked (TABI-143). */
+  stayStatus: ReservationStatus | null
+  /** Total reservations + activities (+ manual blocks, once TABI-143's dependency exists) planned this day. */
+  itemCount: number
+}
 
 interface DayTabsProps {
-  days: { key: string; label: string }[]
+  days: DayTab[]
   selectedKey: string
   onSelect: (key: string) => void
 }
@@ -44,13 +57,28 @@ export function DayTabs({ days, selectedKey, onSelect }: DayTabsProps) {
               key={day.key}
               type="button"
               onClick={() => onSelect(day.key)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
                 selected
                   ? 'border-slate-900 bg-slate-900 text-white'
                   : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
-              {day.label}
+              <span>{day.label}</span>
+              {day.stayStatus && (
+                <span title={strings.planning.dayPillStayStatus(day.stayStatus)} className="shrink-0">
+                  <ReservationTypeIcon type="stay" className={`h-3.5 w-3.5 ${statusTextClasses[day.stayStatus]}`} />
+                </span>
+              )}
+              {day.itemCount > 0 && (
+                <span
+                  title={strings.planning.dayPillItemCount(day.itemCount)}
+                  className={`flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                    selected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {day.itemCount}
+                </span>
+              )}
             </button>
           )
         })}

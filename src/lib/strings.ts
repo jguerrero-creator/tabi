@@ -1,4 +1,5 @@
 import type { TravelMode } from './travelTime'
+import type { ReservationStatus } from '../types/reservation'
 
 const travelModeVerb: Record<TravelMode, string> = {
   WALK: 'walk',
@@ -90,6 +91,9 @@ export const strings = {
     parkingYes: 'Yes',
     parkingNo: 'No',
     checkInDeadlineLabel: 'Check-in deadline',
+    checkInTimeLabel: 'Check-in time',
+    checkOutTimeLabel: 'Check-out time',
+    defaultTimeBadge: 'Default',
     mapUnavailable: 'Location not set',
     loading: 'Loading reservation…',
     errorLoading: 'Could not load this reservation.',
@@ -125,6 +129,8 @@ export const strings = {
     longTravelDay: 'Long travel day',
     localTimeLabel: (timeZone: string) => `🕐 Local time: ${timeZone}`,
     addAtFreeTime: 'Add something here',
+    dayPillStayStatus: (status: ReservationStatus) => `Accommodation: ${strings.status[status]}`,
+    dayPillItemCount: (count: number) => `${count} planned item${count === 1 ? '' : 's'}`,
   },
   menus: {
     overview: 'Overview',
