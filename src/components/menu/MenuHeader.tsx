@@ -5,8 +5,8 @@ interface MenuHeaderProps {
   title: string
   subtitle?: string | null
   count?: number
-  addLabel: string
-  onAdd: () => void
+  addLabel?: string
+  onAdd?: () => void
 }
 
 export function MenuHeader({ title, subtitle, count, addLabel, onAdd }: MenuHeaderProps) {
@@ -32,14 +32,16 @@ export function MenuHeader({ title, subtitle, count, addLabel, onAdd }: MenuHead
         </h1>
         {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
       </div>
-      <button
-        type="button"
-        onClick={onAdd}
-        aria-label={addLabel}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700"
-      >
-        +
-      </button>
+      {onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          aria-label={addLabel}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700"
+        >
+          +
+        </button>
+      )}
     </header>
   )
 }

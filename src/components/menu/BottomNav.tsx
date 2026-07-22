@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { strings } from '../../lib/strings'
 import { ReservationTypeIcon } from '../ui/ReservationTypeIcon'
 import { tripNavTabs } from './tripNavTabs'
 
@@ -27,6 +26,8 @@ export function BottomNav({ tripId }: BottomNavProps) {
             >
               {tab === 'overview' ? (
                 <OverviewIcon className="h-5 w-5" />
+              ) : tab === 'budget' ? (
+                <BudgetIcon className="h-5 w-5" />
               ) : (
                 <ReservationTypeIcon type={tab} className="h-5 w-5" />
               )}
@@ -34,13 +35,6 @@ export function BottomNav({ tripId }: BottomNavProps) {
             </Link>
           )
         })}
-        <span
-          title={strings.common.comingSoon}
-          className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-slate-300"
-        >
-          <BudgetIcon className="h-5 w-5" />
-          {strings.menus.budget}
-        </span>
       </div>
     </nav>
   )

@@ -67,6 +67,8 @@ export function DesktopSidebar({ tripId }: DesktopSidebarProps) {
             >
               {tab === 'overview' ? (
                 <OverviewIcon className="h-5 w-5" />
+              ) : tab === 'budget' ? (
+                <BudgetIcon className="h-5 w-5" />
               ) : (
                 <ReservationTypeIcon type={tab} className="h-5 w-5" />
               )}
@@ -74,13 +76,6 @@ export function DesktopSidebar({ tripId }: DesktopSidebarProps) {
             </Link>
           )
         })}
-        <span
-          title={strings.common.comingSoon}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300"
-        >
-          <BudgetIcon className="h-5 w-5" />
-          {strings.menus.budget}
-        </span>
       </nav>
 
       <Link to="/" className="mt-6 text-sm font-medium text-slate-500 hover:text-slate-700">

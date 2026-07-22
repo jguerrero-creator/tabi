@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { TripLayout } from './components/menu/TripLayout'
 import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen'
+import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
 import { ReservationDetailScreen } from './features/reservations/ReservationDetailScreen'
 import { StayMenuScreen } from './features/stay/StayMenuScreen'
@@ -17,6 +18,7 @@ export function App() {
         <Route path="stay" element={<StayMenuScreen />} />
         <Route path="transport" element={<TransportMenuScreen />} />
         <Route path="activities" element={<ActivitiesMenuScreen />} />
+        <Route path="budget" element={<BudgetMenuScreen />} />
       </Route>
       <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />
       <Route path="/privacy" element={<PrivacyPolicyScreen />} />

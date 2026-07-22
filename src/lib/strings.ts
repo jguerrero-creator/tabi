@@ -11,7 +11,6 @@ const travelModeVerb: Record<TravelMode, string> = {
 export const strings = {
   common: {
     back: 'Back',
-    comingSoon: 'Coming soon',
     overlapBadge: '↳ Also booked during this period',
   },
   home: {
@@ -183,6 +182,16 @@ export const strings = {
     emptyBody: 'This trip has no activities planned.',
     unscheduledLabel: 'Unscheduled',
     addCta: 'Add activity',
+  },
+  budgetMenu: {
+    loading: 'Loading budget…',
+    errorLoading: 'Could not load this trip.',
+    emptyTitle: 'No prices entered yet',
+    emptyBody: 'Add a price to your reservations to see your budget here.',
+    totalLabel: 'Total entered so far',
+    byCategoryLabel: 'By category',
+    itemCount: (count: number) => `${count} ${count === 1 ? 'item' : 'items'}`,
+    partialHint: (priced: number, total: number) => `${priced} of ${total} reservations have a price entered`,
   },
   addReservation: {
     title: 'Add Reservation',
