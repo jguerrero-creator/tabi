@@ -250,6 +250,10 @@ export const strings = {
     overlapNotePlaceholder: 'Why do these overlap?',
     overlapConfirmCta: 'Yes, save anyway',
     overlapCancelCta: 'Go back',
+    outOfPeriodConfirmTitle: 'Outside trip dates',
+    outOfPeriodConfirmMessage: "This falls outside the trip's current dates. Extend the trip to cover it, or keep it as is?",
+    outOfPeriodExtendCta: 'Extend trip dates',
+    outOfPeriodKeepCta: 'Keep as is',
   },
   addressPicker: {
     title: 'Select an address',

@@ -28,5 +28,22 @@ export function useTrip(tripId: string) {
     fetchTrip()
   }, [fetchTrip])
 
-  return { trip, loading, error, refetch: fetchTrip }
+  // TABI-113: lets a reservation outside the trip's current dates extend it, without
+  // requiring the full trip-edit form shape that useTrips().updateTrip expects.
+  const updateDates = useCallback(
+    async (startDate: string, endDate: string) => {
+      const { data, error: updateError } = await supabase
+        .from('trips')
+        .update({ start_date: startDate, end_date: endDate })
+        .eq('id', tripId)
+        .select()
+        .single()
+      if (updateError) throw updateError
+      setTrip(data)
+      return data
+    },
+    [tripId],
+  )
+
+  return { trip, loading, error, refetch: fetchTrip, updateDates }
 }

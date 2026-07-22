@@ -26,6 +26,7 @@ import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationG
 import { useTrip } from '../trips/useTrip'
 import { findOverlappingReservation } from './reservationOverlap'
 import { transportRouteName } from './transportRouteName'
+import { extendedTripRange, isOutsideTripPeriod } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservationsByType } from './useReservationsByType'
 
@@ -154,6 +155,9 @@ export function AddReservationModal({
     input: Omit<NewReservation, 'trip_id'>
   } | null>(null)
   const [overlapNote, setOverlapNote] = useState('')
+  const [outOfPeriodConfirm, setOutOfPeriodConfirm] = useState<{
+    input: Omit<NewReservation, 'trip_id'>
+  } | null>(null)
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
@@ -168,7 +172,7 @@ export function AddReservationModal({
     tripId,
     option.dbType,
   )
-  const { trip, loading: tripLoading } = useTrip(tripId)
+  const { trip, loading: tripLoading, updateDates: updateTripDates } = useTrip(tripId)
 
   // TABI-111: prefill the start date with the trip's first night not yet covered by a Stay
   // reservation (reusing the accommodation coverage-gap logic) — or the trip's own start date
@@ -344,6 +348,16 @@ export function AddReservationModal({
       }
     }
 
+    await proceedAfterOverlapCheck(input)
+  }
+
+  // TABI-113: checked once any overlap has been resolved (or there was none) — a reservation
+  // outside the trip's current dates is never blocked either, just confirmed explicitly.
+  async function proceedAfterOverlapCheck(input: Omit<NewReservation, 'trip_id'>) {
+    if (trip && isOutsideTripPeriod(input, trip)) {
+      setOutOfPeriodConfirm({ input })
+      return
+    }
     await submitReservation(input)
   }
 
@@ -371,12 +385,36 @@ export function AddReservationModal({
       : overlapConfirm.input
     setOverlapConfirm(null)
     setOverlapNote('')
-    await submitReservation(input)
+    await proceedAfterOverlapCheck(input)
   }
 
   function handleCancelOverlap() {
     setOverlapConfirm(null)
     setOverlapNote('')
+  }
+
+  async function handleExtendTrip() {
+    if (!outOfPeriodConfirm || !trip?.start_date || !trip?.end_date) return
+    const { input } = outOfPeriodConfirm
+    const range = extendedTripRange(input, { start_date: trip.start_date, end_date: trip.end_date })
+    setSubmitting(true)
+    setError(null)
+    try {
+      await updateTripDates(range.start_date, range.end_date)
+    } catch {
+      setError(strings.addReservation.errorGeneric)
+      setSubmitting(false)
+      return
+    }
+    setOutOfPeriodConfirm(null)
+    await submitReservation(input)
+  }
+
+  async function handleKeepDatesAsIs() {
+    if (!outOfPeriodConfirm) return
+    const { input } = outOfPeriodConfirm
+    setOutOfPeriodConfirm(null)
+    await submitReservation(input)
   }
 
   return (
@@ -647,6 +685,17 @@ export function AddReservationModal({
           cancelLabel={strings.addReservation.overlapCancelCta}
           onConfirm={handleConfirmOverlap}
           onCancel={handleCancelOverlap}
+          confirming={submitting}
+        />
+      )}
+      {outOfPeriodConfirm && (
+        <ConfirmDialog
+          title={strings.addReservation.outOfPeriodConfirmTitle}
+          message={strings.addReservation.outOfPeriodConfirmMessage}
+          confirmLabel={strings.addReservation.outOfPeriodExtendCta}
+          onConfirm={handleExtendTrip}
+          secondaryLabel={strings.addReservation.outOfPeriodKeepCta}
+          onSecondary={handleKeepDatesAsIs}
           confirming={submitting}
         />
       )}

@@ -8,9 +8,12 @@ interface ConfirmDialogProps {
   note?: string
   onNoteChange?: (value: string) => void
   confirmLabel: string
-  cancelLabel: string
   onConfirm: () => void
-  onCancel: () => void
+  cancelLabel?: string
+  onCancel?: () => void
+  /** A second, non-cancelling choice (e.g. two valid resolutions instead of confirm/abort). */
+  secondaryLabel?: string
+  onSecondary?: () => void
   confirming?: boolean
 }
 
@@ -22,9 +25,11 @@ export function ConfirmDialog({
   note,
   onNoteChange,
   confirmLabel,
-  cancelLabel,
   onConfirm,
+  cancelLabel,
   onCancel,
+  secondaryLabel,
+  onSecondary,
   confirming = false,
 }: ConfirmDialogProps) {
   return (
@@ -47,9 +52,16 @@ export function ConfirmDialog({
         )}
 
         <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={confirming}>
-            {cancelLabel}
-          </Button>
+          {cancelLabel && onCancel && (
+            <Button type="button" variant="secondary" onClick={onCancel} disabled={confirming}>
+              {cancelLabel}
+            </Button>
+          )}
+          {secondaryLabel && onSecondary && (
+            <Button type="button" variant="secondary" onClick={onSecondary} disabled={confirming}>
+              {secondaryLabel}
+            </Button>
+          )}
           <Button type="button" onClick={onConfirm} disabled={confirming}>
             {confirmLabel}
           </Button>
