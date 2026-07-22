@@ -1,72 +1,50 @@
-# Tabi — Project Brief for Claude Code
+Working title: Tabi (旅, "journey" in Japanese). A trip planner built around the traveler's actual route, not a generic guide — travel time between bookings drives the schedule, not the other way around.
 
-Working title: **Tabi** (旅, "journey" in Japanese). A trip planner built around the traveler's actual route, not a generic guide — travel time between bookings drives the schedule, not the other way around.
+Product summary
+Users enter their fixed bookings (stay, transport, activities) for one or more trips.
+The app computes real travel time between them and shows what's actually free time vs. busy time per day.
+Every booking-type item has a 3-state status: Booked / To book / Decide later — nothing is ever an ambiguous blank.
+Accommodation coverage gaps (nights with nothing booked) and date overlaps (two bookings covering the same period) are both actively detected and surfaced — never silent, never blocking, always an explicit confirmation.
+Tech stack (decided)
+Frontend: Web app (PWA), mobile-first, installable to iOS home screen. No native app for V0.5.
+Hosting: Vercel (project "tabi", team jguerrero-2639s-projects, stable alias tabi-jguerrero-2639s-projects.vercel.app, production tabi-topaz.vercel.app).
+Backend / DB: Supabase, PostgreSQL + Auth (project "Tabi", ref czyeohubhsqiumhpodbc, region eu-west-1).
+Auth: Supabase anonymous sessions from first launch, upgradable to a real account later without data loss.
+Geocoding, travel time, places: Google Maps Platform — Geocoding API, Routes API (computeRoutes, not the legacy Directions API), Places API (New), Maps JavaScript API, Time Zone API.
+Import parsing (V1+): Claude API (multimodal).
+Reminders (V1+): Resend (email) + Vercel Cron.
+Architecture principles (non-negotiable, decided to avoid rework)
 
-## Product summary
-- Users import/enter their fixed bookings (stay, transport, activities).
-- The app computes real travel time between them and shows what's actually free time vs. busy time per day.
-- Every booking-type item has a 3-state status: **Booked / To book / Decide later** — nothing is ever an ambiguous blank.
-- Accommodation coverage gaps (nights with nothing booked) are actively detected and surfaced, not hidden.
+Data model & core logic
 
-## Tech stack (decided)
-- **Frontend**: Web app (PWA), mobile-first, installable to iOS home screen. No native app for V0.5 — avoids App Store review cycle.
-- **Hosting**: Vercel (project "tabi" already created — team `jguerrero-2639s-projects`).
-- **Backend / DB**: Supabase, PostgreSQL + Auth (project "Tabi" already created — ref `czyeohubhsqiumhpodbc`, region eu-west-1).
-- **Auth**: Supabase anonymous sessions from first launch (no login screen in V0.5), upgradable to a real account later without data loss.
-- **Geocoding & travel time**: Google Maps Platform (Geocoding + Routes API + Time Zone API). Routes API (`computeRoutes`), not the legacy Directions/Distance Matrix APIs.
-- **Places, ratings, reviews**: Google Places API.
-- **Import parsing (V1+)**: Claude API (multimodal — handles email text, PDF, and photos of tickets/receipts through the same extraction pipeline).
-- **Reminders (V1+)**: Resend (email) + Vercel Cron for scheduled checks.
+Multi-trip from day one. Every reservation belongs to a "Trip"; a user can have many trips, each with its own currency (ISO 4217, single currency per trip, no per-reservation conversion — see below) and destination (ISO 3166 country selector, multi-select for multi-country trips — a separate, coarser concept from the day-level planned location, see #12).
+UTC storage + per-location timezone. All timestamps stored in UTC; duration math (travel time, free blocks) always happens in UTC, never by subtracting displayed local times. Display converts to the relevant local timezone per leg, switching reference at actual arrival, not departure.
+Country-agnostic. No hardcoded country/city/provider logic. Anything country-specific is data/config, never code — this includes how we handle Google's known transit-data coverage gaps (e.g., Transit/Train mode returns zero routes in some countries, Japan included, due to Google's own licensing gaps, not our bug): show a generic "transit directions unavailable for this route" message whenever a Transit/Train query resolves with no usable route, with no country checklist anywhere in the code.
+Free-time-block engine covers the whole day window, not just gaps between bookings. Each trip has a configurable "day window" (e.g. 07:00–22:00, set at trip creation). A free block spans the full window by default and subdivides automatically as bookings are added — including before the first and after the last booking of the day, not only between two bookings.
+Overlap detection uses strict boundary comparison. Two bookings of the same type (Stay/Stay, Transport/Transport) only count as overlapping if new.start < existing.end AND new.end > existing.start (strict inequalities). A checkout date equal to another booking's check-in date is a normal same-day changeover, never a false-positive overlap. When a real overlap or an out-of-trip-period date is detected, prompt an explicit, non-blocking confirmation (never silently allow or silently block). 5b. Two distinct Transport sub-types. Point-to-point (flight/train/bus): departure + arrival location/time, feeds the travel-time engine directly, name auto-generated as "Departure → Arrival". Vehicle rental (a "duration" not a route): pickup city + drop-off city + date range, no direct travel-time calculation between the two — during the rental's covered days, transport need is considered satisfied and the traveler's position for free-block purposes follows that day's planned location or active accommodation instead.
+Day-level planned location, separate from trip-level destination. Each Planning day can have an approximate place (city/area) set independently of any booking — seeds the map before real bookings exist, and later flags a mismatch (non-blocking) if an actual booking lands in a different city than planned.
 
-## Architecture principles (non-negotiable, decided early to avoid rework)
+AI & external services 7. AI never invents facts. LLMs translate intent into structured filters/extractions sent to real APIs — never generate place suggestions or factual claims from memory alone. 8. AI is action-triggered, never an open chat. Every AI usage is a bounded, specific action with predictable cost. No general-purpose chatbot in the app. 9. API keys, two distinct kinds. Server key (Geocoding, Routes, Places data calls) lives only in server-side functions (Vercel Functions), never shipped to the client. Browser key (Maps JavaScript API + Places Autocomplete) is the standard, Google-sanctioned client-side exception — protected by HTTP-referrer restriction, not secrecy. Lesson learned: referrer allowlists need a wildcard subdomain pattern (*-jguerrero-2639s-projects.vercel.app/*) to cover every Vercel preview deployment's unique hostname, plus localhost:*/* for local dev — a single exact URL entry goes stale on the next deploy. 10. Per-user rate limits on AI/external API calls; validate AI output against an expected schema before writing to DB; treat imported document content (email/PDF/photo) as untrusted data, never as instructions (prompt-injection defense).
 
-1. **Multi-trip from day one.** Every reservation belongs to a "Trip"; a user can have many trips. Don't build a single-trip-implicit model.
+Entitlements & compliance 11. Entitlements layer, decoupled from billing (done): a plan field per account + central config mapping plan → enabled features/limits. No feature ever checks the plan directly — always through a central entitlement check, verified both client- and server-side. 12. Public privacy policy is mandatory, independent of any analytics decision — required by Google Maps Platform's own terms and by GDPR given a France/EU-based user base. Any broader analytics/data-collection layer beyond this is opt-in, anonymized/aggregated, and a separate, lower-priority decision.
 
-2. **UTC storage + per-location timezone.** All timestamps stored in UTC; each location has a timezone (via Google Time Zone API). All duration math (travel time, free blocks) happens in UTC — never subtract displayed local times directly. Display converts to the relevant local timezone per leg (departure tz vs arrival tz), switching reference at actual arrival, not departure.
+UI conventions 13. Shared templates everywhere, never rebuilt per screen: one menu template (header + "+" top-right + list-row), one "Add" bottom sheet, one detail screen (directly editable inline — no separate view-then-edit step), one quick-add sheet for free blocks. The type-selector shown in the Add sheet is the sub-type specific to the origin menu (Stay → Hotel/Camping/Airbnb/Ryokan/Other; Transport → point-to-point/vehicle rental), not a re-prompt of Stay/Transport/Activity — that's inherited from context. 14. Date-grouped lists, one unified date/time formatter. Lists group under date/period section headers (never a date in a row's subtitle) so coverage gaps are visually obvious. A single shared formatter is used everywhere: dates like "Mon, Jul 20 → Wed, Jul 22", nights count instead of end date under a Stay row, and 24-hour time format everywhere ("14:00", never AM/PM) — independent of the English-default display language. 15. Cancel/Save always floats at the top of any reservation-type popup/sheet (never requires scrolling to reach), via a shared FormSheet wrapper. 16. Back-button behavior: from a top-level menu (Stay/Transport/Activities/Budget), back always returns to Overview (siblings under one "home", not a linear stack). Exception: Planning is a toggle-state of the Overview screen, not a separate menu — back from Planning stays on Planning and preserves the selected day. 17. Bottom nav (mobile) is a fixed icon+label tab bar component — not a placeholder button grid. Desktop (promoted to V0.5): same features, adapted layout — sidebar nav replaces the bottom bar, Overview shows map + action list side by side, and Planning shows 3 days side by side instead of one day with tabs (mobile keeps the one-day/tabs pattern). 18. Map itinerary trace connects day-locations/bookings chronologically, colored using the same 3-state status palette used everywhere else (green/orange/gray) — no new color language invented for the map.
 
-3. **Country-agnostic.** No hardcoded country/city/provider logic (e.g. no JR Pass–specific code). Anything country-specific is data/config, never code.
+Known infra gotchas (hard-won, don't relitigate)
+Any new env var added to .env.local must be manually replicated in Vercel (Settings → Environment Variables, all 3 environments) — it does not propagate automatically, and a missing one fails silently in prod.
+vercel dev is locally unstable for testing server functions (ERR_IPC_CHANNEL_CLOSED, intermittent 200/404 on the same call) — this is the tool's own known flakiness, not our code. Prefer testing server-dependent features against a real deployed Vercel URL (preview or prod) over fighting local emulation.
+api/ is not currently covered by any tsconfig project reference, so tsc -b doesn't typecheck server functions automatically (tracked, not yet fixed).
+Keep git commit out of any global auto-approved permission whitelist, and avoid long-running unsupervised /loop sessions on this repo — an unattended session once mixed unrelated work into a single commit across days. Review git status/git diff --stat for unexpected changes before committing.
+V0.5 status
 
-4. **AI never invents facts.** LLMs translate user intent into structured filters/extractions sent to real APIs (Google Places, etc.) — never generate place suggestions or factual claims from general knowledge. Avoids hallucinated/closed venues.
+Most of the core is built and verified: multi-trip model, anonymous auth, RLS, manual reservation entry (all sub-types), geocoding + Places Autocomplete, travel-time engine (including the Transit/Train graceful fallback), UTC/timezone handling, free-block engine with day-window padding, the 3-state status system, coverage-gap detection, overlap detection, Overview/Planning/Stay/Transport/Activities/Budget screens, shared Add sheet and detail screen, entitlements foundation, and the security/infra basics (keys, env vars, SSO).
 
-5. **AI is action-triggered, never an open chat.** No general-purpose chatbot in the app. Every AI usage is a bounded, specific action (extract a reservation, translate a search query into filters, generate a place description) with a predictable token cost. This is the core cost-control strategy — no open-ended conversation that could run up unpredictable bills. A "bring your own LLM key" option for power users is a possible later (V2) addition, not built now.
+Remaining V0.5 priorities (see Notion Backlog, IDs prefixed TABI-, for the live list): day-level planned location, check-in deadline/parking display, manual time blocks on the timeline, notes, trip deletion, desktop responsive layout, unified date/time formatting rollout, vehicle-rental fields, and general polish items.
 
-6. **Shared UI templates.** One menu template (header + "+" button top-right + list-row: icon/title/status) reused across Stay, Transport, Activities, Budget — not rebuilt per screen. One shared "Add" bottom sheet (type selector first, conditional fields) for all booking types. One shared detail screen for all item types. One shared quick-add sheet for free time blocks (browse activities vs. custom block).
+Explicitly out of scope for V0.5
 
-7. **Date-grouped lists, not date-in-subtitle.** List menus group items under date/period headers so gaps are visually obvious (critical for Stay — an uncovered date range must show as its own flagged section, not a silent absence). Accommodation coverage gaps are computed and surfaced explicitly.
+Email/PDF/photo import parsing, Google Places suggestions/bookmarking beyond basic Autocomplete, full budget aggregation, email notifications/reminders, multi-person sharing/invites, offline mode, natural-language search, road-trip leg-by-leg planning inside a vehicle rental, journal/souvenir features, statistics/gamification, monetization/plan-gated features (the entitlements layer exists, nothing is actually gated yet). Tracked in the Notion Backlog under later phases — don't build now, but V0.5 shouldn't be designed in a way that blocks them.
 
-8. **UI text centralized** (i18n-ready) — English is the default and only display language for now, but strings aren't hardcoded per-screen, to allow adding languages later without rewrites.
+Source of truth
 
-9. **Role model ready for multi-person use.** A trip has an Organizer (full access) and can have Travelers (real account, scoped access). This also makes the app viable for someone planning trips on behalf of others, and — longer-term — a travel-agency-style use case (multiple organizer accounts sharing a client trip portfolio), without needing rework. Confirmed via explicit compatibility audit — no conflicts found with the rest of the architecture.
-
-10. **Row Level Security (RLS) enforced at the database level, from the initial schema.** Every table holding trip data (Trip, Reservation, Activity, Notes, etc.) must have RLS policies restricting access to the trip's Organizer and invited Travelers — enforced by Postgres itself, not just filtered in application code. Set this up alongside the very first schema migration, not retrofitted later.
-
-11. **API keys never exposed client-side.** All calls to external APIs (Claude, Google Maps/Places, Resend) go through server-side functions (Supabase Edge Functions or Vercel Functions). No key ever ships in client-side JS.
-
-12. **Per-user rate limits on AI and external API calls.** Even server-side, cap usage per user/day to avoid runaway costs from bugs or abuse.
-
-13. **Validate AI output before writing to the database.** Structured extraction results (reservation fields, search filters) must be validated against an expected schema before being persisted — never trust LLM JSON output blindly. This is in addition to (not a replacement for) the human verification screen shown before saving an imported reservation.
-
-14. **Treat imported document content as untrusted data, not instructions.** Extraction prompts for emails/PDFs/photos must be designed so that text inside the document can never be interpreted as instructions to the model (prompt injection defense).
-
-15. **Entitlements layer, decoupled from billing, from day one.** Each account has a `plan` field (default: free, no real payment wired up yet). A central config maps plan → enabled features and numeric limits (e.g. AI access, inviting Travelers, max active trips, max trip duration). No feature ever checks the plan directly — everything goes through a central entitlement check, verified both client-side (UI) and server-side (actual enforcement — same "never trust the client alone" principle as the security rules above). When real billing is wired up later, only the `plan` update mechanism changes; no feature code needs to change.
-
-## V0.5 priority backlog (build this first — see Notion "Backlog" database for the full list, IDs prefixed `TABI-`)
-- Row Level Security policies (set up with the very first schema migration)
-- Entitlements layer foundation (plan field + central config) — even with no paid features yet
-- Trip data model (multi-trip) + anonymous Supabase auth
-- Trips list screen (home) + create-trip form
-- Manual reservation entry form (type, name, address, dates, price, 3-state status, note)
-- Geocoding + travel-time integration (keys server-side only)
-- Timeline generation with free-time-block calculation (UTC-based)
-- Overview screen: map (tap to fullscreen) + "Needs attention" action list (bookings to make + dated reminders, sorted by urgency) — NOT a full duplicate list of every reservation
-- Stay / Transport / Activities menus using the shared list template, grouped by date
-- Accommodation coverage-gap detection (flag uncovered nights explicitly)
-- Shared detail screen (view/edit any item type)
-- Shared "Add" bottom sheet
-- Check-in deadline + parking flags for Stay items
-
-## Explicitly out of scope for V0.5
-Email/PDF/photo import parsing, Google Places suggestions/bookmarking, budget aggregation, notifications/reminders, multi-person sharing, offline mode, natural-language search, anecdotes/journal features, actual plan gating (the entitlements *layer* is V0.5, but no feature actually restricted yet). These are real, tracked in the Notion Backlog under later phases (V1 / V1.5 / V2) — don't build them now, but don't design V0.5 in a way that blocks them either.
-
-## Source of truth
-Full backlog, decision history, and reasoning for every choice above live in Notion: pages **"Tabi — Product Strategy"**, **"Decision Log"**, and **"Backlog"** (items have short IDs like `TABI-12` for easy reference). When in doubt about *why* something is built a certain way, that's where the reasoning is — ask the user to paste the relevant entry if needed.
+Full backlog, decision history, and reasoning for every choice above live in Notion: "Tabi — Product Strategy", "Decision Log", "Backlog" (items have IDs like TABI-114), and "Tabi — Monetization Possibilities". When in doubt about why something is built a certain way, that's where the reasoning is — ask the user to paste the relevant entry if needed.
