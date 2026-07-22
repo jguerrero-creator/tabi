@@ -79,6 +79,7 @@ export type Database = {
           end_lat: number | null
           end_lng: number | null
           end_place_name: string | null
+          end_time_is_default: boolean
           end_timezone: string | null
           id: string
           name: string
@@ -91,6 +92,7 @@ export type Database = {
           start_lat: number | null
           start_lng: number | null
           start_place_name: string | null
+          start_time_is_default: boolean
           start_timezone: string | null
           status: Database["public"]["Enums"]["reservation_status"]
           stay_check_in_deadline: string | null
@@ -111,6 +113,7 @@ export type Database = {
           end_lat?: number | null
           end_lng?: number | null
           end_place_name?: string | null
+          end_time_is_default?: boolean
           end_timezone?: string | null
           id?: string
           name: string
@@ -123,6 +126,7 @@ export type Database = {
           start_lat?: number | null
           start_lng?: number | null
           start_place_name?: string | null
+          start_time_is_default?: boolean
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           stay_check_in_deadline?: string | null
@@ -143,6 +147,7 @@ export type Database = {
           end_lat?: number | null
           end_lng?: number | null
           end_place_name?: string | null
+          end_time_is_default?: boolean
           end_timezone?: string | null
           id?: string
           name?: string
@@ -155,6 +160,7 @@ export type Database = {
           start_lat?: number | null
           start_lng?: number | null
           start_place_name?: string | null
+          start_time_is_default?: boolean
           start_timezone?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           stay_check_in_deadline?: string | null

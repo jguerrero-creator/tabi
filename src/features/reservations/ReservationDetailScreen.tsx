@@ -1,5 +1,5 @@
 import { APIProvider } from '@vis.gl/react-google-maps'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
@@ -10,7 +10,7 @@ import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteFie
 import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
-import { formatInZone } from '../../lib/datetime'
+import { formatInZone, localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
 import {
   AddressSelectionCancelledError,
   fetchGeocodeByPlaceId,
@@ -113,6 +113,21 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [priceCurrency, setPriceCurrency] = useState(reservation.price_currency ?? '')
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(reservation.stay_parking_included)
   const [checkInDeadline, setCheckInDeadline] = useState(reservation.stay_check_in_deadline?.slice(0, 5) ?? '')
+  // TABI-144: check-in/check-out time may be a standard default (see AddReservationModal) —
+  // editable here, with the original snapshot kept to detect an actual edit before clearing
+  // the "default" flag (mirrors the address dirty-check in geocodeIfChanged below).
+  const [checkInTime, setCheckInTime] = useState(() =>
+    reservation.type === 'stay' && reservation.start_at
+      ? localTimeKey(reservation.start_at, reservation.start_timezone)
+      : '',
+  )
+  const [checkOutTime, setCheckOutTime] = useState(() =>
+    reservation.type === 'stay' && reservation.end_at
+      ? localTimeKey(reservation.end_at, reservation.end_timezone)
+      : '',
+  )
+  const initialCheckInTimeRef = useRef(checkInTime)
+  const initialCheckOutTimeRef = useRef(checkOutTime)
   const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
   const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
@@ -208,6 +223,32 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         ? {
             stay_parking_included: parkingIncluded,
             stay_check_in_deadline: checkInDeadline || null,
+          }
+        : {}),
+      ...(reservation.type === 'stay' &&
+      reservation.start_at &&
+      checkInTime.trim() !== '' &&
+      checkInTime !== initialCheckInTimeRef.current
+        ? {
+            start_at: zonedTimeToUtc(
+              localDateKey(reservation.start_at, reservation.start_timezone),
+              checkInTime,
+              reservation.start_timezone ?? localTimeZone(),
+            ),
+            start_time_is_default: false,
+          }
+        : {}),
+      ...(reservation.type === 'stay' &&
+      reservation.end_at &&
+      checkOutTime.trim() !== '' &&
+      checkOutTime !== initialCheckOutTimeRef.current
+        ? {
+            end_at: zonedTimeToUtc(
+              localDateKey(reservation.end_at, reservation.end_timezone),
+              checkOutTime,
+              reservation.end_timezone ?? localTimeZone(),
+            ),
+            end_time_is_default: false,
           }
         : {}),
     }
@@ -333,6 +374,26 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     type="time"
                     value={checkInDeadline}
                     onChange={(e) => setCheckInDeadline(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+              </div>
+            )}
+            {reservation.type === 'stay' && (
+              <div className="flex gap-3">
+                <Field label={strings.reservationDetail.checkInTimeLabel} className="flex-1">
+                  <input
+                    type="time"
+                    value={checkInTime}
+                    onChange={(e) => setCheckInTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+                <Field label={strings.reservationDetail.checkOutTimeLabel} className="flex-1">
+                  <input
+                    type="time"
+                    value={checkOutTime}
+                    onChange={(e) => setCheckOutTime(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>
@@ -469,6 +530,7 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
           address={reservation.start_address}
           at={reservation.start_at}
           timezone={reservation.start_timezone}
+          isTimeDefault={reservation.start_time_is_default}
         />
         <LegRow
           label={legLabels.end}
@@ -476,6 +538,7 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
           address={reservation.end_address}
           at={reservation.end_at}
           timezone={reservation.end_timezone}
+          isTimeDefault={reservation.end_time_is_default}
         />
       </div>
     )
@@ -489,6 +552,7 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
         address={reservation.start_address}
         at={reservation.start_at}
         timezone={reservation.start_timezone}
+        isTimeDefault={reservation.start_time_is_default}
       />
       {reservation.end_at && (
         <LegRow
@@ -497,6 +561,7 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
           address={reservation.end_address}
           at={reservation.end_at}
           timezone={reservation.end_timezone}
+          isTimeDefault={reservation.end_time_is_default}
         />
       )}
       {reservation.type === 'stay' && (
@@ -544,19 +609,30 @@ function LegRow({
   address,
   at,
   timezone,
+  isTimeDefault,
 }: {
   label: string
   placeName: string | null
   address: string | null
   at: string | null
   timezone: string | null
+  isTimeDefault?: boolean
 }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="text-sm font-medium text-slate-900">{placeName ?? address ?? '—'}</p>
       {address && placeName && <p className="text-xs text-slate-500">{address}</p>}
-      {at && <p className="text-xs text-slate-500">{formatInZone(at, timezone)}</p>}
+      {at && (
+        <p className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span>{formatInZone(at, timezone)}</span>
+          {isTimeDefault && (
+            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+              {strings.reservationDetail.defaultTimeBadge}
+            </span>
+          )}
+        </p>
+      )}
     </div>
   )
 }

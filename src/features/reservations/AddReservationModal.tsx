@@ -44,8 +44,15 @@ interface TypeOption {
   transportSubtype: TransportSubtype | null
   requiresEndAddress: boolean
   requiresStart: boolean
+  requiresStartTime: boolean
   requiresEnd: boolean
+  requiresEndTime: boolean
 }
+
+// TABI-144: check-in/check-out time is optional for Stay — a standard default
+// (15:00/11:00) is applied when left blank, per TABI-16's original spec.
+const STAY_DEFAULT_CHECK_IN_TIME = '15:00'
+const STAY_DEFAULT_CHECK_OUT_TIME = '11:00'
 
 const typeOptions: TypeOption[] = [
   {
@@ -54,7 +61,9 @@ const typeOptions: TypeOption[] = [
     transportSubtype: null,
     requiresEndAddress: false,
     requiresStart: true,
+    requiresStartTime: false,
     requiresEnd: true,
+    requiresEndTime: false,
   },
   {
     value: 'flight',
@@ -62,7 +71,9 @@ const typeOptions: TypeOption[] = [
     transportSubtype: 'point_to_point',
     requiresEndAddress: true,
     requiresStart: true,
+    requiresStartTime: true,
     requiresEnd: true,
+    requiresEndTime: true,
   },
   {
     value: 'train',
@@ -70,7 +81,9 @@ const typeOptions: TypeOption[] = [
     transportSubtype: 'point_to_point',
     requiresEndAddress: true,
     requiresStart: true,
+    requiresStartTime: true,
     requiresEnd: true,
+    requiresEndTime: true,
   },
   {
     value: 'local_transport',
@@ -78,7 +91,9 @@ const typeOptions: TypeOption[] = [
     transportSubtype: 'point_to_point',
     requiresEndAddress: true,
     requiresStart: true,
+    requiresStartTime: true,
     requiresEnd: true,
+    requiresEndTime: true,
   },
   {
     value: 'car_rental',
@@ -86,7 +101,9 @@ const typeOptions: TypeOption[] = [
     transportSubtype: 'at_disposal',
     requiresEndAddress: true,
     requiresStart: true,
+    requiresStartTime: false,
     requiresEnd: true,
+    requiresEndTime: false,
   },
   {
     value: 'activity',
@@ -94,7 +111,9 @@ const typeOptions: TypeOption[] = [
     transportSubtype: null,
     requiresEndAddress: false,
     requiresStart: false,
+    requiresStartTime: false,
     requiresEnd: false,
+    requiresEndTime: false,
   },
 ]
 
@@ -257,17 +276,17 @@ export function AddReservationModal({
       setError(strings.addReservation.errorNameRequired)
       return
     }
-    if (option.requiresStart && (!startDate || (!isAtDisposal && !startTime))) {
+    if (option.requiresStart && (!startDate || (option.requiresStartTime && !startTime))) {
       setError(strings.addReservation.errorStartRequired)
       return
     }
     if (option.requiresEnd) {
       if (option.dbType === 'stay' && !manualEndDate) {
-        if (!nights.trim() || Number(nights) < 1 || !endTime) {
+        if (!nights.trim() || Number(nights) < 1) {
           setError(strings.addReservation.errorNightsRequired)
           return
         }
-      } else if (!endDate || (!isAtDisposal && !endTime)) {
+      } else if (!endDate || (option.requiresEndTime && !endTime)) {
         setError(strings.addReservation.errorEndRequired)
         return
       }
@@ -303,8 +322,12 @@ export function AddReservationModal({
 
     // Vehicle rental collects a date range, not exact times (TABI-123) — anchor to midday so
     // the stored timestamp never drifts to an adjacent calendar day across timezone conversion.
-    const effectiveStartTime = isAtDisposal ? '12:00' : startTime
-    const effectiveEndTime = isAtDisposal ? '12:00' : endTime
+    // TABI-144: Stay check-in/check-out time is optional — fall back to a standard default
+    // (15:00/11:00) when left blank, flagged so the detail screen can surface it as unconfirmed.
+    const startTimeDefaulted = option.dbType === 'stay' && !startTime
+    const endTimeDefaulted = option.dbType === 'stay' && !endTime
+    const effectiveStartTime = isAtDisposal ? '12:00' : startTimeDefaulted ? STAY_DEFAULT_CHECK_IN_TIME : startTime
+    const effectiveEndTime = isAtDisposal ? '12:00' : endTimeDefaulted ? STAY_DEFAULT_CHECK_OUT_TIME : endTime
     const startAt = startDate && effectiveStartTime ? zonedTimeToUtc(startDate, effectiveStartTime, startTimezone) : null
     const endAt = endDate && effectiveEndTime ? zonedTimeToUtc(endDate, effectiveEndTime, endTimezone) : null
 
@@ -335,6 +358,8 @@ export function AddReservationModal({
       price_currency: priceCurrency.trim() || null,
       start_at: startAt,
       end_at: endAt,
+      start_time_is_default: startTimeDefaulted,
+      end_time_is_default: endTimeDefaulted,
       start_address: startGeo?.formattedAddress ?? (startAddress.trim() || null),
       start_lat: startGeo?.lat ?? null,
       start_lng: startGeo?.lng ?? null,
@@ -588,7 +613,8 @@ export function AddReservationModal({
             time={startTime}
             onDateChange={setStartDate}
             onTimeChange={setStartTime}
-            required={option.requiresStart}
+            dateRequired={option.requiresStart}
+            timeRequired={option.requiresStartTime}
           />
         )}
 
@@ -623,7 +649,7 @@ export function AddReservationModal({
                     aria-label={`${strings.addReservation.endLabel} time`}
                     value={endTime}
                     onChange={(event) => setEndTime(event.target.value)}
-                    required={option.requiresEnd}
+                    required={option.requiresEndTime}
                     className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </div>
@@ -653,7 +679,8 @@ export function AddReservationModal({
                 time={endTime}
                 onDateChange={setEndDate}
                 onTimeChange={setEndTime}
-                required={option.requiresEnd}
+                dateRequired={option.requiresEnd}
+                timeRequired={option.requiresEndTime}
               />
             )}
             {option.dbType === 'stay' && (
@@ -868,14 +895,16 @@ function DateTimeField({
   time,
   onDateChange,
   onTimeChange,
-  required,
+  dateRequired,
+  timeRequired,
 }: {
   legend: string
   date: string
   time: string
   onDateChange: (value: string) => void
   onTimeChange: (value: string) => void
-  required: boolean
+  dateRequired: boolean
+  timeRequired: boolean
 }) {
   return (
     <fieldset className="flex-1">
@@ -886,7 +915,7 @@ function DateTimeField({
           aria-label={`${legend} date`}
           value={date}
           onChange={(event) => onDateChange(event.target.value)}
-          required={required}
+          required={dateRequired}
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
         <input
@@ -894,7 +923,7 @@ function DateTimeField({
           aria-label={`${legend} time`}
           value={time}
           onChange={(event) => onTimeChange(event.target.value)}
-          required={required}
+          required={timeRequired}
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
       </div>
