@@ -91,7 +91,14 @@ export function useTrips() {
     return data
   }, [])
 
-  return { trips, loading, error, createTrip, updateTrip, refetch: fetchTrips }
+  const deleteTrip = useCallback(async (tripId: string) => {
+    const { error: deleteError } = await supabase.from('trips').delete().eq('id', tripId)
+    if (deleteError) throw deleteError
+
+    setTrips((current) => current.filter((trip) => trip.id !== tripId))
+  }, [])
+
+  return { trips, loading, error, createTrip, updateTrip, deleteTrip, refetch: fetchTrips }
 }
 
 function compareByStartDate(a: Trip, b: Trip) {

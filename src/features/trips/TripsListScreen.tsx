@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Spinner } from '../../components/ui/Spinner'
 import { countryName } from '../../lib/countries'
 import { strings } from '../../lib/strings'
@@ -9,11 +10,28 @@ import { TripFormModal } from './TripFormModal'
 import { useTrips } from './useTrips'
 
 export function TripsListScreen() {
-  const { trips, loading, error, createTrip, updateTrip } = useTrips()
+  const { trips, loading, error, createTrip, updateTrip, deleteTrip } = useTrips()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
+  const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const { upcoming, past } = useMemo(() => splitByDate(trips), [trips])
+
+  async function handleConfirmDelete() {
+    if (!deletingTrip) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteTrip(deletingTrip.id)
+      setDeletingTrip(null)
+    } catch {
+      setDeleteError(strings.deleteTrip.errorGeneric)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-5xl">
@@ -51,8 +69,18 @@ export function TripsListScreen() {
 
         {!loading && !error && trips.length > 0 && (
           <div className="space-y-6">
-            <TripSection title={strings.sections.upcoming} trips={upcoming} onEdit={setEditingTrip} />
-            <TripSection title={strings.sections.past} trips={past} onEdit={setEditingTrip} />
+            <TripSection
+              title={strings.sections.upcoming}
+              trips={upcoming}
+              onEdit={setEditingTrip}
+              onDelete={setDeletingTrip}
+            />
+            <TripSection
+              title={strings.sections.past}
+              trips={past}
+              onEdit={setEditingTrip}
+              onDelete={setDeletingTrip}
+            />
           </div>
         )}
 
@@ -74,6 +102,21 @@ export function TripsListScreen() {
           onSubmit={(input) => updateTrip(editingTrip.id, input)}
         />
       )}
+
+      {deletingTrip && (
+        <ConfirmDialog
+          title={strings.deleteTrip.confirmTitle}
+          message={deleteError ? `${strings.deleteTrip.confirmMessage} ${deleteError}` : strings.deleteTrip.confirmMessage}
+          confirmLabel={strings.deleteTrip.confirmCta}
+          cancelLabel={strings.deleteTrip.cancelCta}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            setDeletingTrip(null)
+            setDeleteError(null)
+          }}
+          confirming={deleting}
+        />
+      )}
     </div>
   )
 }
@@ -82,10 +125,12 @@ function TripSection({
   title,
   trips,
   onEdit,
+  onDelete,
 }: {
   title: string
   trips: Trip[]
   onEdit: (trip: Trip) => void
+  onDelete: (trip: Trip) => void
 }) {
   if (trips.length === 0) return null
 
@@ -111,9 +156,17 @@ function TripSection({
               type="button"
               onClick={() => onEdit(trip)}
               aria-label={strings.editTrip.editCta}
-              className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             >
               ✎
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(trip)}
+              aria-label={strings.deleteTrip.deleteCta}
+              className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-red-600"
+            >
+              🗑
             </button>
           </li>
         ))}

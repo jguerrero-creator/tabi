@@ -48,6 +48,15 @@ export const strings = {
     editCta: 'Edit trip',
     submit: 'Save Changes',
   },
+  deleteTrip: {
+    deleteCta: 'Delete trip',
+    confirmTitle: 'Delete this trip?',
+    confirmMessage:
+      'This will permanently delete this trip and all its reservations, notes, and reminders. This cannot be undone.',
+    confirmCta: 'Delete trip',
+    cancelCta: 'Cancel',
+    errorGeneric: 'Could not delete this trip. Please try again.',
+  },
   sections: {
     upcoming: 'Upcoming',
     past: 'Past',
@@ -247,6 +256,15 @@ export const strings = {
     remove: 'Remove',
     geocoding: 'Locating…',
     errorGeneric: 'Could not save this location. Please try again.',
+  },
+  dayNote: {
+    addCta: '+ Add note',
+    label: 'Note',
+    placeholder: 'Add a note for this day…',
+    save: 'Save',
+    cancel: 'Cancel',
+    remove: 'Remove',
+    errorGeneric: 'Could not save this note. Please try again.',
   },
   reminders: {
     title: 'Reminders',
