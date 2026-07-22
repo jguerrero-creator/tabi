@@ -275,10 +275,16 @@ function buildMapPoints(reservations: Reservation[], dayLocationsByKey: Map<stri
   }))
   const groupsByKey = new Map(groups.map((group) => [group.dateKey, group]))
 
-  const dayKeys = new Set([
-    ...dayLocationsByKey.keys(),
-    ...groups.map((group) => group.dateKey).filter((key) => key !== UNSCHEDULED_KEY),
-  ])
+  // Sorted chronologically (dateKey is 'YYYY-MM-DD', so lexical order is date
+  // order) rather than by Set insertion order, since `dayLocationsByKey` comes
+  // from an unordered Supabase fetch — the map trace needs real chronological
+  // order to connect points correctly, unlike the old markers-only version.
+  const dayKeys = Array.from(
+    new Set([
+      ...dayLocationsByKey.keys(),
+      ...groups.map((group) => group.dateKey).filter((key) => key !== UNSCHEDULED_KEY),
+    ]),
+  ).sort((a, b) => a.localeCompare(b))
 
   const points: MapPoint[] = []
   for (const dayKey of dayKeys) {
@@ -289,7 +295,12 @@ function buildMapPoints(reservations: Reservation[], dayLocationsByKey: Map<stri
     }
     const plannedLocation = dayLocationsByKey.get(dayKey)
     if (plannedLocation) {
-      points.push({ lat: plannedLocation.lat, lng: plannedLocation.lng, label: plannedLocation.place_name })
+      points.push({
+        lat: plannedLocation.lat,
+        lng: plannedLocation.lng,
+        label: plannedLocation.place_name,
+        status: null,
+      })
     }
   }
 
@@ -307,6 +318,7 @@ function reservationPoints(reservations: Reservation[]): MapPoint[] {
         lat: reservation.start_lat,
         lng: reservation.start_lng,
         label: reservation.start_place_name ?? reservation.name,
+        status: reservation.status,
       })
     }
     if (reservation.type === 'transport' && reservation.end_lat !== null && reservation.end_lng !== null) {
@@ -314,6 +326,7 @@ function reservationPoints(reservations: Reservation[]): MapPoint[] {
         lat: reservation.end_lat,
         lng: reservation.end_lng,
         label: reservation.end_place_name ?? reservation.name,
+        status: reservation.status,
       })
     }
   }

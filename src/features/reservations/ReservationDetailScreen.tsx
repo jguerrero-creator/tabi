@@ -128,6 +128,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       lat: reservation.start_lat,
       lng: reservation.start_lng,
       label: reservation.start_place_name ?? strings.reservationDetail.startLabel,
+      status: reservation.status,
     })
   }
   if (
@@ -139,6 +140,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       lat: reservation.end_lat,
       lng: reservation.end_lng,
       label: reservation.end_place_name ?? strings.reservationDetail.endLabel,
+      status: reservation.status,
     })
   }
 

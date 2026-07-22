@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps'
+import { APIProvider, Map } from '@vis.gl/react-google-maps'
 import type { MapPoint } from '../../components/ui/MiniMap'
-import { MiniMap } from '../../components/ui/MiniMap'
+import { MapTrace, MiniMap } from '../../components/ui/MiniMap'
 import { strings } from '../../lib/strings'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
@@ -32,9 +32,7 @@ export function OverviewMap({ points }: OverviewMapProps) {
         <div className="fixed inset-0 z-50 bg-black">
           <APIProvider apiKey={mapsApiKey}>
             <Map defaultCenter={centerOf(points)} defaultZoom={11} gestureHandling="greedy">
-              {points.map((point, index) => (
-                <Marker key={`${point.label}-${index}`} position={point} title={point.label} />
-              ))}
+              <MapTrace points={points} />
             </Map>
           </APIProvider>
           <button
