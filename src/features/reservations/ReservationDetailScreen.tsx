@@ -1,5 +1,5 @@
 import { APIProvider } from '@vis.gl/react-google-maps'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
@@ -20,6 +20,7 @@ import {
 } from '../../lib/geocode'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
+import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { transportRouteName } from './transportRouteName'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
@@ -128,6 +129,32 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   )
   const initialCheckInTimeRef = useRef(checkInTime)
   const initialCheckOutTimeRef = useRef(checkOutTime)
+  // TABI-160: dates were previously not editable here at all — reuses the same "number of
+  // nights" derivation as AddReservationModal (TABI-112) rather than asking for a checkout
+  // date directly, with the same initial-snapshot dirty-check pattern as the times above.
+  const [checkInDate, setCheckInDate] = useState(() =>
+    reservation.type === 'stay' && reservation.start_at
+      ? localDateKey(reservation.start_at, reservation.start_timezone)
+      : '',
+  )
+  const [checkOutDate, setCheckOutDate] = useState(() =>
+    reservation.type === 'stay' && reservation.end_at
+      ? localDateKey(reservation.end_at, reservation.end_timezone)
+      : '',
+  )
+  const [nights, setNights] = useState(() =>
+    reservation.type === 'stay' && reservation.start_at && reservation.end_at
+      ? String(
+          nightsBetween(
+            localDateKey(reservation.start_at, reservation.start_timezone),
+            localDateKey(reservation.end_at, reservation.end_timezone),
+          ),
+        )
+      : '',
+  )
+  const [manualEndDate, setManualEndDate] = useState(false)
+  const initialCheckInDateRef = useRef(checkInDate)
+  const initialCheckOutDateRef = useRef(checkOutDate)
   const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
   const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
@@ -158,6 +185,16 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       status: reservation.status,
     })
   }
+
+  // Mirrors AddReservationModal's TABI-112 effect: while manualEndDate is off, checkout follows
+  // check-in + nights. Invalid/blank nights leave the last valid checkOutDate alone rather than
+  // clearing it, since — unlike the add flow — there's always an existing date to fall back to.
+  useEffect(() => {
+    if (reservation.type !== 'stay' || manualEndDate) return
+    const n = Number(nights)
+    if (!checkInDate || nights.trim() === '' || !Number.isFinite(n) || n < 1) return
+    setCheckOutDate(addDays(checkInDate, Math.trunc(n)))
+  }, [reservation.type, manualEndDate, checkInDate, nights])
 
   async function handleStatusChange(status: ReservationStatus) {
     await onUpdate({ status })
@@ -214,6 +251,52 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     event.preventDefault()
     setFormError(null)
 
+    // TABI-160: dates/nights validated and folded into the patch alongside the TABI-144 times —
+    // only include start_at/end_at when something actually changed, same dirty-check shape as
+    // the rest of this form.
+    let stayDatePatch: Partial<Reservation> = {}
+    if (reservation.type === 'stay' && reservation.start_at && reservation.end_at) {
+      if (!manualEndDate && (nights.trim() === '' || Number(nights) < 1)) {
+        setFormError(strings.reservationDetail.errorNightsRequired)
+        return
+      }
+
+      const effectiveCheckInTime = checkInTime.trim() || initialCheckInTimeRef.current
+      const effectiveCheckOutTime = checkOutTime.trim() || initialCheckOutTimeRef.current
+      const effectiveCheckInDate = checkInDate || initialCheckInDateRef.current
+      const effectiveCheckOutDate = checkOutDate || initialCheckOutDateRef.current
+      const newStartAt = zonedTimeToUtc(
+        effectiveCheckInDate,
+        effectiveCheckInTime,
+        reservation.start_timezone ?? localTimeZone(),
+      )
+      const newEndAt = zonedTimeToUtc(
+        effectiveCheckOutDate,
+        effectiveCheckOutTime,
+        reservation.end_timezone ?? localTimeZone(),
+      )
+      if (newEndAt <= newStartAt) {
+        setFormError(strings.reservationDetail.errorEndBeforeStart)
+        return
+      }
+
+      const startDateChanged = effectiveCheckInDate !== initialCheckInDateRef.current
+      const startTimeChanged =
+        checkInTime.trim() !== '' && checkInTime !== initialCheckInTimeRef.current
+      const endDateChanged = effectiveCheckOutDate !== initialCheckOutDateRef.current
+      const endTimeChanged =
+        checkOutTime.trim() !== '' && checkOutTime !== initialCheckOutTimeRef.current
+
+      stayDatePatch = {
+        ...(startDateChanged || startTimeChanged
+          ? { start_at: newStartAt, ...(startTimeChanged ? { start_time_is_default: false } : {}) }
+          : {}),
+        ...(endDateChanged || endTimeChanged
+          ? { end_at: newEndAt, ...(endTimeChanged ? { end_time_is_default: false } : {}) }
+          : {}),
+      }
+    }
+
     let patch: Partial<Reservation> = {
       ...(isAutoNamedTransport ? {} : { name: name.trim() }),
       note: note.trim() || null,
@@ -225,32 +308,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             stay_check_in_deadline: checkInDeadline || null,
           }
         : {}),
-      ...(reservation.type === 'stay' &&
-      reservation.start_at &&
-      checkInTime.trim() !== '' &&
-      checkInTime !== initialCheckInTimeRef.current
-        ? {
-            start_at: zonedTimeToUtc(
-              localDateKey(reservation.start_at, reservation.start_timezone),
-              checkInTime,
-              reservation.start_timezone ?? localTimeZone(),
-            ),
-            start_time_is_default: false,
-          }
-        : {}),
-      ...(reservation.type === 'stay' &&
-      reservation.end_at &&
-      checkOutTime.trim() !== '' &&
-      checkOutTime !== initialCheckOutTimeRef.current
-        ? {
-            end_at: zonedTimeToUtc(
-              localDateKey(reservation.end_at, reservation.end_timezone),
-              checkOutTime,
-              reservation.end_timezone ?? localTimeZone(),
-            ),
-            end_time_is_default: false,
-          }
-        : {}),
+      ...stayDatePatch,
     }
 
     try {
@@ -381,6 +439,14 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             )}
             {reservation.type === 'stay' && (
               <div className="flex gap-3">
+                <Field label={strings.reservationDetail.checkInDateLabel} className="flex-1">
+                  <input
+                    type="date"
+                    value={checkInDate}
+                    onChange={(e) => setCheckInDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
                 <Field label={strings.reservationDetail.checkInTimeLabel} className="flex-1">
                   <input
                     type="time"
@@ -389,16 +455,76 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>
-                <Field label={strings.reservationDetail.checkOutTimeLabel} className="flex-1">
-                  <input
-                    type="time"
-                    value={checkOutTime}
-                    onChange={(e) => setCheckOutTime(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
-                  />
-                </Field>
               </div>
             )}
+            {reservation.type === 'stay' &&
+              (manualEndDate ? (
+                <div className="space-y-2">
+                  <div className="flex gap-3">
+                    <Field label={strings.reservationDetail.checkOutDateLabel} className="flex-1">
+                      <input
+                        type="date"
+                        value={checkOutDate}
+                        onChange={(e) => setCheckOutDate(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                      />
+                    </Field>
+                    <Field label={strings.reservationDetail.checkOutTimeLabel} className="flex-1">
+                      <input
+                        type="time"
+                        value={checkOutTime}
+                        onChange={(e) => setCheckOutTime(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                      />
+                    </Field>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setManualEndDate(false)}
+                    className="text-sm text-teal-700 underline"
+                  >
+                    {strings.addReservation.nightsCheckoutToggle}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-3">
+                    <Field label={strings.addReservation.nightsLabel} className="w-20">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={nights}
+                        onChange={(e) => setNights(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                      />
+                    </Field>
+                    <Field label={strings.reservationDetail.checkOutDateLabel} className="flex-1">
+                      <input
+                        type="date"
+                        value={checkOutDate}
+                        disabled
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-500"
+                      />
+                    </Field>
+                    <Field label={strings.reservationDetail.checkOutTimeLabel} className="flex-1">
+                      <input
+                        type="time"
+                        value={checkOutTime}
+                        onChange={(e) => setCheckOutTime(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                      />
+                    </Field>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setManualEndDate(true)}
+                    className="text-sm text-teal-700 underline"
+                  >
+                    {strings.addReservation.manualCheckoutToggle}
+                  </button>
+                </div>
+              ))}
             <div className="flex gap-3">
               <Field label={strings.reservationDetail.priceLabel} className="flex-1">
                 <input

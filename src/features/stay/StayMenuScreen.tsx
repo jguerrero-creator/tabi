@@ -13,7 +13,7 @@ import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
 import { localDateKey, formatDateRangeLabel, formatTimeOnly } from '../../lib/datetime'
 import type { Reservation } from '../../types/reservation'
-import { computeAccommodationGaps, type AccommodationGap } from './computeAccommodationGaps'
+import { computeAccommodationGaps, nightsBetween, type AccommodationGap } from './computeAccommodationGaps'
 
 type TimelineEntry =
   | { kind: 'group'; sortKey: string; group: DateGroup<Reservation> }
@@ -190,9 +190,4 @@ function buildTimeline(reservations: Reservation[], gaps: AccommodationGap[]): T
     ...gaps.map((gap): TimelineEntry => ({ kind: 'gap', sortKey: gap.start, gap })),
   ]
   return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-}
-
-function nightsBetween(start: string, end: string): number {
-  const msPerDay = 24 * 60 * 60 * 1000
-  return Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / msPerDay)
 }
