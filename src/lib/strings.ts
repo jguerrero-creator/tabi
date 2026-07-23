@@ -159,6 +159,7 @@ export const strings = {
     longTravel: (duration: string) => `${duration} travel — long leg`,
     noTransitRoute: 'Public transit unavailable for this route — check Google Maps or try another mode.',
     selectMode: 'Select a travel mode to see travel time',
+    addAsReservation: '+ Add reservation',
   },
   stayMenu: {
     title: 'Stay',

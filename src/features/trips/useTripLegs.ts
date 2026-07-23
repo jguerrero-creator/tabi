@@ -11,6 +11,11 @@ export interface TripLeg {
   mode: TravelMode | null
   durationSeconds: number | null
   distanceMeters: number | null
+  /** Carried through from `TripLegInput` (TABI-155) so a "+ Add" quick-add can prefill locations. */
+  origin: LatLng | null
+  destination: LatLng
+  /** UTC ISO string — see `TripLegInput.departureTime`. */
+  departureTime: string
 }
 
 /**
@@ -51,6 +56,9 @@ export function useTripLegs(
             mode,
             durationSeconds: null,
             distanceMeters: null,
+            origin: leg.origin,
+            destination: leg.destination,
+            departureTime: leg.departureTime,
           }
         }
         const result = await fetchTravelTime(leg.origin, leg.destination, mode, leg.departureTime)
@@ -60,6 +68,9 @@ export function useTripLegs(
           mode,
           durationSeconds: result.durationSeconds,
           distanceMeters: result.distanceMeters,
+          origin: leg.origin,
+          destination: leg.destination,
+          departureTime: leg.departureTime,
         }
       }),
     )

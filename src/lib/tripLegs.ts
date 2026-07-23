@@ -21,6 +21,45 @@ export function legKey(fromReservationId: string, toReservationId: string): stri
   return `${fromReservationId}->${toReservationId}`
 }
 
+export interface LegEndpointPlace {
+  formattedAddress: string
+  lat: number
+  lng: number
+  timezone: string
+  city: string | null
+  placeName: string | null
+}
+
+/**
+ * TABI-155: resolves a leg's endpoint (a plain `LatLng` computed by
+ * `buildTripLegs`) back to the rich address it came from, by matching
+ * coordinates against the reservation's own end/start fields — needed to
+ * prefill the Add-reservation sheet from a computed "Getting Around" leg.
+ * Returns null when the point doesn't match either of the reservation's own
+ * addresses (TABI-124: a day anchored to a planned location or active stay
+ * instead of a reservation endpoint) or when the matching side has no address
+ * text to prefill with.
+ */
+export function resolveLegEndpointPlace(reservation: Reservation, latLng: LatLng): LegEndpointPlace | null {
+  for (const which of ['end', 'start'] as const) {
+    const lat = which === 'end' ? reservation.end_lat : reservation.start_lat
+    const lng = which === 'end' ? reservation.end_lng : reservation.start_lng
+    const timezone = which === 'end' ? reservation.end_timezone : reservation.start_timezone
+    const address = which === 'end' ? reservation.end_address : reservation.start_address
+    if (lat === latLng.lat && lng === latLng.lng && timezone && address) {
+      return {
+        formattedAddress: address,
+        lat,
+        lng,
+        timezone,
+        city: which === 'end' ? reservation.end_city : reservation.start_city,
+        placeName: which === 'end' ? reservation.end_place_name : reservation.start_place_name,
+      }
+    }
+  }
+  return null
+}
+
 /**
  * Pairs each reservation with the next one chronologically and returns the
  * legs that need a travel-time lookup — i.e. both ends are geocoded and the

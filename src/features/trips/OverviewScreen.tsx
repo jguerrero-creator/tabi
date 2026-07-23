@@ -14,7 +14,7 @@ import { AddReservationModal } from '../reservations/AddReservationModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { OverviewMap } from './OverviewMap'
 import { RemindersSection } from './RemindersSection'
-import { TripLegsSection } from './TripLegsSection'
+import { TripLegsSection, type LegQuickAddPayload } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
 import { useTrip } from './useTrip'
 import { useTripDayLocations } from './useTripDayLocations'
@@ -41,6 +41,9 @@ export function OverviewScreen() {
   // pre-seeded with that block's own start time/timezone instead of asking
   // the user to re-derive it.
   const [quickAddBlock, setQuickAddBlock] = useState<{ startAt: string; timezone: string | null } | null>(null)
+  // TABI-155: "+ Add" on a computed "Getting Around" leg opens the same shared
+  // Add sheet, prefilled with that leg's departure/arrival and mode.
+  const [legQuickAdd, setLegQuickAdd] = useState<LegQuickAddPayload | null>(null)
   // TABI-131: tab + selected day live in the URL (not local state) so that
   // navigating to a reservation's detail screen and back restores Planning
   // and its selected day instead of remounting to the Overview default.
@@ -168,7 +171,9 @@ export function OverviewScreen() {
                     legs={legs}
                     loading={legsLoading}
                     error={legsError}
+                    trip={trip}
                     onModeChange={(key, mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
+                    onQuickAddTransport={setLegQuickAdd}
                   />
 
                   <section>
@@ -255,6 +260,25 @@ export function OverviewScreen() {
           initialStartAt={quickAddBlock.startAt}
           initialTimezone={quickAddBlock.timezone}
           onClose={() => setQuickAddBlock(null)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+        />
+      )}
+
+      {legQuickAdd && (
+        <AddReservationModal
+          tripId={tripId ?? ''}
+          defaultType={legQuickAdd.type}
+          initialStartAt={legQuickAdd.initialStartAt}
+          initialTimezone={legQuickAdd.initialTimezone}
+          initialEndAt={legQuickAdd.initialEndAt}
+          initialEndTimezone={legQuickAdd.initialEndTimezone}
+          initialStartPlace={legQuickAdd.initialStartPlace}
+          initialEndPlace={legQuickAdd.initialEndPlace}
+          onClose={() => setLegQuickAdd(null)}
           onCreate={async (input) => {
             const created = await createReservation(input)
             await refetchReservations()

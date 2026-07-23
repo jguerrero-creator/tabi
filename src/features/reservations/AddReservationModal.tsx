@@ -34,9 +34,9 @@ import { useReservationsByType } from './useReservationsByType'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
-type ResolvedPlace = GeocodeResult & { placeName: string | null }
+export type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
-type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'car_rental' | 'activity'
+export type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'car_rental' | 'activity'
 
 interface TypeOption {
   value: UiReservationType
@@ -130,6 +130,16 @@ interface AddReservationModalProps {
    */
   initialStartAt?: string | null
   initialTimezone?: string | null
+  /**
+   * TABI-155: seeds the end date/time and both addresses when creating a
+   * Transport reservation directly from a computed "Getting Around" leg —
+   * the departure/arrival points and an estimated arrival are already known,
+   * so there's no need to re-geocode what the travel-time engine just resolved.
+   */
+  initialEndAt?: string | null
+  initialEndTimezone?: string | null
+  initialStartPlace?: ResolvedPlace | null
+  initialEndPlace?: ResolvedPlace | null
   onClose: () => void
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
@@ -139,6 +149,10 @@ export function AddReservationModal({
   defaultType = 'hotel',
   initialStartAt = null,
   initialTimezone = null,
+  initialEndAt = null,
+  initialEndTimezone = null,
+  initialStartPlace = null,
+  initialEndPlace = null,
   onClose,
   onCreate,
 }: AddReservationModalProps) {
@@ -151,18 +165,22 @@ export function AddReservationModal({
   const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState('')
   const [status, setStatus] = useState<ReservationStatus>('to_book')
-  const [startAddress, setStartAddress] = useState('')
-  const [endAddress, setEndAddress] = useState('')
-  const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
-  const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(null)
+  const [startAddress, setStartAddress] = useState(() => initialStartPlace?.formattedAddress ?? '')
+  const [endAddress, setEndAddress] = useState(() => initialEndPlace?.formattedAddress ?? '')
+  const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(() => initialStartPlace)
+  const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(() => initialEndPlace)
   const [startDate, setStartDate] = useState(() =>
     initialStartAt ? localDateKey(initialStartAt, initialTimezone) : '',
   )
   const [startTime, setStartTime] = useState(() =>
     initialStartAt ? localTimeKey(initialStartAt, initialTimezone) : '',
   )
-  const [endDate, setEndDate] = useState('')
-  const [endTime, setEndTime] = useState('')
+  const [endDate, setEndDate] = useState(() =>
+    initialEndAt ? localDateKey(initialEndAt, initialEndTimezone ?? initialTimezone) : '',
+  )
+  const [endTime, setEndTime] = useState(() =>
+    initialEndAt ? localTimeKey(initialEndAt, initialEndTimezone ?? initialTimezone) : '',
+  )
   const [nights, setNights] = useState('')
   const [manualEndDate, setManualEndDate] = useState(false)
   const [priceAmount, setPriceAmount] = useState('')

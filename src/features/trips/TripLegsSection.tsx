@@ -1,23 +1,46 @@
 import { useMemo } from 'react'
 import { TravelModePicker } from '../../components/ui/TravelModePicker'
 import { Spinner } from '../../components/ui/Spinner'
+import { localDateKey, zonedTimeToUtc } from '../../lib/datetime'
 import { formatDuration, formatDistance } from '../../lib/duration'
 import { computeFreeTimeBlocks, MIN_FREE_SECONDS_TO_SHOW } from '../../lib/freeTimeBlocks'
-import { legKey } from '../../lib/tripLegs'
+import { legKey, resolveLegEndpointPlace, type LegEndpointPlace } from '../../lib/tripLegs'
 import type { TravelMode } from '../../lib/travelTime'
 import { strings } from '../../lib/strings'
 import type { Reservation } from '../../types/reservation'
+import type { Trip } from '../../types/trip'
 import type { TripLeg } from './useTripLegs'
+
+/** TABI-155: prefill payload handed up to `OverviewScreen` to open the shared Add sheet. */
+export interface LegQuickAddPayload {
+  type: 'train' | 'local_transport'
+  initialStartAt: string
+  initialEndAt: string
+  initialTimezone: string
+  initialEndTimezone: string
+  initialStartPlace: LegEndpointPlace
+  initialEndPlace: LegEndpointPlace
+}
 
 interface TripLegsSectionProps {
   reservations: Reservation[]
   legs: TripLeg[]
   loading: boolean
   error: string | null
+  trip: Trip | null
   onModeChange: (key: string, mode: TravelMode) => void
+  onQuickAddTransport: (payload: LegQuickAddPayload) => void
 }
 
-export function TripLegsSection({ reservations, legs, loading, error, onModeChange }: TripLegsSectionProps) {
+export function TripLegsSection({
+  reservations,
+  legs,
+  loading,
+  error,
+  trip,
+  onModeChange,
+  onQuickAddTransport,
+}: TripLegsSectionProps) {
   const freeTimeByLeg = useMemo(() => {
     const blocks = computeFreeTimeBlocks(reservations, legs)
     return new Map(blocks.map((block) => [legKey(block.fromReservationId, block.toReservationId), block]))
@@ -53,6 +76,7 @@ export function TripLegsSection({ reservations, legs, loading, error, onModeChan
             const to = byId.get(leg.toReservationId)
             const key = legKey(leg.fromReservationId, leg.toReservationId)
             const freeBlock = freeTimeByLeg.get(key)
+            const quickAddPayload = buildQuickAddPayload(leg, from, to, trip)
             return (
               <li key={key} className="rounded-xl border border-slate-200 bg-white p-3">
                 <p className="truncate text-sm font-medium text-slate-900">
@@ -83,6 +107,15 @@ export function TripLegsSection({ reservations, legs, loading, error, onModeChan
                   )}
                 </div>
                 <TravelModePicker value={leg.mode} onChange={(mode) => onModeChange(key, mode)} />
+                {quickAddPayload && (
+                  <button
+                    type="button"
+                    onClick={() => onQuickAddTransport(quickAddPayload)}
+                    className="mt-2 rounded-lg border border-teal-600 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-50"
+                  >
+                    {strings.tripLegs.addAsReservation}
+                  </button>
+                )}
               </li>
             )
           })}
@@ -102,4 +135,46 @@ function formatLeg(durationSeconds: number | null, distanceMeters: number | null
 /** TRAIN is TRANSIT narrowed to rail (see api/travel-time.ts) — both hit the same no-route gap. */
 function isTransitMode(mode: TravelMode): boolean {
   return mode === 'TRANSIT' || mode === 'TRAIN'
+}
+
+/**
+ * TABI-155: builds the "+ Add" prefill payload once a leg has a chosen mode
+ * and both endpoints resolve back to a real reservation's address — null
+ * otherwise (no mode yet, or an endpoint anchored to a day's planned location
+ * or active stay instead of a reservation's own address, TABI-124), so the
+ * button never opens a sheet prefilled with a guessed or missing address.
+ * Arrival is estimated from the computed leg duration when available;
+ * otherwise it falls back to the same instant as departure, left for the
+ * user to correct — the departure time itself is intentionally NOT the
+ * computed departure instant but the trip's day-window start, since the
+ * exact time isn't confirmed yet at this "to book" stage.
+ */
+function buildQuickAddPayload(
+  leg: TripLeg,
+  from: Reservation | undefined,
+  to: Reservation | undefined,
+  trip: Trip | null,
+): LegQuickAddPayload | null {
+  if (!leg.mode || !leg.origin || !from || !to || !trip) return null
+
+  const startPlace = resolveLegEndpointPlace(from, leg.origin)
+  const endPlace = resolveLegEndpointPlace(to, leg.destination)
+  if (!startPlace || !endPlace) return null
+
+  const dateKey = localDateKey(leg.departureTime, startPlace.timezone)
+  const initialStartAt = zonedTimeToUtc(dateKey, trip.day_start_time, startPlace.timezone)
+  const initialEndAt =
+    leg.durationSeconds !== null
+      ? new Date(Date.parse(initialStartAt) + leg.durationSeconds * 1000).toISOString()
+      : initialStartAt
+
+  return {
+    type: leg.mode === 'TRAIN' ? 'train' : 'local_transport',
+    initialStartAt,
+    initialEndAt,
+    initialTimezone: startPlace.timezone,
+    initialEndTimezone: endPlace.timezone,
+    initialStartPlace: startPlace,
+    initialEndPlace: endPlace,
+  }
 }
