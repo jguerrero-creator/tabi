@@ -28,7 +28,8 @@ export function FormSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl">
-        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+        {/* TABI-159: noValidate so native HTML5 required-field popups never preempt our custom error messages */}
+        <form onSubmit={onSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
             <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
             <div className="flex shrink-0 gap-2">
