@@ -2,6 +2,7 @@ import { APIProvider, Map, Marker, Polyline } from '@vis.gl/react-google-maps'
 import { mapStatusColor } from '../../lib/mapStatusColors'
 import { strings } from '../../lib/strings'
 import type { ReservationStatus } from '../../types/reservation'
+import { MapErrorBoundary } from './MapErrorBoundary'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
@@ -34,16 +35,18 @@ export function MiniMap({ points, className = '', heightClassName = 'h-40' }: Mi
 
   return (
     <div className={`${heightClassName} w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
-      <APIProvider apiKey={mapsApiKey}>
-        <Map
-          defaultCenter={center}
-          defaultZoom={points.length === 2 ? 10 : 14}
-          gestureHandling="cooperative"
-          disableDefaultUI
-        >
-          <MapTrace points={points} />
-        </Map>
-      </APIProvider>
+      <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
+        <APIProvider apiKey={mapsApiKey}>
+          <Map
+            defaultCenter={center}
+            defaultZoom={points.length === 2 ? 10 : 14}
+            gestureHandling="cooperative"
+            disableDefaultUI
+          >
+            <MapTrace points={points} />
+          </Map>
+        </APIProvider>
+      </MapErrorBoundary>
     </div>
   )
 }

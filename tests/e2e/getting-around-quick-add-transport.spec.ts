@@ -12,9 +12,9 @@ test('"+ Add" on a computed Getting Around leg opens the Add sheet prefilled as 
   page,
 }) => {
   // Local dev's Maps JS API key referrer allowlist doesn't cover this Playwright-driven
-  // localhost port (a known, unrelated infra gap — see CLAUDE.md's Maps referrer gotcha),
-  // and the map failing to load otherwise unmounts the whole page (no error boundary around
-  // it). Block the map script for this test only; unrelated to the quick-add logic under test.
+  // localhost port (TABI-162, a known, unrelated infra gap — see CLAUDE.md's Maps referrer
+  // gotcha). Block the map script for this test only; unrelated to the quick-add logic under
+  // test.
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
