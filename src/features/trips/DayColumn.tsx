@@ -31,6 +31,7 @@ type RailEntry =
     }
   | { kind: 'free'; key: string; time: string; timezone: string | null; durationSeconds: number }
   | { kind: 'tight'; key: string; time: string; timezone: string | null; durationSeconds: number }
+  | { kind: 'stay'; key: string; time: null; timezone: null; reservation: Reservation }
 
 interface DayColumnProps {
   dayKey: string
@@ -47,6 +48,13 @@ interface DayColumnProps {
   dayLocation?: TripDayLocation | null
   onSaveDayLocation?: (input: DayLocationInput) => Promise<void>
   onClearDayLocation?: () => Promise<void>
+  /**
+   * The Stay reservation covering this night, if any (TABI-158) — rendered as
+   * an untimed block at the end of the rail so where you sleep tonight is
+   * always visible, even on nights with no check-in event of their own.
+   * Same "Unscheduled" pseudo-day omission as dayLocation/dayNote above.
+   */
+  activeStay?: Reservation | null
   /** Day-level note (TABI-56) — same "Unscheduled" pseudo-day omission as dayLocation above. */
   dayNote?: TripDayNote | null
   onSaveDayNote?: (note: string) => Promise<void>
@@ -66,6 +74,7 @@ export function DayColumn({
   dayLocation,
   onSaveDayLocation,
   onClearDayLocation,
+  activeStay,
   dayNote,
   onSaveDayNote,
   onClearDayNote,
@@ -75,7 +84,7 @@ export function DayColumn({
   const dayTimezone = items[0]?.start_timezone ?? localTimeZone()
   const anchorInstant = items[0]?.start_at
 
-  const railEntries =
+  const baseEntries =
     items.length === 0 && edges.fullDay
       ? [
           {
@@ -87,6 +96,15 @@ export function DayColumn({
           },
         ]
       : buildRailEntries(items, freeTimeByFromId, edges)
+
+  // Omitted when the stay's own check-in reservation already appears among
+  // `items` for this day — that reservation card already answers "where do I
+  // sleep tonight" with a real time, so a second untimed block would be a
+  // confusing duplicate (TABI-158).
+  const showTonightStay = activeStay && !items.some((item) => item.id === activeStay.id)
+  const railEntries: RailEntry[] = showTonightStay
+    ? [...baseEntries, { kind: 'stay', key: `stay-${activeStay.id}`, time: null, timezone: null, reservation: activeStay }]
+    : baseEntries
 
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
@@ -254,6 +272,8 @@ function renderEntry(
   switch (entry.kind) {
     case 'reservation':
       return <ReservationCard reservation={entry.reservation} />
+    case 'stay':
+      return <TonightStayCard reservation={entry.reservation} />
     case 'tight':
       return (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
@@ -310,6 +330,33 @@ function ReservationCard({ reservation }: { reservation: Reservation }) {
           <span className="truncate">{reservation.name}</span>
         </p>
         {rowLabel(reservation) && <p className="truncate text-xs text-slate-500">{rowLabel(reservation)}</p>}
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * Untimed "tonight's accommodation" block (TABI-158) — visually distinct from
+ * `ReservationCard`'s solid, timed style (dashed border, muted icon, a
+ * caption above the name) so it never reads as a scheduled event.
+ */
+function TonightStayCard({ reservation }: { reservation: Reservation }) {
+  const location = reservation.start_place_name ?? reservation.start_city ?? reservation.start_address
+  return (
+    <Link
+      to={`/reservations/${reservation.id}`}
+      className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 hover:bg-slate-50"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+        <ReservationTypeIcon type="stay" className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium text-slate-500">{strings.planning.tonightsStay}</p>
+        <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
+          <span className="truncate">{reservation.name}</span>
+        </p>
+        {location && <p className="truncate text-xs text-slate-500">{location}</p>}
       </div>
     </Link>
   )

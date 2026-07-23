@@ -120,6 +120,9 @@ export function TripTimeline({
           items={groupsByKey.get(effectiveSelectedKey)?.items ?? []}
           freeTimeByFromId={freeTimeByFromId}
           edges={dayEdgesByKey.get(effectiveSelectedKey) ?? {}}
+          activeStay={
+            effectiveSelectedKey === UNSCHEDULED_KEY ? null : findActiveStay(effectiveSelectedKey, reservations)
+          }
           dayLocation={dayLocationsByKey.get(effectiveSelectedKey)}
           onAddAtFreeBlock={onAddAtFreeBlock}
           onSaveDayLocation={
@@ -151,6 +154,7 @@ export function TripTimeline({
             items={groupsByKey.get(day.key)?.items ?? []}
             freeTimeByFromId={freeTimeByFromId}
             edges={dayEdgesByKey.get(day.key) ?? {}}
+            activeStay={day.key === UNSCHEDULED_KEY ? null : findActiveStay(day.key, reservations)}
             dayLocation={dayLocationsByKey.get(day.key)}
             onAddAtFreeBlock={onAddAtFreeBlock}
             onSaveDayLocation={
