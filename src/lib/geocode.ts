@@ -19,6 +19,12 @@ export type GeocodeResponse =
 
 export class AddressSelectionCancelledError extends Error {}
 
+// TABI-9: thrown specifically for api/geocode.ts's 404 ("Address not found" — Google
+// returned zero results, a hard failure distinct from an ambiguous/ranked candidate list).
+// Callers can catch this separately to offer a manual/no-geocode fallback instead of just
+// blocking the save on a generic error.
+export class AddressNotFoundError extends Error {}
+
 export async function fetchGeocode(address: string): Promise<GeocodeResponse> {
   return postGeocode({ address })
 }
@@ -38,7 +44,9 @@ async function postGeocode(body: { address: string } | { placeId: string }): Pro
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null)
-    throw new Error(errorBody?.error ?? 'Failed to geocode address')
+    const message = errorBody?.error ?? 'Failed to geocode address'
+    if (response.status === 404) throw new AddressNotFoundError(message)
+    throw new Error(message)
   }
 
   return response.json()

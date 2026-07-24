@@ -8,6 +8,7 @@ import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteFie
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import { formatDayPillLabel, localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
 import {
+  AddressNotFoundError,
   AddressSelectionCancelledError,
   fetchGeocodeByPlaceId,
   resolveAddress,
@@ -132,6 +133,15 @@ export function AddReservationModal({
     input: Omit<NewReservation, 'trip_id'>
     mismatch: LocationMismatch
   } | null>(null)
+  // TABI-9: when geocoding hard-fails (address not found — not the ambiguous-candidates case,
+  // which useAddressPicker already handles), offer to save with the free-text address as-is
+  // rather than blocking the reservation entirely. Never silent: this is an explicit confirm,
+  // same philosophy as the overlap/out-of-period/location-mismatch confirms below.
+  const [geocodeFailureConfirm, setGeocodeFailureConfirm] = useState<{
+    fields: Array<'start' | 'end'>
+    startGeo: ResolvedPlace | null
+    endGeo: ResolvedPlace | null
+  } | null>(null)
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   // Field requirements derive from the main type + (for Transport) its subtype, rather than
@@ -254,14 +264,25 @@ export function AddReservationModal({
     setGeocoding(true)
     let startGeo: ResolvedPlace | null = startPlace
     let endGeo: ResolvedPlace | null = endPlace
+    const notFoundFields: Array<'start' | 'end'> = []
     try {
       if (!startGeo) {
-        const resolved = await resolveAddress(startAddress, requestPick)
-        startGeo = resolved ? { ...resolved, placeName: null } : null
+        try {
+          const resolved = await resolveAddress(startAddress, requestPick)
+          startGeo = resolved ? { ...resolved, placeName: null } : null
+        } catch (err) {
+          if (!(err instanceof AddressNotFoundError)) throw err
+          notFoundFields.push('start')
+        }
       }
       if (option.requiresEndAddress && !endGeo) {
-        const resolved = await resolveAddress(endAddress, requestPick)
-        endGeo = resolved ? { ...resolved, placeName: null } : null
+        try {
+          const resolved = await resolveAddress(endAddress, requestPick)
+          endGeo = resolved ? { ...resolved, placeName: null } : null
+        } catch (err) {
+          if (!(err instanceof AddressNotFoundError)) throw err
+          notFoundFields.push('end')
+        }
       }
     } catch (err) {
       setError(
@@ -274,6 +295,26 @@ export function AddReservationModal({
     }
     setGeocoding(false)
 
+    if (notFoundFields.length > 0) {
+      setGeocodeFailureConfirm({ fields: notFoundFields, startGeo, endGeo })
+      return
+    }
+
+    await buildAndProceed(startGeo, endGeo)
+  }
+
+  async function handleConfirmGeocodeFailure() {
+    if (!geocodeFailureConfirm) return
+    const { startGeo, endGeo } = geocodeFailureConfirm
+    setGeocodeFailureConfirm(null)
+    await buildAndProceed(startGeo, endGeo)
+  }
+
+  function handleCancelGeocodeFailure() {
+    setGeocodeFailureConfirm(null)
+  }
+
+  async function buildAndProceed(startGeo: ResolvedPlace | null, endGeo: ResolvedPlace | null) {
     const startTimezone = startGeo?.timezone ?? initialTimezone ?? localTimeZone()
     const endTimezone = option.requiresEndAddress ? (endGeo?.timezone ?? startTimezone) : startTimezone
 
@@ -739,8 +780,26 @@ export function AddReservationModal({
           confirming={submitting}
         />
       )}
+      {geocodeFailureConfirm && (
+        <ConfirmDialog
+          title={strings.addReservation.geocodeFailureConfirmTitle}
+          message={strings.addReservation.geocodeFailureConfirmMessage(
+            describeGeocodeFailureFields(geocodeFailureConfirm.fields),
+          )}
+          confirmLabel={strings.addReservation.geocodeFailureConfirmCta}
+          onConfirm={handleConfirmGeocodeFailure}
+          cancelLabel={strings.addReservation.geocodeFailureCancelCta}
+          onCancel={handleCancelGeocodeFailure}
+          confirming={submitting}
+        />
+      )}
     </APIProvider>
   )
+}
+
+function describeGeocodeFailureFields(fields: Array<'start' | 'end'>): string {
+  if (fields.length === 2) return 'start and end addresses'
+  return fields[0] === 'start' ? 'start address' : 'end address'
 }
 
 function StaySubtypePicker({

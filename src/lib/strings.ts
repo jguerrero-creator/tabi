@@ -290,6 +290,11 @@ export const strings = {
       `This reservation is in ${reservationCity}, but you planned ${plannedCity} for ${dayLabel}. Is that intended?`,
     locationMismatchConfirmCta: 'Yes, save anyway',
     locationMismatchCancelCta: 'Go back',
+    geocodeFailureConfirmTitle: 'Address not found',
+    geocodeFailureConfirmMessage: (fields: string) =>
+      `We couldn't locate the ${fields} automatically. Save it as typed, without an exact map location for now?`,
+    geocodeFailureConfirmCta: 'Save without location',
+    geocodeFailureCancelCta: 'Go back and edit',
   },
   addressPicker: {
     title: 'Select an Address',
