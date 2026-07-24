@@ -11,9 +11,12 @@ import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripLeg } from './useTripLegs'
 
-/** TABI-155: prefill payload handed up to `OverviewScreen` to open the shared Add sheet. */
+/**
+ * TABI-155: prefill payload handed up to `OverviewScreen` to open the shared Add sheet.
+ * Always a point-to-point Transport reservation — a computed "Getting Around" leg only
+ * ever exists between two real bookings, never for a vehicle rental (TABI-121/124).
+ */
 export interface LegQuickAddPayload {
-  type: 'train' | 'local_transport'
   initialStartAt: string
   initialEndAt: string
   initialTimezone: string
@@ -169,7 +172,6 @@ function buildQuickAddPayload(
       : initialStartAt
 
   return {
-    type: leg.mode === 'TRAIN' ? 'train' : 'local_transport',
     initialStartAt,
     initialEndAt,
     initialTimezone: startPlace.timezone,

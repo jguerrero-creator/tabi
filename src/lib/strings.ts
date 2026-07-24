@@ -230,14 +230,6 @@ export const strings = {
     title: 'Add Reservation',
     typeLabel: 'Type',
     changeTypeToggle: 'Change type',
-    types: {
-      hotel: 'Stay',
-      flight: 'Flight',
-      train: 'Train',
-      local_transport: 'Local transport',
-      car_rental: 'Vehicle rental',
-      activity: 'Activity',
-    },
     staySubtypeLabel: 'Accommodation type',
     staySubtypes: {
       hotel: 'Hotel',
@@ -245,6 +237,11 @@ export const strings = {
       airbnb: 'Airbnb',
       ryokan: 'Ryokan',
       other: 'Other',
+    },
+    transportSubtypeLabel: 'Transport type',
+    transportSubtypes: {
+      point_to_point: 'Flight / Train / Bus',
+      at_disposal: 'Vehicle rental',
     },
     nameLabel: 'Name',
     namePlaceholder: 'e.g. Hotel Le Bristol Paris',

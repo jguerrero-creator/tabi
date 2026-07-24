@@ -107,7 +107,7 @@ export function TransportMenuScreen() {
       {showAddModal && (
         <AddReservationModal
           tripId={tripId ?? ''}
-          defaultType="flight"
+          defaultType="transport"
           onClose={() => setShowAddModal(false)}
           onCreate={async (input) => {
             const created = await createReservation(input)

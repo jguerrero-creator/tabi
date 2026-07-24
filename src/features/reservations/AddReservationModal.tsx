@@ -36,92 +36,19 @@ const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefine
 
 export type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
-export type UiReservationType = 'hotel' | 'flight' | 'train' | 'local_transport' | 'car_rental' | 'activity'
-
-interface TypeOption {
-  value: UiReservationType
-  dbType: ReservationType
-  transportSubtype: TransportSubtype | null
-  requiresEndAddress: boolean
-  requiresStart: boolean
-  requiresStartTime: boolean
-  requiresEnd: boolean
-  requiresEndTime: boolean
-}
-
 // TABI-144: check-in/check-out time is optional for Stay — a standard default
 // (15:00/11:00) is applied when left blank, per TABI-16's original spec.
 const STAY_DEFAULT_CHECK_IN_TIME = '15:00'
 const STAY_DEFAULT_CHECK_OUT_TIME = '11:00'
 
-const typeOptions: TypeOption[] = [
-  {
-    value: 'hotel',
-    dbType: 'stay',
-    transportSubtype: null,
-    requiresEndAddress: false,
-    requiresStart: true,
-    requiresStartTime: false,
-    requiresEnd: true,
-    requiresEndTime: false,
-  },
-  {
-    value: 'flight',
-    dbType: 'transport',
-    transportSubtype: 'point_to_point',
-    requiresEndAddress: true,
-    requiresStart: true,
-    requiresStartTime: true,
-    requiresEnd: true,
-    requiresEndTime: true,
-  },
-  {
-    value: 'train',
-    dbType: 'transport',
-    transportSubtype: 'point_to_point',
-    requiresEndAddress: true,
-    requiresStart: true,
-    requiresStartTime: true,
-    requiresEnd: true,
-    requiresEndTime: true,
-  },
-  {
-    value: 'local_transport',
-    dbType: 'transport',
-    transportSubtype: 'point_to_point',
-    requiresEndAddress: true,
-    requiresStart: true,
-    requiresStartTime: true,
-    requiresEnd: true,
-    requiresEndTime: true,
-  },
-  {
-    value: 'car_rental',
-    dbType: 'transport',
-    transportSubtype: 'at_disposal',
-    requiresEndAddress: true,
-    requiresStart: true,
-    requiresStartTime: false,
-    requiresEnd: true,
-    requiresEndTime: false,
-  },
-  {
-    value: 'activity',
-    dbType: 'activity',
-    transportSubtype: null,
-    requiresEndAddress: false,
-    requiresStart: false,
-    requiresStartTime: false,
-    requiresEnd: false,
-    requiresEndTime: false,
-  },
-]
-
+const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
+const transportSubtypeOptions: TransportSubtype[] = ['point_to_point', 'at_disposal']
 
 interface AddReservationModalProps {
   tripId: string
-  defaultType?: UiReservationType
+  defaultType?: ReservationType
+  defaultTransportSubtype?: TransportSubtype
   /**
    * Seeds the start date/time from a free-time block on the timeline (TABI-54)
    * — the block's own real-location timezone, not the browser's, since
@@ -146,7 +73,8 @@ interface AddReservationModalProps {
 
 export function AddReservationModal({
   tripId,
-  defaultType = 'hotel',
+  defaultType = 'stay',
+  defaultTransportSubtype = 'point_to_point',
   initialStartAt = null,
   initialTimezone = null,
   initialEndAt = null,
@@ -156,11 +84,14 @@ export function AddReservationModal({
   onClose,
   onCreate,
 }: AddReservationModalProps) {
-  const [uiType, setUiType] = useState<UiReservationType>(defaultType)
+  const [mainType, setMainType] = useState<ReservationType>(defaultType)
   // TABI-126: the add sheet inherits its type from the menu it was opened from (Stay/Transport/
   // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
   const [typeExpanded, setTypeExpanded] = useState(false)
   const [staySubtype, setStaySubtype] = useState<StaySubtype>('hotel')
+  // TABI-121: Transport's own sub-type (point-to-point vs vehicle rental), symmetric to Stay's —
+  // shown whenever the main type is Transport, not folded into the main type selector.
+  const [transportSubtype, setTransportSubtype] = useState<TransportSubtype>(defaultTransportSubtype)
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
   const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState('')
@@ -203,12 +134,22 @@ export function AddReservationModal({
   } | null>(null)
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
-  const option = typeOptions.find((candidate) => candidate.value === uiType) ?? typeOptions[0]
+  // Field requirements derive from the main type + (for Transport) its subtype, rather than
+  // a flat list of pre-baked combinations — see TABI-121.
+  const isTransport = mainType === 'transport'
+  const isPointToPoint = isTransport && transportSubtype === 'point_to_point'
+  const isAtDisposal = isTransport && transportSubtype === 'at_disposal'
+  const option = {
+    dbType: mainType,
+    transportSubtype: isTransport ? transportSubtype : null,
+    requiresEndAddress: isPointToPoint || isAtDisposal,
+    requiresStart: mainType !== 'activity',
+    requiresStartTime: isPointToPoint,
+    requiresEnd: mainType !== 'activity',
+    requiresEndTime: isPointToPoint,
+  }
   // TABI-122: point-to-point transport has no free-text name — it's derived from the route.
-  const isAutoNamedTransport = option.transportSubtype === 'point_to_point'
-  // TABI-123: vehicle rental is a duration, not a route — city-level pickup/drop-off and a
-  // date range, not the point-to-point flow's exact address + departure/arrival time.
-  const isAtDisposal = option.transportSubtype === 'at_disposal'
+  const isAutoNamedTransport = isPointToPoint
   // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
   // whichever type is currently selected so switching type mid-form checks against the right set.
   const { reservations: sameTypeReservations, loading: sameTypeLoading } = useReservationsByType(
@@ -504,20 +445,20 @@ export function AddReservationModal({
         {typeExpanded ? (
           <Field label={strings.addReservation.typeLabel}>
             <select
-              value={uiType}
-              onChange={(event) => setUiType(event.target.value as UiReservationType)}
+              value={mainType}
+              onChange={(event) => setMainType(event.target.value as ReservationType)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
             >
-              {typeOptions.map((candidate) => (
-                <option key={candidate.value} value={candidate.value}>
-                  {strings.addReservation.types[candidate.value]}
+              {mainTypeOptions.map((candidate) => (
+                <option key={candidate} value={candidate}>
+                  {strings.reservationType[candidate]}
                 </option>
               ))}
             </select>
           </Field>
         ) : (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-900">{strings.addReservation.types[uiType]}</span>
+            <span className="text-sm text-slate-900">{strings.reservationType[mainType]}</span>
             <button
               type="button"
               onClick={() => setTypeExpanded(true)}
@@ -534,6 +475,15 @@ export function AddReservationModal({
               {strings.addReservation.staySubtypeLabel}
             </p>
             <StaySubtypePicker value={staySubtype} onChange={setStaySubtype} />
+          </div>
+        )}
+
+        {isTransport && (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">
+              {strings.addReservation.transportSubtypeLabel}
+            </p>
+            <TransportSubtypePicker value={transportSubtype} onChange={setTransportSubtype} />
           </div>
         )}
 
@@ -818,6 +768,38 @@ function StaySubtypePicker({
             }`}
           >
             {strings.addReservation.staySubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function TransportSubtypePicker({
+  value,
+  onChange,
+}: {
+  value: TransportSubtype
+  onChange: (subtype: TransportSubtype) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      {transportSubtypeOptions.map((subtype) => {
+        const selected = subtype === value
+        return (
+          <button
+            key={subtype}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(subtype)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.transportSubtypes[subtype]}
           </button>
         )
       })}

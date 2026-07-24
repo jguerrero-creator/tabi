@@ -271,7 +271,7 @@ export function OverviewScreen() {
       {legQuickAdd && (
         <AddReservationModal
           tripId={tripId ?? ''}
-          defaultType={legQuickAdd.type}
+          defaultType="transport"
           initialStartAt={legQuickAdd.initialStartAt}
           initialTimezone={legQuickAdd.initialTimezone}
           initialEndAt={legQuickAdd.initialEndAt}

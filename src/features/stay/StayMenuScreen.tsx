@@ -122,7 +122,7 @@ export function StayMenuScreen() {
       {showAddModal && (
         <AddReservationModal
           tripId={tripId ?? ''}
-          defaultType="hotel"
+          defaultType="stay"
           onClose={() => setShowAddModal(false)}
           onCreate={async (input) => {
             const created = await createReservation(input)
