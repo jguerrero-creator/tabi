@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Spinner } from '../../components/ui/Spinner'
 import { countryName } from '../../lib/countries'
+import { formatDateRangeLabel, formatDayPillLabel } from '../../lib/datetime'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
 import { TripFormModal } from './TripFormModal'
@@ -192,8 +193,9 @@ function splitByDate(trips: Trip[]) {
   return { upcoming, past }
 }
 
+// TABI-119: reuse the shared date formatters everywhere — never raw ISO strings.
 function formatDateRange(start: string | null, end: string | null) {
   if (!start && !end) return 'Dates not set'
-  if (start && end) return `${start} → ${end}`
-  return start ?? end ?? ''
+  if (start && end) return formatDateRangeLabel(start, end)
+  return formatDayPillLabel(start ?? end!)
 }
