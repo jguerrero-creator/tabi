@@ -14,6 +14,11 @@ export const strings = {
     back: 'Back',
     overlapBadge: '↳ Also booked during this period',
   },
+  appError: {
+    title: 'Something went wrong.',
+    body: 'Reload the page to keep going — anything you already saved is safe.',
+    reload: 'Reload',
+  },
   home: {
     title: 'My Trips',
     emptyTitle: 'No trips yet',
