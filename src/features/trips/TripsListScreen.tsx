@@ -6,6 +6,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { countryName } from '../../lib/countries'
 import { formatDateRangeLabel, formatDayPillLabel } from '../../lib/datetime'
 import { strings } from '../../lib/strings'
+import { useProfile } from '../../lib/useProfile'
 import type { Trip } from '../../types/trip'
 import { TripFormModal } from './TripFormModal'
 import { useTrips } from './useTrips'
@@ -19,6 +20,14 @@ export function TripsListScreen() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const { upcoming, past } = useMemo(() => splitByDate(trips), [trips])
+
+  // TABI-98: the shared entitlement check, actually invoked client-side (display-only —
+  // greys out the trigger; the real enforcement is server-side, see api/_lib/entitlements.ts).
+  // `profile` is null while loading or on a transient fetch error, and `maxActiveTrips` is
+  // still unlimited for every plan today (TABI-97), so this never disables trip creation as
+  // a side effect of either of those — it only starts doing anything once a real limit exists.
+  const { profile, can } = useProfile()
+  const atTripLimit = profile !== null && !can({ limit: 'maxActiveTrips', currentValue: trips.length })
 
   async function handleConfirmDelete() {
     if (!deletingTrip) return
@@ -41,8 +50,10 @@ export function TripsListScreen() {
         <button
           type="button"
           onClick={() => setShowCreateModal(true)}
+          disabled={atTripLimit}
           aria-label={strings.home.createCta}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700"
+          title={atTripLimit ? strings.home.tripLimitReached : undefined}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
         >
           +
         </button>
@@ -64,7 +75,10 @@ export function TripsListScreen() {
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <h2 className="text-base font-medium text-slate-900">{strings.home.emptyTitle}</h2>
             <p className="text-sm text-slate-500">{strings.home.emptyBody}</p>
-            <Button onClick={() => setShowCreateModal(true)}>{strings.home.createCta}</Button>
+            <Button onClick={() => setShowCreateModal(true)} disabled={atTripLimit}>
+              {strings.home.createCta}
+            </Button>
+            {atTripLimit && <p className="text-xs text-red-600">{strings.home.tripLimitReached}</p>}
           </div>
         )}
 

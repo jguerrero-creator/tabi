@@ -37,6 +37,7 @@ export const strings = {
     emptyTitle: 'No trips yet',
     emptyBody: 'Create your first trip to get started.',
     createCta: 'New Trip',
+    tripLimitReached: "You've reached your plan's active trip limit.",
     loading: 'Loading trips…',
     errorLoading: 'Could not load your trips. Please try again.',
     privacyLink: 'Privacy Policy',
