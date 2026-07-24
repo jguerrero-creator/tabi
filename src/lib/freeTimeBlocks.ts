@@ -1,5 +1,5 @@
 import type { Reservation } from '../types/reservation'
-import { zonedTimeToUtc } from './datetime'
+import { localDateKey, zonedTimeToUtc } from './datetime'
 import { legKey } from './tripLegs'
 import type { TravelMode } from './travelTime'
 
@@ -124,9 +124,9 @@ export function computeDayEdgeFreeBlocks(
 
   for (const day of days) {
     const dayStart = zonedTimeToUtc(day.dateKey, dayStartTime, day.timezone)
-    const dayEnd = zonedTimeToUtc(day.dateKey, dayEndTime, day.timezone)
 
     if (day.items.length === 0) {
+      const dayEnd = zonedTimeToUtc(day.dateKey, dayEndTime, day.timezone)
       pushDayEdgeBlock(blocks, day.dateKey, 'full-day', dayStart, dayEnd)
       continue
     }
@@ -136,7 +136,19 @@ export function computeDayEdgeFreeBlocks(
     const last = sorted[sorted.length - 1]
 
     pushDayEdgeBlock(blocks, day.dateKey, 'leading', dayStart, first.start_at)
-    pushDayEdgeBlock(blocks, day.dateKey, 'trailing', last.end_at ?? last.start_at, dayEnd)
+
+    // The trailing edge starts after the day's last item has already ended —
+    // by then the traveler may be in a different timezone than the one this
+    // day started in (an international arrival). `dayEndTime` must be
+    // evaluated on the arrival's own local calendar date, in the arrival's
+    // own timezone — not on `day.dateKey`/`day.timezone`, which anchor to
+    // wherever/whenever the day *started* (TABI-165). The block still files
+    // under `day.dateKey` for tab assignment; only the cutoff instant moves.
+    const trailingInstant = last.end_at ?? last.start_at
+    const trailingTimezone = last.end_timezone ?? last.start_timezone ?? day.timezone
+    const trailingDateKey = localDateKey(trailingInstant, trailingTimezone)
+    const trailingDayEnd = zonedTimeToUtc(trailingDateKey, dayEndTime, trailingTimezone)
+    pushDayEdgeBlock(blocks, day.dateKey, 'trailing', trailingInstant, trailingDayEnd)
   }
 
   return blocks
