@@ -326,9 +326,7 @@ export function AddReservationModal({
       setError(
         err instanceof AddressSelectionCancelledError
           ? strings.addressPicker.selectionRequiredError
-          : err instanceof Error
-            ? err.message
-            : strings.addReservation.errorGeneric,
+          : strings.addReservation.geocodeErrorGeneric,
       )
       setGeocoding(false)
       return

@@ -19,6 +19,19 @@ export const strings = {
     body: 'Reload the page to keep going — anything you already saved is safe.',
     reload: 'Reload',
   },
+  reportBug: {
+    trigger: 'Report a bug',
+    title: 'Report a Bug',
+    titleLabel: 'Title',
+    titlePlaceholder: 'What went wrong?',
+    descriptionLabel: 'Description / steps to reproduce',
+    descriptionPlaceholder: 'Optional — what were you doing when it happened?',
+    cancel: 'Cancel',
+    submit: 'Send',
+    closeCta: 'Close',
+    successMessage: 'Thanks — the bug has been logged.',
+    errorMessage: 'Could not send the report. Please try again.',
+  },
   home: {
     title: 'My Trips',
     emptyTitle: 'No trips yet',
@@ -264,6 +277,7 @@ export const strings = {
     errorNightsRequired: 'Number of nights is required.',
     errorEndBeforeStart: 'End must be on or after start.',
     errorGeneric: 'Something went wrong. Please try again.',
+    geocodeErrorGeneric: 'Could not locate this address. Please try again.',
     overlapConfirmTitle: 'Overlapping dates',
     overlapConfirmMessage: (name: string) => `This overlaps with "${name}". Is this intended?`,
     overlapNoteLabel: 'Note (optional)',
@@ -281,7 +295,7 @@ export const strings = {
     locationMismatchCancelCta: 'Go back',
   },
   addressPicker: {
-    title: 'Select an address',
+    title: 'Select an Address',
     cancel: 'Cancel',
     selectionRequiredError: 'Please select an address from the list, or edit your search.',
   },
@@ -328,13 +342,13 @@ export const strings = {
         list: [
           'Account data: an anonymous session identifier created automatically the first time you open Tabi, used to associate your trips with your device/browser. This version does not require or collect an email address or password.',
           'Trip data: trip name, destination countries, start/end dates, currency, and any notes you add.',
-          'Reservation data: booking type, name, price, status (Booked / To book / Decide later), notes, and — for stay, transport, and activity items — addresses, place names, geographic coordinates (latitude/longitude), and time zone, resolved via Google’s Geocoding and Time Zone APIs. For stay items specifically: whether parking is included and a check-in deadline, if you enter them.',
+          "Reservation data: booking type, name, price, status (Booked / To book / Decide later), notes, and — for stay, transport, and activity items — addresses, place names, geographic coordinates (latitude/longitude), and time zone, resolved via Google's Geocoding and Time Zone APIs. For stay items specifically: whether parking is included and a check-in deadline, if you enter them.",
           'Planned-location data: for days without a fixed booking, an address or area you enter, geocoded the same way.',
           'Reminders: any reminder titles and dates you create.',
         ],
       },
       {
-        heading: 'What we don’t collect',
+        heading: "What we don't collect",
         paragraphs: [
           'We do not collect payment information, government ID, or biometric data, and we do not use analytics, advertising, or third-party tracking cookies.',
         ],
@@ -343,7 +357,7 @@ export const strings = {
       {
         heading: 'Why we collect it',
         paragraphs: [
-          'We process this data solely to provide Tabi’s core functionality: computing real travel time between your bookings, building your day-by-day timeline, detecting gaps in accommodation coverage, and surfacing reminders and "needs attention" items. We do not use your data for any other purpose.',
+          'We process this data solely to provide Tabi\'s core functionality: computing real travel time between your bookings, building your day-by-day timeline, detecting gaps in accommodation coverage, and surfacing reminders and "needs attention" items. We do not use your data for any other purpose.',
           'Legal basis (GDPR Art. 6): performance of the service you request when you use the app (Art. 6(1)(b)), and our legitimate interest in operating and improving Tabi (Art. 6(1)(f)).',
         ],
         list: [],
@@ -354,7 +368,7 @@ export const strings = {
         list: [
           'Supabase (database & authentication) — stores your trip, reservation, and session data. Hosted in the EU (eu-west-1, Ireland).',
           'Vercel (hosting) — serves the app and runs the server-side functions that call the APIs below, via its global edge network.',
-          'Google Maps Platform (Geocoding, Time Zone, Routes, and Maps JavaScript/Places Autocomplete APIs) — used to turn addresses into coordinates, compute travel time, and let you search for places. When you type or select an address, that text is sent to Google. Google’s own privacy policy (https://policies.google.com/privacy) governs its processing of that data, as required by the Google Maps Platform Terms of Service.',
+          "Google Maps Platform (Geocoding, Time Zone, Routes, and Maps JavaScript/Places Autocomplete APIs) — used to turn addresses into coordinates, compute travel time, and let you search for places. When you type or select an address, that text is sent to Google. Google's own privacy policy (https://policies.google.com/privacy) governs its processing of that data, as required by the Google Maps Platform Terms of Service.",
         ],
       },
       {
@@ -381,26 +395,26 @@ export const strings = {
       {
         heading: 'How to delete your data',
         paragraphs: [
-          'Tabi uses anonymous sessions rather than accounts in this version, so there isn’t a self-serve "delete account" option yet. Clearing your browser’s local storage for this site ends your local session, but your trip data remains stored until you ask us to remove it. To request deletion, email jguerrero@digitaloasis.tech — we’ll confirm what we found and delete it, normally within 30 days.',
+          'Tabi uses anonymous sessions rather than accounts in this version, so there isn\'t a self-serve "delete account" option yet. Clearing your browser\'s local storage for this site ends your local session, but your trip data remains stored until you ask us to remove it. To request deletion, email jguerrero@digitaloasis.tech — we\'ll confirm what we found and delete it, normally within 30 days.',
         ],
         list: [],
       },
       {
         heading: 'Cookies & local storage',
         paragraphs: [
-          'Tabi stores a session token in your browser’s local storage so you can return to your trips without signing in. We do not use analytics, advertising, or third-party tracking cookies.',
+          "Tabi stores a session token in your browser's local storage so you can return to your trips without signing in. We do not use analytics, advertising, or third-party tracking cookies.",
         ],
         list: [],
       },
       {
-        heading: 'Children’s privacy',
+        heading: "Children's privacy",
         paragraphs: ['Tabi is not directed at children, and we do not knowingly collect data from anyone under 16.'],
         list: [],
       },
       {
         heading: 'Changes to this policy',
         paragraphs: [
-          'We may update this policy as Tabi evolves — for example, when accounts and self-service deletion are added. We’ll update the "last updated" date above whenever we do.',
+          'We may update this policy as Tabi evolves — for example, when accounts and self-service deletion are added. We\'ll update the "last updated" date above whenever we do.',
         ],
         list: [],
       },

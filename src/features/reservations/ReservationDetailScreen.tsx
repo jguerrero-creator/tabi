@@ -332,9 +332,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       setFormError(
         err instanceof AddressSelectionCancelledError
           ? strings.addressPicker.selectionRequiredError
-          : err instanceof Error
-            ? err.message
-            : strings.reservationDetail.geocodeErrorGeneric,
+          : strings.reservationDetail.geocodeErrorGeneric,
       )
       setGeocoding(false)
       return
