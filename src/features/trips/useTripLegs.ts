@@ -61,16 +61,32 @@ export function useTripLegs(
             departureTime: leg.departureTime,
           }
         }
-        const result = await fetchTravelTime(leg.origin, leg.destination, mode, leg.departureTime)
-        return {
-          fromReservationId: leg.fromReservationId,
-          toReservationId: leg.toReservationId,
-          mode,
-          durationSeconds: result.durationSeconds,
-          distanceMeters: result.distanceMeters,
-          origin: leg.origin,
-          destination: leg.destination,
-          departureTime: leg.departureTime,
+        // TABI-34: a single leg's fetch failing (network error, 5xx) must not wipe out every
+        // other leg — fall back to the same "unknown duration" shape used when Routes API
+        // itself finds no route, rather than letting it reject and fail the whole Promise.all.
+        try {
+          const result = await fetchTravelTime(leg.origin, leg.destination, mode, leg.departureTime)
+          return {
+            fromReservationId: leg.fromReservationId,
+            toReservationId: leg.toReservationId,
+            mode,
+            durationSeconds: result.durationSeconds,
+            distanceMeters: result.distanceMeters,
+            origin: leg.origin,
+            destination: leg.destination,
+            departureTime: leg.departureTime,
+          }
+        } catch {
+          return {
+            fromReservationId: leg.fromReservationId,
+            toReservationId: leg.toReservationId,
+            mode,
+            durationSeconds: null,
+            distanceMeters: null,
+            origin: leg.origin,
+            destination: leg.destination,
+            departureTime: leg.departureTime,
+          }
         }
       }),
     )
