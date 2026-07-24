@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { TripLayout } from './components/menu/TripLayout'
+import { ReportBugWidget } from './components/ui/ReportBugWidget'
 import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen'
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
@@ -11,17 +12,20 @@ import { TripsListScreen } from './features/trips/TripsListScreen'
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<TripsListScreen />} />
-      <Route path="/trips/:tripId" element={<TripLayout />}>
-        <Route index element={<OverviewScreen />} />
-        <Route path="stay" element={<StayMenuScreen />} />
-        <Route path="transport" element={<TransportMenuScreen />} />
-        <Route path="activities" element={<ActivitiesMenuScreen />} />
-        <Route path="budget" element={<BudgetMenuScreen />} />
-      </Route>
-      <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />
-      <Route path="/privacy" element={<PrivacyPolicyScreen />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<TripsListScreen />} />
+        <Route path="/trips/:tripId" element={<TripLayout />}>
+          <Route index element={<OverviewScreen />} />
+          <Route path="stay" element={<StayMenuScreen />} />
+          <Route path="transport" element={<TransportMenuScreen />} />
+          <Route path="activities" element={<ActivitiesMenuScreen />} />
+          <Route path="budget" element={<BudgetMenuScreen />} />
+        </Route>
+        <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />
+        <Route path="/privacy" element={<PrivacyPolicyScreen />} />
+      </Routes>
+      <ReportBugWidget />
+    </>
   )
 }
