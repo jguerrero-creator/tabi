@@ -116,7 +116,6 @@ export function AddReservationModal({
   const [nights, setNights] = useState('')
   const [manualEndDate, setManualEndDate] = useState(false)
   const [priceAmount, setPriceAmount] = useState('')
-  const [priceCurrency, setPriceCurrency] = useState('')
   const [note, setNote] = useState('')
   const [geocoding, setGeocoding] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -353,7 +352,8 @@ export function AddReservationModal({
       status,
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
-      price_currency: priceCurrency.trim() || null,
+      // TABI-16: no currency selector here — currency is always inherited from the trip.
+      price_currency: priceAmount.trim() === '' ? null : (trip?.currency ?? null),
       start_at: startAt,
       end_at: endAt,
       start_time_is_default: startTimeDefaulted,
@@ -702,26 +702,19 @@ export function AddReservationModal({
           </div>
         )}
 
-        <div className="flex gap-3">
-          <Field label={strings.addReservation.priceLabel} className="flex-1">
+        {/* TABI-16: no currency selector here — currency is always inherited from the trip. */}
+        <Field label={strings.addReservation.priceLabel}>
+          <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 focus-within:border-teal-600">
             <input
               type="number"
               step="0.01"
               value={priceAmount}
               onChange={(event) => setPriceAmount(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              className="w-full text-sm focus:outline-none"
             />
-          </Field>
-          <Field label={strings.addReservation.currencyLabel} className="w-24">
-            <input
-              value={priceCurrency}
-              onChange={(event) => setPriceCurrency(event.target.value.toUpperCase())}
-              maxLength={3}
-              placeholder="USD"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
-            />
-          </Field>
-        </div>
+            {trip?.currency && <span className="shrink-0 text-sm text-slate-500">{trip.currency}</span>}
+          </div>
+        </Field>
 
         <Field label={strings.addReservation.notesLabel}>
           <textarea

@@ -52,7 +52,6 @@ test('a reservation can be created from the Stay menu via the Add Reservation fo
     await page.getByLabel('End date').fill('2026-09-12')
     await page.getByLabel('End time').fill('11:00')
     await page.getByLabel('Price').fill('250')
-    await page.getByLabel('Currency').fill('usd')
     await page.getByLabel('Notes').fill('Booked via e2e verification')
     await page.getByRole('radio', { name: 'Booked' }).click()
 
@@ -80,6 +79,7 @@ test('a reservation can be created from the Stay menu via the Add Reservation fo
     expect(created.status).toBe('booked')
     expect(created.name).toBe(reservationName)
     expect(created.price_amount).toBe(250)
+    // No currency field in the form — inherited straight from the trip's own currency.
     expect(created.price_currency).toBe('USD')
     expect(created.note).toBe('Booked via e2e verification')
     expect(created.start_timezone).toBe('Asia/Tokyo')

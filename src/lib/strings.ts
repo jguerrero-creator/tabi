@@ -262,7 +262,6 @@ export const strings = {
     parkingNo: 'No',
     checkInDeadlineLabel: 'Check-in deadline',
     priceLabel: 'Price',
-    currencyLabel: 'Currency',
     notesLabel: 'Notes',
     notesPlaceholder: 'Add a note…',
     submit: 'Add Reservation',
