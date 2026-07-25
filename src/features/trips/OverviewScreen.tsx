@@ -257,6 +257,7 @@ export function OverviewScreen() {
         <AddReservationModal
           tripId={tripId ?? ''}
           defaultType="activity"
+          requireTypeChoice
           initialStartAt={quickAddBlock.startAt}
           initialTimezone={quickAddBlock.timezone}
           onClose={() => setQuickAddBlock(null)}

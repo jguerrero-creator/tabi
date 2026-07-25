@@ -7,10 +7,12 @@ import { authenticatedClientFor } from './support/auth'
 test.use({ viewport: { width: 390, height: 844 } })
 
 // TABI-54 — "+" on a free-time block in the Planning rail opens the shared
-// Add sheet (defaulted to Activity, the one type with no required address)
-// pre-seeded with that block's own start time/timezone, so adding a manual
-// entry ("free time", "walk") doesn't require going through the full
-// formal-reservation flow.
+// Add sheet pre-seeded with that block's own start time/timezone, so adding
+// a manual entry ("free time", "walk") doesn't require going through the
+// full formal-reservation flow. Unlike Stay/Transport/Activities menus,
+// a free-time block has no origin menu to inherit a type from, so the
+// type selector opens expanded (Activity/Stay/Transport), forcing an
+// explicit choice instead of silently assuming one.
 
 test('a manual block can be added from a free-time slot on the Planning rail', async ({ page }) => {
   await page.goto('/')
@@ -59,8 +61,11 @@ test('a manual block can be added from a free-time slot on the Planning rail', a
     await addFreeBlockButton.click()
 
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
-    // Type inherits Activity (collapsed selector) rather than asking again.
-    await expect(page.getByText('Activity')).toBeVisible()
+    // Type selector opens expanded — an explicit choice, not a silently assumed default —
+    // pre-selected on Activity, the one type with no required address.
+    const typeSelect = page.getByLabel('Type')
+    await expect(typeSelect).toHaveValue('activity')
+    await expect(typeSelect.locator('option')).toHaveText(['Stay', 'Transport', 'Activity'])
     // Start date/time pre-seeded from the free block's own JST start (08:00), not the runner's local time.
     await expect(page.locator('input[type="date"]').first()).toHaveValue('2026-09-10')
     await expect(page.locator('input[type="time"]').first()).toHaveValue('08:00')

@@ -51,6 +51,13 @@ interface AddReservationModalProps {
   defaultType?: ReservationType
   defaultTransportSubtype?: TransportSubtype
   /**
+   * TABI-54: a free-time block on the timeline has no origin menu to inherit a type
+   * from (unlike Stay/Transport/Activities, where TABI-126's inherited-type collapse
+   * is correct) — so the type selector starts expanded, forcing an explicit choice
+   * instead of silently assuming `defaultType`.
+   */
+  requireTypeChoice?: boolean
+  /**
    * Seeds the start date/time from a free-time block on the timeline (TABI-54)
    * — the block's own real-location timezone, not the browser's, since
    * `initialTimezone` also stands in for `startTimezone` below until a real
@@ -76,6 +83,7 @@ export function AddReservationModal({
   tripId,
   defaultType = 'stay',
   defaultTransportSubtype = 'point_to_point',
+  requireTypeChoice = false,
   initialStartAt = null,
   initialTimezone = null,
   initialEndAt = null,
@@ -88,7 +96,9 @@ export function AddReservationModal({
   const [mainType, setMainType] = useState<ReservationType>(defaultType)
   // TABI-126: the add sheet inherits its type from the menu it was opened from (Stay/Transport/
   // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
-  const [typeExpanded, setTypeExpanded] = useState(false)
+  // TABI-54: except when there's no such origin menu (a free-time block quick-add), where
+  // `requireTypeChoice` starts it expanded instead of silently assuming `defaultType`.
+  const [typeExpanded, setTypeExpanded] = useState(requireTypeChoice)
   const [staySubtype, setStaySubtype] = useState<StaySubtype>('hotel')
   // TABI-121: Transport's own sub-type (point-to-point vs vehicle rental), symmetric to Stay's —
   // shown whenever the main type is Transport, not folded into the main type selector.
