@@ -95,14 +95,15 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
 
     // A free block is attached right after the reservation it follows (the
     // Stay), inside the Stay's own day (Sep 10) — not dropped because the
-    // Transport it connects to starts on a later day. No 'travel' sub-entry
-    // is expected here: this leg has no user-picked transport mode (TABI-154
-    // made mode a manual choice), so freeTimeBlocks.ts skips the pairwise
-    // block entirely and the rail falls back to the day-window's trailing
-    // free block instead (see the new backlog ticket filed for whether that
-    // fallback is the intended behavior for a cross-day gap specifically).
+    // Transport it connects to starts on a later day. It spans the real 3h
+    // gap to the Transport's departure (11:00 → 14:00 JST), not the
+    // day-window's generic trailing edge: this leg has no user-picked
+    // transport mode yet (TABI-154 made mode a manual choice), but a gap
+    // must never render as silence, so it shows as a plain free block with
+    // no travel time subtracted rather than being skipped.
     const freeRow = stayRow.locator('xpath=following-sibling::li[1]')
     await expect(freeRow).toContainText('free')
+    await expect(freeRow).toContainText('3h')
 
     await page.screenshot({ path: 'test-results/planning-timeline-visual.png', fullPage: true })
 

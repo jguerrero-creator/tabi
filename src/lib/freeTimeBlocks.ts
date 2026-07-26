@@ -73,10 +73,14 @@ export function computeFreeTimeBlocks(
     const leg = legByPair.get(legKey(from.id, to.id))
     // No leg means the pair shares a location or isn't geocoded yet —
     // buildTripLegs only emits legs that need an actual lookup, so no
-    // travel time is required here. A leg with a null duration means the
-    // lookup ran but came back unusable (e.g. an unparseable route) — that's
-    // "unknown", not "zero", so skip rather than guess and overstate free time.
-    if (leg && leg.durationSeconds === null) continue
+    // travel time is required here. A leg with a null duration AND a
+    // user-picked mode means the lookup itself ran but came back unusable
+    // (e.g. an unparseable route) — that's "unknown", not "zero", so skip
+    // rather than guess and overstate free time. A leg with no mode picked
+    // yet (TABI-154 made mode a manual choice) is different: the gap is real
+    // and must never render as silence — show it as a plain free block with
+    // no travel time subtracted, same as if no leg were needed at all.
+    if (leg && leg.durationSeconds === null && leg.mode !== null) continue
     const travelSeconds = leg?.durationSeconds ?? 0
 
     blocks.push({

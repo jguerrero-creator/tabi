@@ -238,7 +238,26 @@ function buildRailEntries(
     }
 
     if (isLastOfDay) {
-      if (dayEdges.trailing) {
+      // The real pairwise gap to the actual next reservation can end sooner
+      // than the day-window's own trailing cutoff — e.g. a Stay grouped under
+      // its check-in day whose checkout, and the reservation right after it,
+      // both land on a later calendar day, still well before that day's own
+      // window ends. Use whichever bound is tighter so free time is never
+      // overstated past a reservation that's actually coming up, while a next
+      // reservation that's genuinely days away still gets capped at the
+      // day-window's end (TABI-4).
+      if (block && (!dayEdges.trailing || Date.parse(block.end) < Date.parse(dayEdges.trailing.end))) {
+        if (block.durationSeconds >= MIN_FREE_SECONDS_TO_SHOW) {
+          const freeStart = new Date(Date.parse(block.start) + block.travelSeconds * 1000).toISOString()
+          entries.push({
+            kind: 'free',
+            key: `${reservation.id}-free`,
+            time: freeStart,
+            timezone: destinationTimezone,
+            durationSeconds: block.durationSeconds,
+          })
+        }
+      } else if (dayEdges.trailing) {
         entries.push({
           kind: 'free',
           key: `${reservation.id}-free`,
