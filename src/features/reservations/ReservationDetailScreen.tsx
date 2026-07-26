@@ -394,7 +394,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
           <TypeSpecificZone reservation={reservation} />
 
-          <form onSubmit={handleSave} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+          <form
+            onSubmit={handleSave}
+            noValidate
+            className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"
+          >
             {isAutoNamedTransport ? (
               <div>
                 <p className="mb-1 text-sm font-medium text-slate-700">{strings.reservationDetail.nameLabel}</p>
