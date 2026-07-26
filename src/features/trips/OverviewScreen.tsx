@@ -137,7 +137,7 @@ export function OverviewScreen() {
         )}
 
         {!loading && !error && (
-          <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 lg:space-y-0">
+          <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
             <div className="flex rounded-full border border-slate-200 bg-white p-1 lg:hidden">
               <button
                 type="button"
