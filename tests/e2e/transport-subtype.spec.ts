@@ -44,14 +44,15 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
     await page.getByRole('button', { name: 'Add reservation' }).click()
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
 
-    // Default sub-type (Flight) shows point-to-point labels. The type selector is collapsed by
-    // default (TABI-126) — it inherits Flight from the Transport menu without re-asking.
+    // Default sub-type (point-to-point) shows point-to-point labels. The main type selector is
+    // collapsed by default (TABI-126) — it inherits Transport from the Transport menu without
+    // re-asking — but the subtype radio group is always shown whenever the main type is
+    // Transport (TABI-121), regardless of whether that selector is expanded.
     await expect(page.getByLabel('Departure address')).toBeVisible()
     await expect(page.getByLabel('Arrival address')).toBeVisible()
 
     // Switching to Vehicle rental swaps the fields shown for pickup/drop-off.
-    await page.getByRole('button', { name: 'Change type' }).click()
-    await page.getByLabel('Type').selectOption('car_rental')
+    await page.getByRole('radio', { name: 'Vehicle rental' }).click()
     await expect(page.getByLabel('Pick-up city')).toBeVisible()
     await expect(page.getByLabel('Drop-off city')).toBeVisible()
     await expect(page.getByLabel('Departure address')).toHaveCount(0)
@@ -60,10 +61,9 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
     await page.getByLabel('Name').fill(reservationName)
     await page.getByLabel('Pick-up city').fill('Tokyo Station, Tokyo, Japan')
     await page.getByLabel('Drop-off city').fill('Osaka Station, Osaka, Japan')
+    // Vehicle rental is a duration, not a route (CLAUDE.md #5b) — date only, no time-of-day fields.
     await page.getByLabel('Start date').fill('2026-09-10')
-    await page.getByLabel('Start time').fill('09:00')
     await page.getByLabel('End date').fill('2026-09-15')
-    await page.getByLabel('End time').fill('18:00')
 
     const [insertResponse] = await Promise.all([
       page.waitForResponse(

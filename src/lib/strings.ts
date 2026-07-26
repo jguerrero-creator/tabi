@@ -195,7 +195,7 @@ export const strings = {
     setDatesHint: 'Set trip start and end dates to see coverage gaps.',
     gapLabel: 'Not booked',
     nightsCount: (nights: number) => `${nights} ${nights === 1 ? 'night' : 'nights'}`,
-    addCta: 'Add reservation',
+    addCta: 'Add reservation (Stay)',
     noParkingFlag: 'No parking',
     parkingIncludedFlag: 'Parking included',
     checkInDeadlineFlag: (time: string) => `Check-in by ${time}`,
@@ -206,7 +206,7 @@ export const strings = {
     errorLoading: 'Could not load this trip.',
     emptyTitle: 'No transport booked yet',
     emptyBody: 'This trip has no flights, trains, or local transport reservations.',
-    addCta: 'Add reservation',
+    addCta: 'Add reservation (Transport)',
   },
   activitiesMenu: {
     title: 'Activities',
