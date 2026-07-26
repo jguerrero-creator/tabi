@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import type { Reminder } from '../../types/reminder'
 import type { ReminderInput } from './useTripReminders'
@@ -31,7 +32,8 @@ export function RemindersSection({ onCreate }: RemindersSectionProps) {
       setTitle('')
       setDate('')
       setAdding(false)
-    } catch {
+    } catch (err) {
+      logClientError('RemindersSection.handleSubmit', err)
       setError(strings.reminders.errorGeneric)
     } finally {
       setSubmitting(false)

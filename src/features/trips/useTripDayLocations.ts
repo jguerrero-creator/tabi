@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { TripDayLocation } from '../../types/dayLocation'
 
@@ -27,6 +28,7 @@ export function useTripDayLocations(tripId: string) {
     const { data, error: fetchError } = await supabase.from('trip_day_locations').select('*').eq('trip_id', tripId)
 
     if (fetchError) {
+      logClientError('useTripDayLocations.fetchLocations', fetchError)
       setError(fetchError.message)
     } else {
       setLocationsByDate(new Map((data ?? []).map((row) => [row.date, row])))

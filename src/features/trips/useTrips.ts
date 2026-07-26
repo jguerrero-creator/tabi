@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { NewTrip, Trip } from '../../types/trip'
 
@@ -27,6 +28,7 @@ export function useTrips() {
       .order('start_date', { ascending: true, nullsFirst: false })
 
     if (fetchError) {
+      logClientError('useTrips.fetchTrips', fetchError)
       setError(fetchError.message)
     } else {
       setTrips(data ?? [])

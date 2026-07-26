@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import type { TripDayNote } from '../../types/dayNote'
 
@@ -39,7 +40,8 @@ export function DayNote({ dayKey, note, onSave, onClear }: DayNoteProps) {
     try {
       await onSave(text.trim())
       setEditing(false)
-    } catch {
+    } catch (err) {
+      logClientError('DayNote.handleSave', err)
       setError(strings.dayNote.errorGeneric)
     } finally {
       setSaving(false)
@@ -52,7 +54,8 @@ export function DayNote({ dayKey, note, onSave, onClear }: DayNoteProps) {
     try {
       await onClear()
       setEditing(false)
-    } catch {
+    } catch (err) {
+      logClientError('DayNote.handleRemove', err)
       setError(strings.dayNote.errorGeneric)
     } finally {
       setSaving(false)

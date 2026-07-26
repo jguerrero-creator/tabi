@@ -321,6 +321,7 @@ export const strings = {
     remove: 'Remove',
     geocoding: 'Locating…',
     errorGeneric: 'Could not save this location. Please try again.',
+    geocodeErrorNotFound: "We couldn't locate that address. Try a different search.",
   },
   dayNote: {
     addCta: '+ Add note',

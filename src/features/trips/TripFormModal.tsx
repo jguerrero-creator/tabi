@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { CountryMultiSelect } from '../../components/ui/CountryMultiSelect'
 import { FormSheet } from '../../components/ui/FormSheet'
 import { CURRENCIES, getDefaultCurrency } from '../../lib/currencies'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import type { Trip } from '../../types/trip'
 
@@ -65,7 +66,8 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
         note: note.trim() || null,
       })
       onClose()
-    } catch {
+    } catch (err) {
+      logClientError('TripFormModal.handleSubmit', err)
       setError(strings.createTrip.errorGeneric)
     } finally {
       setSubmitting(false)

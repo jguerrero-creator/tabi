@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { findActiveStay } from '../stay/computeAccommodationGaps'
 import { buildTripLegs, legKey } from '../../lib/tripLegs'
+import { logClientError } from '../../lib/logError'
 import { fetchTravelTime, type LatLng, type TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
@@ -76,7 +77,8 @@ export function useTripLegs(
             destination: leg.destination,
             departureTime: leg.departureTime,
           }
-        } catch {
+        } catch (err) {
+          logClientError('useTripLegs.fetchLeg', err)
           return {
             fromReservationId: leg.fromReservationId,
             toReservationId: leg.toReservationId,
@@ -93,7 +95,8 @@ export function useTripLegs(
       .then((results) => {
         if (!cancelled) setLegs(results)
       })
-      .catch(() => {
+      .catch((err) => {
+        logClientError('useTripLegs.computeLegs', err)
         if (!cancelled) setError('Failed to compute travel times')
       })
       .finally(() => {

@@ -18,6 +18,7 @@ import {
   type GeocodeCandidate,
   type GeocodeResult,
 } from '../../lib/geocode'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
@@ -329,6 +330,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         )
       }
     } catch (err) {
+      if (!(err instanceof AddressSelectionCancelledError)) logClientError('ReservationDetailScreen.geocode', err)
       setFormError(
         err instanceof AddressSelectionCancelledError
           ? strings.addressPicker.selectionRequiredError
@@ -342,7 +344,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setSaving(true)
     try {
       await onUpdate(patch)
-    } catch {
+    } catch (err) {
+      logClientError('ReservationDetailScreen.handleSave', err)
       setFormError(strings.reservationDetail.errorGeneric)
     } finally {
       setSaving(false)
@@ -354,7 +357,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setDeleting(true)
     try {
       await onDelete()
-    } catch {
+    } catch (err) {
+      logClientError('ReservationDetailScreen.handleDelete', err)
       setFormError(strings.reservationDetail.errorGeneric)
       setDeleting(false)
     }

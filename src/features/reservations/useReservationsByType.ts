@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { Reservation, ReservationType } from '../../types/reservation'
 
@@ -18,6 +19,7 @@ export function useReservationsByType(tripId: string, type: ReservationType) {
       .order('start_at', { ascending: true })
 
     if (fetchError) {
+      logClientError('useReservationsByType.fetchReservations', fetchError)
       setError(fetchError.message)
     } else {
       setReservations(data ?? [])

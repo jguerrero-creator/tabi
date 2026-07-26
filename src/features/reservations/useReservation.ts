@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { Reservation, ReservationUpdate } from '../../types/reservation'
 
@@ -17,6 +18,7 @@ export function useReservation(reservationId: string) {
       .maybeSingle()
 
     if (fetchError) {
+      logClientError('useReservation.fetchReservation', fetchError)
       setError(fetchError.message)
     } else {
       setReservation(data)

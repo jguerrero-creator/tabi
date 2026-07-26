@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Spinner } from '../../components/ui/Spinner'
 import { countryName } from '../../lib/countries'
 import { formatDateRangeLabel, formatDayPillLabel } from '../../lib/datetime'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { useProfile } from '../../lib/useProfile'
 import type { Trip } from '../../types/trip'
@@ -36,7 +37,8 @@ export function TripsListScreen() {
     try {
       await deleteTrip(deletingTrip.id)
       setDeletingTrip(null)
-    } catch {
+    } catch (err) {
+      logClientError('TripsListScreen.handleConfirmDelete', err)
       setDeleteError(strings.deleteTrip.errorGeneric)
     } finally {
       setDeleting(false)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { Trip } from '../../types/trip'
 
@@ -17,6 +18,7 @@ export function useTrip(tripId: string) {
       .maybeSingle()
 
     if (fetchError) {
+      logClientError('useTrip.fetchTrip', fetchError)
       setError(fetchError.message)
     } else {
       setTrip(data)

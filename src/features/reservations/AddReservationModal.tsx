@@ -14,6 +14,7 @@ import {
   resolveAddress,
   type GeocodeResult,
 } from '../../lib/geocode'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import type {
   NewReservation,
@@ -421,7 +422,8 @@ export function AddReservationModal({
     try {
       await onCreate(input)
       onClose()
-    } catch {
+    } catch (err) {
+      logClientError('AddReservationModal.submitReservation', err)
       setError(strings.addReservation.errorGeneric)
     } finally {
       setSubmitting(false)
@@ -455,7 +457,8 @@ export function AddReservationModal({
     setError(null)
     try {
       await updateTripDates(range.start_date, range.end_date)
-    } catch {
+    } catch (err) {
+      logClientError('AddReservationModal.handleExtendTrip', err)
       setError(strings.addReservation.errorGeneric)
       setSubmitting(false)
       return

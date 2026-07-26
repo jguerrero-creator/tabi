@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { Reminder } from '../../types/reminder'
 
@@ -26,6 +27,7 @@ export function useTripReminders(tripId: string) {
       .order('date', { ascending: true })
 
     if (fetchError) {
+      logClientError('useTripReminders.fetchReminders', fetchError)
       setError(fetchError.message)
     } else {
       setReminders(data ?? [])

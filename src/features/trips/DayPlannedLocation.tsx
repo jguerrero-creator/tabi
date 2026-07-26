@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import { PlaceAutocompleteField, type PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
-import { AddressSelectionCancelledError, fetchGeocodeByPlaceId, resolveAddress, type GeocodeResult } from '../../lib/geocode'
+import {
+  AddressNotFoundError,
+  AddressSelectionCancelledError,
+  fetchGeocodeByPlaceId,
+  resolveAddress,
+  type GeocodeResult,
+} from '../../lib/geocode'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import type { TripDayLocation } from '../../types/dayLocation'
 import { useAddressPicker } from '../reservations/useAddressPicker'
@@ -51,7 +58,8 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
     try {
       const result = await fetchGeocodeByPlaceId(placeId)
       setPendingPlace({ ...result, placeName: placeName ?? selectedText })
-    } catch {
+    } catch (err) {
+      logClientError('DayPlannedLocation.handlePlaceSelect', err)
       setError(strings.dayLocation.errorGeneric)
     }
   }
@@ -61,7 +69,8 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
     try {
       await onSave(input)
       setEditing(false)
-    } catch {
+    } catch (err) {
+      logClientError('DayPlannedLocation.commit', err)
       setError(strings.dayLocation.errorGeneric)
     } finally {
       setSaving(false)
@@ -98,11 +107,16 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
         city: resolved.city,
       })
     } catch (err) {
-      setError(
-        err instanceof AddressSelectionCancelledError
-          ? strings.addressPicker.selectionRequiredError
-          : strings.dayLocation.errorGeneric,
-      )
+      if (err instanceof AddressSelectionCancelledError) {
+        setError(strings.addressPicker.selectionRequiredError)
+      } else if (err instanceof AddressNotFoundError) {
+        // TABI-bugfix: align with AddReservationModal's handling of the same error — a
+        // hard geocoding miss gets its own specific message instead of the generic one.
+        setError(strings.dayLocation.geocodeErrorNotFound)
+      } else {
+        logClientError('DayPlannedLocation.handleSave', err)
+        setError(strings.dayLocation.errorGeneric)
+      }
     } finally {
       setSaving(false)
     }
@@ -114,7 +128,8 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
     try {
       await onClear()
       setEditing(false)
-    } catch {
+    } catch (err) {
+      logClientError('DayPlannedLocation.handleRemove', err)
       setError(strings.dayLocation.errorGeneric)
     } finally {
       setSaving(false)

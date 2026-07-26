@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { logClientError } from './logError'
 import { supabase } from './supabase'
 import {
   checkEntitlement,
@@ -28,6 +29,7 @@ export function useProfile() {
       const { data: userData, error: userError } = await supabase.auth.getUser()
       if (userError || !userData.user) {
         if (!cancelled) {
+          if (userError) logClientError('useProfile.fetchProfile.auth', userError)
           setError(userError?.message ?? 'No authenticated user')
           setLoading(false)
         }
@@ -43,6 +45,7 @@ export function useProfile() {
       if (cancelled) return
 
       if (fetchError) {
+        logClientError('useProfile.fetchProfile', fetchError)
         setError(fetchError.message)
       } else {
         setProfile(data as Profile)
