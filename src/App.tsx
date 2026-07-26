@@ -1,6 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { TripLayout } from './components/menu/TripLayout'
-import { ReportBugWidget } from './components/ui/ReportBugWidget'
+import { ReportWidget } from './components/ui/ReportWidget'
 import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen'
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
@@ -25,7 +25,7 @@ export function App() {
         <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />
         <Route path="/privacy" element={<PrivacyPolicyScreen />} />
       </Routes>
-      <ReportBugWidget />
+      <ReportWidget />
     </>
   )
 }
