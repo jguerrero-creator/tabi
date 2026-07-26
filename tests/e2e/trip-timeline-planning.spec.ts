@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { authenticatedClientFor } from './support/auth'
 
+// TABI-172 — the "Planning" nav button is lg:hidden on the desktop layout
+// (TABI-149), so it's only reachable at a mobile viewport.
+test.use({ viewport: { width: 390, height: 844 } })
+
 // TABI-3/4/13 — the Planning tab shows one day at a time via day-tab pills
 // (matches the product wireframe), with a vertical rail threading each day's
 // reservations and free-time/travel blocks together. The free/travel block

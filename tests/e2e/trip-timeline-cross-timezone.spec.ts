@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { authenticatedClientFor } from './support/auth'
 
+// TABI-172 — the "Planning" nav button is lg:hidden on the desktop layout
+// (TABI-149), so it's only reachable at a mobile viewport.
+test.use({ viewport: { width: 390, height: 844 } })
+
 // TABI-65 — "Affichage contextualisé des heures selon le fuseau local": the
 // Planning rail must display each reservation (and the free time around it)
 // in its own location's timezone, switching reference at arrival rather than
