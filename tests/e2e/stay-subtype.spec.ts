@@ -62,7 +62,7 @@ test('selecting a Stay sub-type in the Add sheet persists stay_subtype', async (
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
 

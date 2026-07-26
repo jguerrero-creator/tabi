@@ -50,7 +50,7 @@ test('adding a reservation outside the trip dates asks to extend or keep as is',
     const [insertExtendResponse] = await Promise.all([
       page.waitForResponse((res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST'),
       (async () => {
-        await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
+        await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
         await expect(page.getByRole('heading', { name: 'Outside trip dates' })).toBeVisible()
         await page.getByRole('button', { name: 'Extend trip dates' }).click()
       })(),
@@ -83,7 +83,7 @@ test('adding a reservation outside the trip dates asks to extend or keep as is',
     const [insertKeepResponse] = await Promise.all([
       page.waitForResponse((res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST'),
       (async () => {
-        await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
+        await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
         await expect(page.getByRole('heading', { name: 'Outside trip dates' })).toBeVisible()
         await page.getByRole('button', { name: 'Keep as is' }).click()
       })(),

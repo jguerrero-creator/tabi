@@ -5,9 +5,9 @@ import { authenticatedClientFor } from './support/auth'
 // disposition)". Spec: once "Transport" is selected in the Add sheet, an
 // immediate choice of sub-type — Flight/Train/Bus (point-to-point) or
 // Vehicle rental (at-disposal) — determines the fields shown next. Exercises
-// the Vehicle rental option end to end: field labels switch to pickup/
+// the Vehicle rental option end to end: field labels switch to pick-up/
 // drop-off, the created row persists transport_subtype = 'at_disposal', and
-// the shared detail screen shows Pickup/Drop-off leg labels instead of
+// the shared detail screen shows Pick-up/Drop-off leg labels instead of
 // Departure/Arrival.
 
 test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off fields and persists', async ({
@@ -52,13 +52,13 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
     // Switching to Vehicle rental swaps the fields shown for pickup/drop-off.
     await page.getByRole('button', { name: 'Change type' }).click()
     await page.getByLabel('Type').selectOption('car_rental')
-    await expect(page.getByLabel('Pickup city')).toBeVisible()
+    await expect(page.getByLabel('Pick-up city')).toBeVisible()
     await expect(page.getByLabel('Drop-off city')).toBeVisible()
     await expect(page.getByLabel('Departure address')).toHaveCount(0)
 
     const reservationName = `E2E car rental ${runId}`
     await page.getByLabel('Name').fill(reservationName)
-    await page.getByLabel('Pickup city').fill('Tokyo Station, Tokyo, Japan')
+    await page.getByLabel('Pick-up city').fill('Tokyo Station, Tokyo, Japan')
     await page.getByLabel('Drop-off city').fill('Osaka Station, Osaka, Japan')
     await page.getByLabel('Start date').fill('2026-09-10')
     await page.getByLabel('Start time').fill('09:00')
@@ -69,7 +69,7 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
 
@@ -86,10 +86,10 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
     expect(created.type).toBe('transport')
     expect(created.transport_subtype).toBe('at_disposal')
 
-    // Detail screen shows Pickup/Drop-off leg labels, not Departure/Arrival.
+    // Detail screen shows Pick-up/Drop-off leg labels, not Departure/Arrival.
     await page.getByText(reservationName).click()
     await expect(page.getByRole('heading', { name: reservationName })).toBeVisible()
-    await expect(page.getByText('Pickup', { exact: true })).toBeVisible()
+    await expect(page.getByText('Pick-up', { exact: true })).toBeVisible()
     await expect(page.getByText('Drop-off', { exact: true })).toBeVisible()
     await expect(page.getByText('Departure')).toHaveCount(0)
     await expect(page.getByText('Arrival')).toHaveCount(0)

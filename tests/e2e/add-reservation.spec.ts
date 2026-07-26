@@ -59,7 +59,7 @@ test('a reservation can be created from the Stay menu via the Add Reservation fo
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
 

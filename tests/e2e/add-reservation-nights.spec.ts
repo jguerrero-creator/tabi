@@ -55,7 +55,7 @@ test('entering nights computes a read-only checkout date for a Stay reservation'
 
     const [insertResponse] = await Promise.all([
       page.waitForResponse((res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST'),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toHaveCount(0)
@@ -169,7 +169,7 @@ test('submitting a Stay reservation without nights shows a nights-specific error
     await page.getByLabel('End time').fill('11:00')
     // Nights left blank on purpose.
 
-    await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
+    await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
     await expect(page.getByText('Number of nights is required.')).toBeVisible()
   } finally {
     const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)

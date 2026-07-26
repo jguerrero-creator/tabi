@@ -64,7 +64,7 @@ test('selecting an Autocomplete suggestion by click fills the address and saves 
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
 
@@ -141,7 +141,7 @@ test('selecting an Autocomplete suggestion via keyboard fills the address and sa
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
 

@@ -61,7 +61,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
     await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
     await page.getByLabel('End date').fill('2026-09-13')
     await page.getByLabel('End time').fill('11:00')
-    await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
+    await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: 'Overlapping dates' })).toBeVisible()
     await expect(page.getByText(`This overlaps with "${existingName}". Is this intended?`)).toBeVisible()
@@ -72,7 +72,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
     await expect(page.getByText(`E2E overlap candidate ${runId}`)).toHaveCount(0)
 
     // Re-submit and confirm this time: the optional note is appended to the reservation note.
-    await page.getByRole('button', { name: 'Add Reservation', exact: true }).click()
+    await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Overlapping dates' })).toBeVisible()
     await page.getByLabel('Note (optional)').fill('Two bookings on purpose, boat trip in between.')
 
@@ -102,7 +102,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(insertResponse.ok()).toBe(true)
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toHaveCount(0)

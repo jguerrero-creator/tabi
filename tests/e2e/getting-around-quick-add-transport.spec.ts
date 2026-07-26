@@ -124,7 +124,7 @@ test('"+ Add" on a computed Getting Around leg opens the Add sheet prefilled as 
       page.waitForResponse(
         (res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST',
       ),
-      page.getByRole('button', { name: 'Add Reservation', exact: true }).click(),
+      page.getByRole('button', { name: 'Add reservation', exact: true }).click(),
     ])
     expect(createResponse.ok()).toBe(true)
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toHaveCount(0)
