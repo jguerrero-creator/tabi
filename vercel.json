@@ -1,4 +1,7 @@
 {
   "framework": "vite",
-  "devCommand": "vite --port $PORT"
+  "devCommand": "vite --port $PORT",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
