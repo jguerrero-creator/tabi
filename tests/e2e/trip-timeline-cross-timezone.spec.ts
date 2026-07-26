@@ -68,30 +68,35 @@ test('Planning rail shows each entry in its own local timezone, not one day-wide
     await page.getByRole('button', { name: 'Planning' }).click()
     await expect(page.getByRole('button', { name: 'Sep 10' })).toBeVisible()
 
-    const nyRow = page.locator('li').filter({ hasText: nyName })
-    const chicagoRow = page.locator('li').filter({ hasText: chicagoName })
+    // Scoped to the mobile single-day view (data-testid="mobile-day-view") —
+    // the desktop multi-day carousel (TABI-149) renders every day's rail at
+    // once too, just CSS-hidden at this viewport, so an unscoped locator
+    // matches both copies and fails Playwright's strict mode (TABI-172 follow-up).
+    const mobileView = page.getByTestId('mobile-day-view')
+    const nyRow = mobileView.locator('li').filter({ hasText: nyName })
+    const chicagoRow = mobileView.locator('li').filter({ hasText: chicagoName })
     await expect(nyRow).toBeVisible()
     await expect(chicagoRow).toBeVisible()
 
-    // NY reservation renders its own start in NY local time.
-    await expect(nyRow).toContainText('9:00 AM')
+    // NY reservation renders its own start in NY local time (24h format).
+    await expect(nyRow).toContainText('09:00')
 
-    // Chicago reservation must render in Chicago local time (4:00 PM) — not
-    // the day's single anchor timezone (NY), which would show 5:00 PM for
+    // Chicago reservation must render in Chicago local time (16:00) — not
+    // the day's single anchor timezone (NY), which would show 17:00 for
     // the exact same instant. This is the regression TABI-65 fixes: before,
     // every rail entry used the first reservation's timezone for the whole
     // day, regardless of which location that entry actually belonged to.
-    await expect(chicagoRow).toContainText('4:00 PM')
-    await expect(chicagoRow).not.toContainText('5:00 PM')
+    await expect(chicagoRow).toContainText('16:00')
+    await expect(chicagoRow).not.toContainText('17:00')
 
     // The free-time entry between the two reservations switches to the
-    // destination's timezone (Chicago, 10:00 AM) once its clock is showing
+    // destination's timezone (Chicago, 10:00) once its clock is showing
     // "time until the next booking" rather than the NY departure anchor
-    // (11:00 AM) — the "switch reference at arrival" behavior from TABI-65.
+    // (11:00) — the "switch reference at arrival" behavior from TABI-65.
     const freeRow = nyRow.locator('xpath=following-sibling::li[1]')
     await expect(freeRow).toContainText('free')
-    await expect(freeRow).toContainText('10:00 AM')
-    await expect(freeRow).not.toContainText('11:00 AM')
+    await expect(freeRow).toContainText('10:00')
+    await expect(freeRow).not.toContainText('11:00')
   } finally {
     const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)
     if (deleteReservationsError) throw deleteReservationsError

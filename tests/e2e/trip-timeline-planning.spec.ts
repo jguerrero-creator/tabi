@@ -44,6 +44,7 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
     const { error: stayError } = await client.from('reservations').insert({
       trip_id: trip.id,
       type: 'stay',
+      stay_subtype: 'hotel',
       status: 'booked',
       name: stayName,
       start_at: '2026-09-10T06:00:00.000Z',
@@ -60,6 +61,7 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
     const { error: transportError } = await client.from('reservations').insert({
       trip_id: trip.id,
       type: 'transport',
+      transport_subtype: 'point_to_point',
       status: 'booked',
       name: transportName,
       start_at: '2026-09-12T05:00:00.000Z',
@@ -78,26 +80,35 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
     // Defaults to the first day; both day-tab pills exist.
     await expect(page.getByRole('button', { name: 'Sep 10' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Sep 12' })).toBeVisible()
-    await expect(page.getByText('Local time:')).toBeVisible()
 
-    const stayRow = page.locator('li').filter({ hasText: stayName })
+    // Scoped to the mobile single-day view (data-testid="mobile-day-view") —
+    // the desktop multi-day carousel (TABI-149) renders every day's rail at
+    // once too, just CSS-hidden at this viewport, so an unscoped locator
+    // matches both copies and fails Playwright's strict mode (TABI-172 follow-up).
+    const mobileView = page.getByTestId('mobile-day-view')
+    await expect(mobileView.getByText('Local time:')).toBeVisible()
+
+    const stayRow = mobileView.locator('li').filter({ hasText: stayName })
     await expect(stayRow).toBeVisible()
     // Only the selected day's reservations are shown.
-    await expect(page.locator('li').filter({ hasText: transportName })).toHaveCount(0)
+    await expect(mobileView.locator('li').filter({ hasText: transportName })).toHaveCount(0)
 
-    // The block is attached right after the reservation it follows (the Stay),
-    // inside the Stay's own day (Sep 10) — not dropped because the Transport
-    // it connects to starts on a later day.
-    const travelRow = stayRow.locator('xpath=following-sibling::li[1]')
-    await expect(travelRow).toContainText('travel')
-    const freeRow = stayRow.locator('xpath=following-sibling::li[2]')
+    // A free block is attached right after the reservation it follows (the
+    // Stay), inside the Stay's own day (Sep 10) — not dropped because the
+    // Transport it connects to starts on a later day. No 'travel' sub-entry
+    // is expected here: this leg has no user-picked transport mode (TABI-154
+    // made mode a manual choice), so freeTimeBlocks.ts skips the pairwise
+    // block entirely and the rail falls back to the day-window's trailing
+    // free block instead (see the new backlog ticket filed for whether that
+    // fallback is the intended behavior for a cross-day gap specifically).
+    const freeRow = stayRow.locator('xpath=following-sibling::li[1]')
     await expect(freeRow).toContainText('free')
 
     await page.screenshot({ path: 'test-results/planning-timeline-visual.png', fullPage: true })
 
     // Switching day-tabs shows Sep 12's own reservation instead.
     await page.getByRole('button', { name: 'Sep 12' }).click()
-    await expect(page.locator('li').filter({ hasText: transportName })).toBeVisible()
+    await expect(mobileView.locator('li').filter({ hasText: transportName })).toBeVisible()
     await expect(stayRow).toHaveCount(0)
   } finally {
     const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)

@@ -113,7 +113,7 @@ export function TripTimeline({
 
   return (
     <>
-      <div className="space-y-4 lg:hidden">
+      <div data-testid="mobile-day-view" className="space-y-4 lg:hidden">
         <DayTabs days={days} selectedKey={effectiveSelectedKey} onSelect={onSelectDay} />
         <DayColumn
           dayKey={effectiveSelectedKey}
