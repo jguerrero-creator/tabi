@@ -1,5 +1,5 @@
 import { groupByDate, UNSCHEDULED_KEY, type DateGroup } from '../../components/menu/groupByDate'
-import { formatDayPillLabel, localTimeZone } from '../../lib/datetime'
+import { formatDayPillLabel, localDateKey, localTimeZone } from '../../lib/datetime'
 import {
   computeDayEdgeFreeBlocks,
   computeFreeTimeBlocks,
@@ -13,7 +13,7 @@ import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
-import { DayColumn } from './DayColumn'
+import { DayColumn, type DayItem } from './DayColumn'
 import { DayTabs, type DayTab } from './DayTabs'
 import type { TripLeg } from './useTripLegs'
 import type { DayLocationInput } from './useTripDayLocations'
@@ -77,9 +77,10 @@ export function TripTimeline({
   onClearDayNote,
   onAddAtFreeBlock,
 }: TripTimelineProps) {
+  const dayOccurrences = buildDayOccurrences(reservations)
   const groups = groupByDate(
-    reservations,
-    (reservation) => ({ at: reservation.start_at, timezone: reservation.start_timezone }),
+    dayOccurrences,
+    (item) => ({ at: item.start_at, timezone: item.start_timezone }),
     { unscheduledLabel: strings.planning.unscheduledLabel },
   )
   const groupsByKey = new Map(groups.map((group) => [group.dateKey, group]))
@@ -186,8 +187,8 @@ export function TripTimeline({
  */
 function buildDayTabs(
   trip: Trip | null,
-  groups: DateGroup<Reservation>[],
-  groupsByKey: Map<string, DateGroup<Reservation>>,
+  groups: DateGroup<DayItem>[],
+  groupsByKey: Map<string, DateGroup<DayItem>>,
   reservations: Reservation[],
 ): DayTab[] {
   const rangeKeys = tripDateRangeKeys(trip?.start_date ?? null, trip?.end_date ?? null)
@@ -227,7 +228,7 @@ function buildDayTabs(
  * it — `activeStay` fills that gap. Guarded against double-counting on the
  * check-in day itself, where the stay is already present in `items`.
  */
-function countDayItems(items: Reservation[], activeStay: Reservation | null): number {
+function countDayItems(items: DayItem[], activeStay: Reservation | null): number {
   if (!activeStay) return items.length
   const alreadyCounted = items.some((item) => item.id === activeStay.id)
   return alreadyCounted ? items.length : items.length + 1
@@ -260,7 +261,7 @@ function dateParts(dateStr: string): [number, number, number] {
 function buildDayEdgesByKey(
   trip: Trip,
   days: { key: string; label: string }[],
-  groupsByKey: Map<string, DateGroup<Reservation>>,
+  groupsByKey: Map<string, DateGroup<DayItem>>,
 ): Map<string, DayEdges> {
   const input = days
     .filter((day) => day.key !== UNSCHEDULED_KEY)
@@ -269,7 +270,7 @@ function buildDayEdgesByKey(
       return {
         dateKey: day.key,
         timezone: items[0]?.start_timezone ?? localTimeZone(),
-        items: items.filter((item): item is Reservation & { start_at: string } => item.start_at !== null),
+        items: items.filter((item): item is DayItem & { start_at: string } => item.start_at !== null),
       }
     })
 
@@ -284,4 +285,36 @@ function buildDayEdgesByKey(
     byKey.set(block.dateKey, existing)
   }
   return byKey
+}
+
+/**
+ * Expands each multi-night Stay into two occurrences of the same reservation
+ * — a check-in entry on its start day, a check-out entry on its end day — so
+ * the checkout shows up as a real, timed rail item on its own day instead of
+ * only ever being folded into the check-in day's trailing free time. Every
+ * other reservation (and a same-day Stay, if one ever existed) passes through
+ * as a single occurrence, unchanged.
+ */
+function buildDayOccurrences(reservations: Reservation[]): DayItem[] {
+  const occurrences: DayItem[] = []
+
+  for (const reservation of reservations) {
+    if (reservation.type === 'stay' && reservation.start_at && reservation.end_at) {
+      const checkInDay = localDateKey(reservation.start_at, reservation.start_timezone)
+      const checkOutDay = localDateKey(reservation.end_at, reservation.end_timezone)
+      if (checkInDay !== checkOutDay) {
+        occurrences.push({ ...reservation, suppressTrailingFreeBlock: true })
+        occurrences.push({
+          ...reservation,
+          start_at: reservation.end_at,
+          start_timezone: reservation.end_timezone,
+          isCheckoutOccurrence: true,
+        })
+        continue
+      }
+    }
+    occurrences.push(reservation)
+  }
+
+  return occurrences.sort((a, b) => (a.start_at ?? '').localeCompare(b.start_at ?? ''))
 }

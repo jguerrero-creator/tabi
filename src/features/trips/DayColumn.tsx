@@ -18,8 +18,23 @@ import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
 import type { DayLocationInput } from './useTripDayLocations'
 
+/**
+ * A reservation as it appears on one specific day's rail. A multi-night Stay
+ * contributes two occurrences sharing the same underlying reservation id —
+ * one on its check-in day, one on its check-out day (built by
+ * `buildDayOccurrences` in TripTimeline.tsx) — so its checkout is visible on
+ * its own day instead of only ever showing up folded into the check-in day's
+ * trailing free time.
+ */
+export type DayItem = Reservation & {
+  /** True for the check-out occurrence of a multi-night Stay (false/absent for its check-in occurrence and for every other reservation). */
+  isCheckoutOccurrence?: boolean
+  /** True on a multi-night Stay's check-in occurrence — its post-checkout free time belongs to the check-out occurrence's own day, not this one. */
+  suppressTrailingFreeBlock?: boolean
+}
+
 type RailEntry =
-  | { kind: 'reservation'; key: string; time: string | null; timezone: string | null; reservation: Reservation }
+  | { kind: 'reservation'; key: string; time: string | null; timezone: string | null; reservation: DayItem }
   | {
       kind: 'travel'
       key: string
@@ -37,7 +52,7 @@ interface DayColumnProps {
   dayKey: string
   /** Only passed by the desktop carousel (TABI-149) — mobile relies on DayTabs to convey day identity instead. */
   label?: string
-  items: Reservation[]
+  items: DayItem[]
   freeTimeByFromId: Map<string, FreeTimeBlock>
   edges: { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }
   /**
@@ -171,7 +186,7 @@ export function DayColumn({
  * the day-bounded trailing edge rather than shown alongside it.
  */
 function buildRailEntries(
-  items: Reservation[],
+  items: DayItem[],
   freeTimeByFromId: Map<string, FreeTimeBlock>,
   dayEdges: { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock },
 ): RailEntry[] {
@@ -209,7 +224,11 @@ function buildRailEntries(
     // A day's last reservation has no pairwise block at all when it's also
     // the trip's very last scheduled reservation — the trailing edge must
     // still show in that case, so it's handled outside the `block` guard.
-    const block = freeTimeByFromId.get(reservation.id)
+    // A multi-night Stay's check-in occurrence never owns this block either:
+    // the pairwise gap always starts at the real checkout instant, which by
+    // definition falls on a later calendar day than check-in, so it belongs
+    // to the check-out occurrence's own day rail instead (TABI-112 follow-up).
+    const block = reservation.suppressTrailingFreeBlock ? undefined : freeTimeByFromId.get(reservation.id)
 
     if (block && block.durationSeconds < 0) {
       entries.push({
@@ -334,7 +353,7 @@ function renderEntry(
   }
 }
 
-function ReservationCard({ reservation }: { reservation: Reservation }) {
+function ReservationCard({ reservation }: { reservation: DayItem }) {
   return (
     <Link
       to={`/reservations/${reservation.id}`}
@@ -386,8 +405,9 @@ function dayHasTooLongTravel(items: Reservation[], freeTimeByFromId: Map<string,
   return items.some((item) => freeTimeByFromId.get(item.id)?.tooLongTravel ?? false)
 }
 
-function rowLabel(reservation: Reservation): string | null {
+function rowLabel(reservation: DayItem): string | null {
   if (!reservation.start_at) return null
-  const startLabel = strings.reservationLegLabels[reservation.type].start
-  return `${startLabel} · ${formatTimeInZone(reservation.start_at, reservation.start_timezone)}`
+  const labels = strings.reservationLegLabels[reservation.type]
+  const label = reservation.isCheckoutOccurrence ? labels.end : labels.start
+  return `${label} · ${formatTimeInZone(reservation.start_at, reservation.start_timezone)}`
 }

@@ -11,9 +11,15 @@ test.use({ viewport: { width: 390, height: 844 } })
 // between two consecutive reservations must still show even when the second
 // one's start_at falls on a different calendar day than the first — e.g. a
 // multi-night Stay's checkout followed, a few hours later the same day, by a
-// Transport departure. Since the Stay is grouped under its *check-in* day,
-// that block previously vanished silently. It must also show réservé/trajet/
-// libre as visually distinct states, not a single merged "free" row.
+// Transport departure. It must also show réservé/trajet/libre as visually
+// distinct states, not a single merged "free" row.
+//
+// A multi-night Stay now gets its own Check-out occurrence on its check-out
+// day (TABI-112 follow-up — `buildDayOccurrences` in TripTimeline.tsx), so
+// the 3h gap between checkout and the Transport departure correctly renders
+// on Sep 12 right after the Check-out row, not smeared onto Sep 10 after
+// Check-in (the Check-in day's own trailing free time now stops at that same
+// day's own window end instead).
 
 test('Planning shows one day at a time via day-tabs, with a cross-day free/travel block correctly placed', async ({
   page,
@@ -88,29 +94,37 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
     const mobileView = page.getByTestId('mobile-day-view')
     await expect(mobileView.getByText('Local time:')).toBeVisible()
 
-    const stayRow = mobileView.locator('li').filter({ hasText: stayName })
+    const stayRow = mobileView.locator('li').filter({ hasText: stayName }).filter({ hasText: 'Check-in' })
     await expect(stayRow).toBeVisible()
     // Only the selected day's reservations are shown.
     await expect(mobileView.locator('li').filter({ hasText: transportName })).toHaveCount(0)
 
-    // A free block is attached right after the reservation it follows (the
-    // Stay), inside the Stay's own day (Sep 10) — not dropped because the
-    // Transport it connects to starts on a later day. It spans the real 3h
-    // gap to the Transport's departure (11:00 → 14:00 JST), not the
-    // day-window's generic trailing edge: this leg has no user-picked
-    // transport mode yet (TABI-154 made mode a manual choice), but a gap
-    // must never render as silence, so it shows as a plain free block with
-    // no travel time subtracted rather than being skipped.
-    const freeRow = stayRow.locator('xpath=following-sibling::li[1]')
+    // Check-in day's own trailing free time runs to *that day's* window end
+    // (22:00 JST) — it must not swallow the checkout day's free time too.
+    const checkInTrailingFreeRow = stayRow.locator('xpath=following-sibling::li[1]')
+    await expect(checkInTrailingFreeRow).toContainText('free')
+    await expect(checkInTrailingFreeRow).toContainText('7h')
+
+    // Switching day-tabs shows Sep 12's own occurrence of the Stay (its
+    // Check-out row) plus the Transport.
+    await page.getByRole('button', { name: 'Sep 12' }).click()
+    await expect(mobileView.locator('li').filter({ hasText: transportName })).toBeVisible()
+
+    // A free block is attached right after the Check-out row, on the
+    // checkout's own day (Sep 12) — not dropped because the Transport it
+    // connects to starts later the same day. It spans the real 3h gap to the
+    // Transport's departure (11:00 → 14:00 JST), not the day-window's generic
+    // trailing edge: this leg has no user-picked transport mode yet (TABI-154
+    // made mode a manual choice), but a gap must never render as silence, so
+    // it shows as a plain free block with no travel time subtracted rather
+    // than being skipped.
+    const checkOutRow = mobileView.locator('li').filter({ hasText: stayName }).filter({ hasText: 'Check-out' })
+    await expect(checkOutRow).toBeVisible()
+    const freeRow = checkOutRow.locator('xpath=following-sibling::li[1]')
     await expect(freeRow).toContainText('free')
     await expect(freeRow).toContainText('3h')
 
     await page.screenshot({ path: 'test-results/planning-timeline-visual.png', fullPage: true })
-
-    // Switching day-tabs shows Sep 12's own reservation instead.
-    await page.getByRole('button', { name: 'Sep 12' }).click()
-    await expect(mobileView.locator('li').filter({ hasText: transportName })).toBeVisible()
-    await expect(stayRow).toHaveCount(0)
   } finally {
     const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)
     if (deleteReservationsError) throw deleteReservationsError

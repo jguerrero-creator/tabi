@@ -120,7 +120,11 @@ export interface DayEdgeFreeBlock {
  * to, so the whole edge is free.
  */
 export function computeDayEdgeFreeBlocks(
-  days: { dateKey: string; timezone: string; items: (Reservation & { start_at: string })[] }[],
+  days: {
+    dateKey: string
+    timezone: string
+    items: (Reservation & { start_at: string; suppressTrailingFreeBlock?: boolean })[]
+  }[],
   dayStartTime: string,
   dayEndTime: string,
 ): DayEdgeFreeBlock[] {
@@ -148,8 +152,21 @@ export function computeDayEdgeFreeBlocks(
     // own timezone — not on `day.dateKey`/`day.timezone`, which anchor to
     // wherever/whenever the day *started* (TABI-165). The block still files
     // under `day.dateKey` for tab assignment; only the cutoff instant moves.
-    const trailingInstant = last.end_at ?? last.start_at
-    const trailingTimezone = last.end_timezone ?? last.start_timezone ?? day.timezone
+    //
+    // A multi-night Stay's check-in occurrence is the one exception: its
+    // `end_at` (checkout) routinely lands days later, and that checkout gets
+    // its own occurrence — and its own trailing edge — on its own day (see
+    // `buildDayOccurrences` in TripTimeline.tsx, which sets
+    // `suppressTrailingFreeBlock` on exactly this occurrence). Using `end_at`
+    // here too would double-count that same stretch of free time on the
+    // check-in day as well, so its trailing edge is anchored to its own
+    // `start_at` instead, same as a same-day item. A same-day check-in/
+    // check-out Stay never gets this flag, so it keeps using its real
+    // `end_at` below, same as before.
+    const trailingInstant = last.suppressTrailingFreeBlock ? last.start_at : (last.end_at ?? last.start_at)
+    const trailingTimezone = last.suppressTrailingFreeBlock
+      ? (last.start_timezone ?? day.timezone)
+      : (last.end_timezone ?? last.start_timezone ?? day.timezone)
     const trailingDateKey = localDateKey(trailingInstant, trailingTimezone)
     const trailingDayEnd = zonedTimeToUtc(trailingDateKey, dayEndTime, trailingTimezone)
     pushDayEdgeBlock(blocks, day.dateKey, 'trailing', trailingInstant, trailingDayEnd)
