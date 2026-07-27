@@ -1,5 +1,6 @@
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
 import { useEffect, useRef, useState } from 'react'
+import { logClientError } from '../../lib/logError'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
@@ -149,8 +150,9 @@ function PlaceAutocompleteFieldWithPlaces({
       setSuggestions(results)
       setIsOpen(results.length > 0)
       setActiveIndex(-1)
-    } catch {
+    } catch (err) {
       if (requestId !== requestIdRef.current) return
+      logClientError('PlaceAutocompleteField.fetchSuggestions', err)
       closeList()
     }
   }
