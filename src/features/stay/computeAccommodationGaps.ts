@@ -68,7 +68,8 @@ export function addDays(dateStr: string, days: number): string {
 
 export function nightsBetween(start: string, end: string): number {
   const msPerDay = 24 * 60 * 60 * 1000
-  return Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / msPerDay)
+  const nights = Math.round((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / msPerDay)
+  return Math.max(1, nights)
 }
 
 function dateOnlyInZone(isoUtc: string, timeZone: string | null): string {
