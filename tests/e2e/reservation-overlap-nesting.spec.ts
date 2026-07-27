@@ -49,6 +49,7 @@ test('a confirmed overlapping stay renders nested under the longer stay, not as 
       {
         trip_id: trip.id,
         type: 'stay',
+        stay_subtype: 'hotel',
         status: 'booked',
         name: mainName,
         start_at: mainStart,
@@ -59,6 +60,7 @@ test('a confirmed overlapping stay renders nested under the longer stay, not as 
       {
         trip_id: trip.id,
         type: 'stay',
+        stay_subtype: 'hotel',
         status: 'booked',
         name: nestedName,
         start_at: nestedStart,
@@ -124,6 +126,7 @@ test('a confirmed overlapping transport reservation renders nested under the lon
       {
         trip_id: trip.id,
         type: 'transport',
+        transport_subtype: 'point_to_point',
         status: 'booked',
         name: mainName,
         start_at: mainStart,
@@ -134,6 +137,7 @@ test('a confirmed overlapping transport reservation renders nested under the lon
       {
         trip_id: trip.id,
         type: 'transport',
+        transport_subtype: 'point_to_point',
         status: 'booked',
         name: nestedName,
         start_at: nestedStart,

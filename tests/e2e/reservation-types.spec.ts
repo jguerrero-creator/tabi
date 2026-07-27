@@ -41,10 +41,18 @@ test('reservation type determines the icon and the fields shown on the detail sc
     const { data: reservations, error: reservationsError } = await client
       .from('reservations')
       .insert([
-        { trip_id: trip.id, type: 'stay', name: `E2E stay ${runId}`, start_at: START_AT, end_at: END_AT },
+        {
+          trip_id: trip.id,
+          type: 'stay',
+          stay_subtype: 'hotel',
+          name: `E2E stay ${runId}`,
+          start_at: START_AT,
+          end_at: END_AT,
+        },
         {
           trip_id: trip.id,
           type: 'transport',
+          transport_subtype: 'point_to_point',
           name: `E2E transport ${runId}`,
           start_at: START_AT,
           start_timezone: 'Europe/Paris',

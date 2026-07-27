@@ -38,6 +38,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
     const { error: seedError } = await client.from('reservations').insert({
       trip_id: trip.id,
       type: 'stay',
+      stay_subtype: 'hotel',
       status: 'booked',
       name: existingName,
       start_at: '2026-09-10T06:00:00.000Z',

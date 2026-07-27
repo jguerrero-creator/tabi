@@ -38,6 +38,7 @@ test('Stay menu row shows a nights count instead of an end-date arrow, and hides
     const { error: multiNightError } = await client.from('reservations').insert({
       trip_id: trip.id,
       type: 'stay',
+      stay_subtype: 'hotel',
       name: `E2E multi-night hotel ${runId}`,
       status: 'booked',
       start_at: '2026-09-10T06:00:00.000Z',
@@ -50,6 +51,7 @@ test('Stay menu row shows a nights count instead of an end-date arrow, and hides
     const { error: sameDayError } = await client.from('reservations').insert({
       trip_id: trip.id,
       type: 'stay',
+      stay_subtype: 'hotel',
       name: `E2E same-day hotel ${runId}`,
       status: 'booked',
       start_at: '2026-09-15T14:00:00.000Z',

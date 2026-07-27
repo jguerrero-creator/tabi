@@ -77,6 +77,7 @@ test('the Add Reservation start date prefills to the first uncovered night when 
     const { error: seedError } = await client.from('reservations').insert({
       trip_id: trip.id,
       type: 'stay',
+      stay_subtype: 'hotel',
       status: 'booked',
       name: `E2E prefill existing stay ${runId}`,
       start_at: '2026-12-01T00:00:00.000Z',
