@@ -102,8 +102,8 @@ test('"+ Add" on a computed Getting Around leg opens the Add sheet prefilled as 
     await page.getByRole('button', { name: '+ Add reservation' }).click()
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
 
-    // Prefilled from the leg: sub-type mapped from the chosen mode (DRIVE -> Local transport).
-    await expect(page.getByText('Local transport')).toBeVisible()
+    // Prefilled from the leg: every Getting Around leg quick-adds as a point-to-point Transport.
+    await expect(page.getByText('Flight / Train / Bus')).toBeVisible()
     // Status defaults to "To book" already, unaffected by the prefill.
     await expect(page.getByRole('radio', { name: 'To book' })).toHaveAttribute('aria-checked', 'true')
     // Both addresses came from the leg's own endpoints, no re-geocoding needed.
