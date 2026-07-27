@@ -35,7 +35,7 @@ test('parking + check-in deadline flags on a Stay reservation', async ({ page })
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)
-    await expect(page.getByRole('heading', { name: 'Stay' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Stay', exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Add reservation' }).click()
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()

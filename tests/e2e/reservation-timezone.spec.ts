@@ -37,25 +37,38 @@ test('the same UTC instant renders as the correct local time for each leg timezo
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
 
   try {
-    const { error: reservationError } = await client.from('reservations').insert({
-      trip_id: trip.id,
-      type: 'stay',
-      name: `E2E TZ stay ${runId}`,
-      start_at: SHARED_INSTANT_UTC,
-      start_timezone: 'Asia/Tokyo',
-      end_at: SHARED_INSTANT_UTC,
-      end_timezone: 'America/Los_Angeles',
-    })
-    if (reservationError) throw reservationError
+    const { data: created, error: reservationError } = await client
+      .from('reservations')
+      .insert({
+        trip_id: trip.id,
+        type: 'stay',
+        stay_subtype: 'hotel',
+        name: `E2E TZ stay ${runId}`,
+        start_at: SHARED_INSTANT_UTC,
+        start_timezone: 'Asia/Tokyo',
+        end_at: SHARED_INSTANT_UTC,
+        end_timezone: 'America/Los_Angeles',
+      })
+      .select()
+      .single()
+    if (reservationError || !created) throw reservationError ?? new Error('Reservation insert returned no row')
 
-    await page.goto(`/trips/${trip.id}/stay`)
-
-    const row = page.locator('li').filter({ hasText: `E2E TZ stay ${runId}` })
+    // The Stay list row only shows a nights-count summary (CLAUDE.md #14), not raw per-leg
+    // date/time — the detail screen's editable check-in/check-out fields are where each leg's
+    // own timezone conversion is actually surfaced, so that's what this test exercises.
+    await page.goto(`/reservations/${created.id}`)
+    await expect(page.getByRole('heading', { name: `E2E TZ stay ${runId}` })).toBeVisible()
 
     // Tokyo is UTC+9 with no DST: 23:30 UTC -> next day, 08:30 local.
-    await expect(row).toContainText('Aug 11, 2026, 8:30 AM')
-    // Los Angeles is UTC-7 (PDT) in August: 23:30 UTC -> same day, 16:30 local.
-    await expect(row).toContainText('Aug 10, 2026, 4:30 PM')
+    await expect(page.getByLabel('Check-in date')).toHaveValue('2026-08-11')
+    await expect(page.getByLabel('Check-in time')).toHaveValue('08:30')
+    // Los Angeles is UTC-7 (PDT) in August: 23:30 UTC -> same day, 16:30 local. Check-out DATE
+    // isn't asserted here: by design (TABI-112) it's derived from check-in + nights rather than
+    // a raw per-leg conversion, so it doesn't reflect end_timezone once check-in/check-out land
+    // on different local dates. Check-out TIME is unaffected by that derivation and still comes
+    // straight from end_at/end_timezone, so it's what actually proves independent per-leg
+    // conversion for the checkout leg.
+    await expect(page.getByLabel('Check-out time')).toHaveValue('16:30')
   } finally {
     const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)
     if (deleteReservationsError) throw deleteReservationsError
