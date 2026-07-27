@@ -10,7 +10,15 @@ import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteFie
 import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
-import { formatInZone, localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
+import {
+  addDurationToTime,
+  durationHoursMinutes,
+  formatInZone,
+  localDateKey,
+  localTimeKey,
+  localTimeZone,
+  zonedTimeToUtc,
+} from '../../lib/datetime'
 import {
   AddressSelectionCancelledError,
   fetchGeocodeByPlaceId,
@@ -156,6 +164,26 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [manualEndDate, setManualEndDate] = useState(false)
   const initialCheckInDateRef = useRef(checkInDate)
   const initialCheckOutDateRef = useRef(checkOutDate)
+  // TABI-182: symmetric to the TABI-160 Stay block above, but for Activity — previously there
+  // was no UI at all to edit an Activity's start date/time or add a missing end/duration.
+  const [activityStartDate, setActivityStartDate] = useState(() =>
+    reservation.type === 'activity' && reservation.start_at
+      ? localDateKey(reservation.start_at, reservation.start_timezone)
+      : '',
+  )
+  const [activityStartTime, setActivityStartTime] = useState(() =>
+    reservation.type === 'activity' && reservation.start_at
+      ? localTimeKey(reservation.start_at, reservation.start_timezone)
+      : '',
+  )
+  const [durationHours, setDurationHours] = useState(() => {
+    if (reservation.type !== 'activity' || !reservation.start_at || !reservation.end_at) return ''
+    return String(durationHoursMinutes(reservation.start_at, reservation.end_at).hours)
+  })
+  const [durationMinutes, setDurationMinutes] = useState(() => {
+    if (reservation.type !== 'activity' || !reservation.start_at || !reservation.end_at) return ''
+    return String(durationHoursMinutes(reservation.start_at, reservation.end_at).minutes)
+  })
   const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
   const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
@@ -298,6 +326,46 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       }
     }
 
+    // TABI-182: same idea as stayDatePatch above, but Activity's start/end can legitimately be
+    // null both before and after editing (unlike Stay, which always has both from creation) —
+    // so this compares directly against the current start_at/end_at rather than an initial-value
+    // dirty-check, and requires start date+time together (an Activity is never date-only).
+    let activityDatePatch: Partial<Reservation> = {}
+    if (reservation.type === 'activity') {
+      const trimmedStartDate = activityStartDate.trim()
+      const trimmedStartTime = activityStartTime.trim()
+      const hours = Number(durationHours) || 0
+      const minutes = Number(durationMinutes) || 0
+      const hasDuration = hours > 0 || minutes > 0
+
+      let newStartAt: string | null = null
+      if (trimmedStartDate && trimmedStartTime) {
+        newStartAt = zonedTimeToUtc(trimmedStartDate, trimmedStartTime, reservation.start_timezone ?? localTimeZone())
+      } else if (trimmedStartDate || trimmedStartTime) {
+        setFormError(strings.addReservation.errorStartRequired)
+        return
+      }
+
+      let newEndAt: string | null = null
+      if (newStartAt && hasDuration) {
+        const endTimeStr = addDurationToTime(trimmedStartTime, hours, minutes)
+        newEndAt = zonedTimeToUtc(
+          trimmedStartDate,
+          endTimeStr,
+          reservation.end_timezone ?? reservation.start_timezone ?? localTimeZone(),
+        )
+        if (newEndAt <= newStartAt) {
+          setFormError(strings.reservationDetail.errorDurationCrossesMidnight)
+          return
+        }
+      }
+
+      activityDatePatch = {
+        ...(newStartAt !== reservation.start_at ? { start_at: newStartAt } : {}),
+        ...(newEndAt !== reservation.end_at ? { end_at: newEndAt } : {}),
+      }
+    }
+
     let patch: Partial<Reservation> = {
       ...(isAutoNamedTransport ? {} : { name: name.trim() }),
       note: note.trim() || null,
@@ -310,6 +378,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           }
         : {}),
       ...stayDatePatch,
+      ...activityDatePatch,
     }
 
     try {
@@ -531,6 +600,35 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   </button>
                 </div>
               ))}
+            {reservation.type === 'activity' && (
+              <div className="flex gap-3">
+                <Field label={strings.reservationDetail.startDateLabel} className="flex-1">
+                  <input
+                    type="date"
+                    value={activityStartDate}
+                    onChange={(e) => setActivityStartDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+                <Field label={strings.reservationDetail.startTimeLabel} className="flex-1">
+                  <input
+                    type="time"
+                    value={activityStartTime}
+                    onChange={(e) => setActivityStartTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+              </div>
+            )}
+            {reservation.type === 'activity' && (
+              <DurationField
+                legend={strings.addReservation.durationLabel}
+                hours={durationHours}
+                minutes={durationMinutes}
+                onHoursChange={setDurationHours}
+                onMinutesChange={setDurationMinutes}
+              />
+            )}
             <div className="flex gap-3">
               <Field label={strings.reservationDetail.priceLabel} className="flex-1">
                 <input
@@ -783,6 +881,52 @@ function Field({
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
       {children}
     </label>
+  )
+}
+
+// TABI-182: mirrors AddReservationModal's DurationField (TABI-181) — duplicated per this
+// codebase's existing convention of file-local small form pieces (see Field, DateTimeField).
+function DurationField({
+  legend,
+  hours,
+  minutes,
+  onHoursChange,
+  onMinutesChange,
+}: {
+  legend: string
+  hours: string
+  minutes: string
+  onHoursChange: (value: string) => void
+  onMinutesChange: (value: string) => void
+}) {
+  return (
+    <fieldset className="flex-1">
+      <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
+      <div className="flex gap-2">
+        <input
+          type="number"
+          min={0}
+          max={23}
+          step={1}
+          aria-label={strings.addReservation.durationHoursLabel}
+          placeholder={strings.addReservation.durationHoursLabel}
+          value={hours}
+          onChange={(event) => onHoursChange(event.target.value)}
+          className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        />
+        <input
+          type="number"
+          min={0}
+          max={59}
+          step={1}
+          aria-label={strings.addReservation.durationMinutesLabel}
+          placeholder={strings.addReservation.durationMinutesLabel}
+          value={minutes}
+          onChange={(event) => onMinutesChange(event.target.value)}
+          className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        />
+      </div>
+    </fieldset>
   )
 }
 

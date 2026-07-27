@@ -131,6 +131,26 @@ export function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: strin
   return new Date(utcGuess).toISOString()
 }
 
+/**
+ * Adds an hours/minutes duration to a "HH:MM" wall-clock time, wrapping within the same
+ * day (TABI-181: an Activity never spans multiple calendar days, so this never rolls the
+ * date over — a wraparound past midnight instead surfaces as an end-before-start validation
+ * error, since the wrapped time now sits earlier than the start time on the same date).
+ */
+export function addDurationToTime(timeStr: string, hours: number, minutes: number): string {
+  const [hour, minute] = timeStr.split(':').map(Number)
+  const total = (hour * 60 + minute + hours * 60 + minutes) % (24 * 60)
+  const endHour = Math.floor(total / 60)
+  const endMinute = total % 60
+  return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`
+}
+
+/** Elapsed hours/minutes between two UTC ISO timestamps, for seeding a duration field from a stored start/end. */
+export function durationHoursMinutes(startIso: string, endIso: string): { hours: number; minutes: number } {
+  const totalMinutes = Math.max(0, Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000))
+  return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 }
+}
+
 function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,

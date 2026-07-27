@@ -6,7 +6,14 @@ import { FormSheet } from '../../components/ui/FormSheet'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
 import { StatusPicker } from '../../components/ui/StatusPicker'
-import { formatDayPillLabel, localDateKey, localTimeKey, localTimeZone, zonedTimeToUtc } from '../../lib/datetime'
+import {
+  addDurationToTime,
+  formatDayPillLabel,
+  localDateKey,
+  localTimeKey,
+  localTimeZone,
+  zonedTimeToUtc,
+} from '../../lib/datetime'
 import {
   AddressNotFoundError,
   AddressSelectionCancelledError,
@@ -126,6 +133,10 @@ export function AddReservationModal({
   )
   const [nights, setNights] = useState('')
   const [manualEndDate, setManualEndDate] = useState(false)
+  // TABI-181: Activity has no end-date picker at all — end is always derived from start +
+  // duration, on the same calendar day (same simplification as nights-for-Stay, TABI-112).
+  const [durationHours, setDurationHours] = useState('')
+  const [durationMinutes, setDurationMinutes] = useState('')
   const [priceAmount, setPriceAmount] = useState('')
   const [note, setNote] = useState('')
   const [geocoding, setGeocoding] = useState(false)
@@ -212,6 +223,21 @@ export function AddReservationModal({
     }
     setEndDate(addDays(startDate, Math.trunc(n)))
   }, [option.dbType, manualEndDate, startDate, nights])
+
+  // TABI-181: for Activity, derive end date/time from start + duration instead of asking for
+  // an end date directly — end always stays on the same calendar day as start.
+  useEffect(() => {
+    if (option.dbType !== 'activity') return
+    const hours = Number(durationHours) || 0
+    const minutes = Number(durationMinutes) || 0
+    if (!startDate || !startTime || (hours === 0 && minutes === 0)) {
+      setEndDate('')
+      setEndTime('')
+      return
+    }
+    setEndDate(startDate)
+    setEndTime(addDurationToTime(startTime, hours, minutes))
+  }, [option.dbType, startDate, startTime, durationHours, durationMinutes])
 
   function handleStartAddressChange(text: string) {
     setStartAddress(text)
@@ -683,6 +709,14 @@ export function AddReservationModal({
               {strings.addReservation.manualCheckoutToggle}
             </button>
           </div>
+        ) : option.dbType === 'activity' ? (
+          <DurationField
+            legend={strings.addReservation.durationLabel}
+            hours={durationHours}
+            minutes={durationMinutes}
+            onHoursChange={setDurationHours}
+            onMinutesChange={setDurationMinutes}
+          />
         ) : (
           <div className="space-y-2">
             {isAtDisposal ? (
@@ -987,6 +1021,52 @@ function DateTimeField({
           value={time}
           onChange={(event) => onTimeChange(event.target.value)}
           required={timeRequired}
+          className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        />
+      </div>
+    </fieldset>
+  )
+}
+
+// TABI-181: Activity's end is always derived (start + duration) — this replaces the end
+// DateTimeField for that type only, with no date picker at all.
+function DurationField({
+  legend,
+  hours,
+  minutes,
+  onHoursChange,
+  onMinutesChange,
+}: {
+  legend: string
+  hours: string
+  minutes: string
+  onHoursChange: (value: string) => void
+  onMinutesChange: (value: string) => void
+}) {
+  return (
+    <fieldset className="flex-1">
+      <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
+      <div className="flex gap-2">
+        <input
+          type="number"
+          min={0}
+          max={23}
+          step={1}
+          aria-label={strings.addReservation.durationHoursLabel}
+          placeholder={strings.addReservation.durationHoursLabel}
+          value={hours}
+          onChange={(event) => onHoursChange(event.target.value)}
+          className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        />
+        <input
+          type="number"
+          min={0}
+          max={59}
+          step={1}
+          aria-label={strings.addReservation.durationMinutesLabel}
+          placeholder={strings.addReservation.durationMinutesLabel}
+          value={minutes}
+          onChange={(event) => onMinutesChange(event.target.value)}
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
       </div>
