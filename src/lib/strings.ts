@@ -13,6 +13,7 @@ export const strings = {
   common: {
     back: 'Back',
     overlapBadge: '↳ Also booked during this period',
+    saved: 'Saved',
   },
   appError: {
     title: 'Something went wrong.',

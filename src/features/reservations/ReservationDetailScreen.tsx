@@ -28,6 +28,7 @@ import {
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { showSavedToast } from '../../lib/toast'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { transportRouteName } from './transportRouteName'
@@ -413,6 +414,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setSaving(true)
     try {
       await onUpdate(patch)
+      showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('ReservationDetailScreen.handleSave', err)
       setFormError(strings.reservationDetail.errorGeneric)

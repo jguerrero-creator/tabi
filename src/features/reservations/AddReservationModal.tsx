@@ -23,6 +23,7 @@ import {
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { showSavedToast } from '../../lib/toast'
 import type {
   NewReservation,
   Reservation,
@@ -448,6 +449,7 @@ export function AddReservationModal({
     try {
       await onCreate(input)
       onClose()
+      showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('AddReservationModal.submitReservation', err)
       setError(strings.addReservation.errorGeneric)

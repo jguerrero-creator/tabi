@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { TripLayout } from './components/menu/TripLayout'
 import { ReportWidget } from './components/ui/ReportWidget'
+import { SavedToast } from './components/ui/SavedToast'
 import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen'
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
@@ -26,6 +27,7 @@ export function App() {
         <Route path="/privacy" element={<PrivacyPolicyScreen />} />
       </Routes>
       <ReportWidget />
+      <SavedToast />
     </>
   )
 }

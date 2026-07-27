@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { showSavedToast } from '../../lib/toast'
 import type { TripDayNote } from '../../types/dayNote'
 
 interface DayNoteProps {
@@ -40,6 +41,7 @@ export function DayNote({ dayKey, note, onSave, onClear }: DayNoteProps) {
     try {
       await onSave(text.trim())
       setEditing(false)
+      showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('DayNote.handleSave', err)
       setError(strings.dayNote.errorGeneric)

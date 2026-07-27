@@ -11,6 +11,7 @@ import {
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { showSavedToast } from '../../lib/toast'
 import type { TripDayLocation } from '../../types/dayLocation'
 import { useAddressPicker } from '../reservations/useAddressPicker'
 import type { DayLocationInput } from './useTripDayLocations'
@@ -69,6 +70,7 @@ export function DayPlannedLocation({ dayKey, location, onSave, onClear }: DayPla
     try {
       await onSave(input)
       setEditing(false)
+      showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('DayPlannedLocation.commit', err)
       setError(strings.dayLocation.errorGeneric)

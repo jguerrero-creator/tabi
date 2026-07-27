@@ -4,6 +4,7 @@ import { FormSheet } from '../../components/ui/FormSheet'
 import { CURRENCIES, getDefaultCurrency } from '../../lib/currencies'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { showSavedToast } from '../../lib/toast'
 import type { Trip } from '../../types/trip'
 
 const DEFAULT_DAY_START_TIME = '08:00'
@@ -66,6 +67,7 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
         note: note.trim() || null,
       })
       onClose()
+      showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('TripFormModal.handleSubmit', err)
       setError(strings.createTrip.errorGeneric)
