@@ -8,6 +8,7 @@
 // a forced, strict tool call rather than asking the model to emit raw JSON.
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
+import { requireEntitlement } from './_lib/entitlements'
 import { checkRateLimit } from './_lib/rateLimit'
 
 type ExtractKind = 'text' | 'pdf' | 'image'
@@ -57,6 +58,17 @@ export default async function handler(request: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     console.error('extract-reservation: ANTHROPIC_API_KEY is not configured')
+    return jsonResponse({ error: 'Server misconfigured' }, 500)
+  }
+
+  const entitlement = await requireEntitlement(request, { feature: 'aiAccess' })
+  if (!entitlement.allowed) {
+    if (entitlement.reason === 'unauthenticated') {
+      return jsonResponse({ error: 'Authentication required' }, 401)
+    }
+    if (entitlement.reason === 'denied') {
+      return jsonResponse({ error: 'Your plan does not include AI import' }, 403)
+    }
     return jsonResponse({ error: 'Server misconfigured' }, 500)
   }
 

@@ -14,12 +14,14 @@ export interface PlanEntitlements {
   }
 }
 
-// `null` limit = unlimited. No plan actually restricts anything yet (V0.5) —
-// values will be set when TABI-99/100/101 decide the real gating.
+// `null` limit = unlimited. aiAccess is enabled on free (TABI-177 wired the
+// server-side check without restricting today's users) — other limits still
+// restrict nothing yet; values will be set when TABI-99/100/101 decide the
+// real gating.
 export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   free: {
     features: {
-      aiAccess: false,
+      aiAccess: true,
       inviteTravelers: false,
     },
     limits: {
