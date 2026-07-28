@@ -8,6 +8,7 @@
 // a forced, strict tool call rather than asking the model to emit raw JSON.
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
+import { checkRateLimit } from './_lib/rateLimit'
 
 type ExtractKind = 'text' | 'pdf' | 'image'
 
@@ -56,6 +57,17 @@ export default async function handler(request: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     console.error('extract-reservation: ANTHROPIC_API_KEY is not configured')
+    return jsonResponse({ error: 'Server misconfigured' }, 500)
+  }
+
+  const rateLimit = await checkRateLimit(request, 'extract-reservation')
+  if (!rateLimit.allowed) {
+    if (rateLimit.reason === 'unauthenticated') {
+      return jsonResponse({ error: 'Authentication required' }, 401)
+    }
+    if (rateLimit.reason === 'exceeded') {
+      return jsonResponse({ error: 'Daily extraction limit reached — try again tomorrow' }, 429)
+    }
     return jsonResponse({ error: 'Server misconfigured' }, 500)
   }
 

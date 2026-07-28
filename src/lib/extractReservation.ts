@@ -1,11 +1,18 @@
+import { supabase } from './supabase'
 import type { ExtractedReservation } from '../types/extractedReservation'
 
 export class ExtractionFailedError extends Error {}
 
 export async function extractReservationFromText(text: string): Promise<ExtractedReservation> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const accessToken = sessionData.session?.access_token
+
   const response = await fetch('/api/extract-reservation', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ kind: 'text', text }),
   })
 

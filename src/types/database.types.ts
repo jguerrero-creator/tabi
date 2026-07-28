@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_call_quotas: {
+        Row: {
+          count: number
+          day: string
+          endpoint: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          day?: string
+          endpoint: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          day?: string
+          endpoint?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -318,7 +339,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_api_call_counter: {
+        Args: { p_endpoint: string }
+        Returns: number
+      }
     }
     Enums: {
       reservation_status: "booked" | "to_book" | "decide_later"
