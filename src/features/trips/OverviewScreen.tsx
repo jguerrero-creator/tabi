@@ -11,6 +11,7 @@ import type { TripDayLocation } from '../../types/dayLocation'
 import type { Reminder } from '../../types/reminder'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { AddReservationModal } from '../reservations/AddReservationModal'
+import { ImportConfirmationModal } from '../reservations/ImportConfirmationModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { OverviewMap } from './OverviewMap'
 import { RemindersSection } from './RemindersSection'
@@ -44,6 +45,9 @@ export function OverviewScreen() {
   // TABI-155: "+ Add" on a computed "Getting Around" leg opens the same shared
   // Add sheet, prefilled with that leg's departure/arrival and mode.
   const [legQuickAdd, setLegQuickAdd] = useState<LegQuickAddPayload | null>(null)
+  // TABI-12: minimal paste-text entry point for the extraction-review flow — real upload
+  // channels (email/PDF/photo) are separate backlog work (TABI-15/23/58).
+  const [showImportModal, setShowImportModal] = useState(false)
   // TABI-131: tab + selected day live in the URL (not local state) so that
   // navigating to a reservation's detail screen and back restores Planning
   // and its selected day instead of remounting to the Overview default.
@@ -138,6 +142,16 @@ export function OverviewScreen() {
 
         {!loading && !error && (
           <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+            <div className="flex justify-end lg:col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                {strings.importConfirmation.triggerLabel}
+              </button>
+            </div>
+
             <div className="flex rounded-full border border-slate-200 bg-white p-1 lg:hidden">
               <button
                 type="button"
@@ -280,6 +294,18 @@ export function OverviewScreen() {
           initialStartPlace={legQuickAdd.initialStartPlace}
           initialEndPlace={legQuickAdd.initialEndPlace}
           onClose={() => setLegQuickAdd(null)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportConfirmationModal
+          tripId={tripId ?? ''}
+          onClose={() => setShowImportModal(false)}
           onCreate={async (input) => {
             const created = await createReservation(input)
             await refetchReservations()

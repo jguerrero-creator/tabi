@@ -84,6 +84,24 @@ interface AddReservationModalProps {
   initialEndTimezone?: string | null
   initialStartPlace?: ResolvedPlace | null
   initialEndPlace?: ResolvedPlace | null
+  /**
+   * TABI-12: prefill props for reviewing/correcting an AI-extracted reservation before it's
+   * added to the trip — distinct from `initialStartAt`/`initialTimezone` above, which always
+   * carry a real, already-anchored UTC instant. An extraction has no reliable timezone of its
+   * own, only the wall-clock date/time as printed on the confirmation, so these are seeded as
+   * plain strings and resolved into a real instant at submit time via the normal address
+   * geocoding path — exactly as if the user had typed them in by hand.
+   */
+  defaultStaySubtype?: StaySubtype
+  initialName?: string | null
+  initialStartAddressText?: string | null
+  initialStartDate?: string | null
+  initialStartTime?: string | null
+  initialEndDate?: string | null
+  initialEndTime?: string | null
+  initialPriceAmount?: number | null
+  initialNote?: string | null
+  extractionNotice?: boolean
   onClose: () => void
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
@@ -91,6 +109,7 @@ interface AddReservationModalProps {
 export function AddReservationModal({
   tripId,
   defaultType = 'stay',
+  defaultStaySubtype = 'hotel',
   defaultTransportSubtype = 'point_to_point',
   requireTypeChoice = false,
   initialStartAt = null,
@@ -99,6 +118,15 @@ export function AddReservationModal({
   initialEndTimezone = null,
   initialStartPlace = null,
   initialEndPlace = null,
+  initialName = null,
+  initialStartAddressText = null,
+  initialStartDate = null,
+  initialStartTime = null,
+  initialEndDate = null,
+  initialEndTime = null,
+  initialPriceAmount = null,
+  initialNote = null,
+  extractionNotice = false,
   onClose,
   onCreate,
 }: AddReservationModalProps) {
@@ -108,38 +136,42 @@ export function AddReservationModal({
   // TABI-54: except when there's no such origin menu (a free-time block quick-add), where
   // `requireTypeChoice` starts it expanded instead of silently assuming `defaultType`.
   const [typeExpanded, setTypeExpanded] = useState(requireTypeChoice)
-  const [staySubtype, setStaySubtype] = useState<StaySubtype>('hotel')
+  const [staySubtype, setStaySubtype] = useState<StaySubtype>(defaultStaySubtype)
   // TABI-121: Transport's own sub-type (point-to-point vs vehicle rental), symmetric to Stay's —
   // shown whenever the main type is Transport, not folded into the main type selector.
   const [transportSubtype, setTransportSubtype] = useState<TransportSubtype>(defaultTransportSubtype)
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
   const [checkInDeadline, setCheckInDeadline] = useState('')
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName ?? '')
   const [status, setStatus] = useState<ReservationStatus>('to_book')
-  const [startAddress, setStartAddress] = useState(() => initialStartPlace?.formattedAddress ?? '')
+  const [startAddress, setStartAddress] = useState(
+    () => initialStartPlace?.formattedAddress ?? initialStartAddressText ?? '',
+  )
   const [endAddress, setEndAddress] = useState(() => initialEndPlace?.formattedAddress ?? '')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(() => initialStartPlace)
   const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(() => initialEndPlace)
   const [startDate, setStartDate] = useState(() =>
-    initialStartAt ? localDateKey(initialStartAt, initialTimezone) : '',
+    initialStartAt ? localDateKey(initialStartAt, initialTimezone) : (initialStartDate ?? ''),
   )
   const [startTime, setStartTime] = useState(() =>
-    initialStartAt ? localTimeKey(initialStartAt, initialTimezone) : '',
+    initialStartAt ? localTimeKey(initialStartAt, initialTimezone) : (initialStartTime ?? ''),
   )
   const [endDate, setEndDate] = useState(() =>
-    initialEndAt ? localDateKey(initialEndAt, initialEndTimezone ?? initialTimezone) : '',
+    initialEndAt ? localDateKey(initialEndAt, initialEndTimezone ?? initialTimezone) : (initialEndDate ?? ''),
   )
   const [endTime, setEndTime] = useState(() =>
-    initialEndAt ? localTimeKey(initialEndAt, initialEndTimezone ?? initialTimezone) : '',
+    initialEndAt ? localTimeKey(initialEndAt, initialEndTimezone ?? initialTimezone) : (initialEndTime ?? ''),
   )
   const [nights, setNights] = useState('')
-  const [manualEndDate, setManualEndDate] = useState(false)
+  // An extracted checkout date/time is already explicit — skip the nights-derivation default
+  // (TABI-112) so it isn't immediately overwritten by the nights-derivation effect below.
+  const [manualEndDate, setManualEndDate] = useState(() => Boolean(initialEndDate))
   // TABI-181: Activity has no end-date picker at all — end is always derived from start +
   // duration, on the same calendar day (same simplification as nights-for-Stay, TABI-112).
   const [durationHours, setDurationHours] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
-  const [priceAmount, setPriceAmount] = useState('')
-  const [note, setNote] = useState('')
+  const [priceAmount, setPriceAmount] = useState(() => (initialPriceAmount != null ? String(initialPriceAmount) : ''))
+  const [note, setNote] = useState(initialNote ?? '')
   const [geocoding, setGeocoding] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -524,6 +556,12 @@ export function AddReservationModal({
         submitting={submitting}
         submitDisabled={geocoding}
       >
+        {extractionNotice && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {strings.addReservation.extractionNoticeBanner}
+          </div>
+        )}
+
         {typeExpanded ? (
           <Field label={strings.addReservation.typeLabel}>
             <select

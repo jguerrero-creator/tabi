@@ -313,6 +313,19 @@ export const strings = {
       `We couldn't locate the ${fields} automatically. Save it as typed, without an exact map location for now?`,
     geocodeFailureConfirmCta: 'Save without location',
     geocodeFailureCancelCta: 'Go back and edit',
+    extractionNoticeBanner:
+      'These details were extracted automatically from your imported confirmation — please review and correct anything that’s wrong before saving.',
+  },
+  importConfirmation: {
+    title: 'Paste Confirmation Text',
+    triggerLabel: 'Paste confirmation',
+    textLabel: 'Confirmation email or booking text',
+    textPlaceholder: 'Paste the text of a booking confirmation email…',
+    submit: 'Extract',
+    cancel: 'Cancel',
+    extracting: 'Reading your confirmation…',
+    errorGeneric: 'Could not read this confirmation. You can enter it manually instead.',
+    manualFallbackCta: 'Enter manually instead',
   },
   addressPicker: {
     title: 'Select an Address',
