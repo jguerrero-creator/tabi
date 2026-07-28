@@ -7,6 +7,7 @@
 // see the system prompt below (TABI-93). The output schema is enforced via
 // a forced, strict tool call rather than asking the model to emit raw JSON.
 import Anthropic from '@anthropic-ai/sdk'
+import { z } from 'zod'
 
 type ExtractKind = 'text' | 'pdf' | 'image'
 
@@ -17,20 +18,22 @@ interface ExtractRequestBody {
   mediaType?: string
 }
 
-type StaySubtype = 'hotel' | 'camping' | 'airbnb' | 'ryokan' | 'other'
-type TransportSubtype = 'point_to_point' | 'at_disposal'
+// Mirrors EXTRACT_TOOL's input_schema below — re-validated at runtime here
+// because Claude's strict tool-use schema only constrains the request; it
+// doesn't guarantee the response we get back actually matches it (TABI-94).
+const ExtractedReservationSchema = z.object({
+  type: z.enum(['stay', 'transport', 'activity']).nullable(),
+  staySubtype: z.enum(['hotel', 'camping', 'airbnb', 'ryokan', 'other']).nullable(),
+  transportSubtype: z.enum(['point_to_point', 'at_disposal']).nullable(),
+  name: z.string().nullable(),
+  address: z.string().nullable(),
+  startDateTime: z.string().nullable(),
+  endDateTime: z.string().nullable(),
+  confirmationNumber: z.string().nullable(),
+  price: z.object({ amount: z.number(), currency: z.string() }).nullable(),
+})
 
-interface ExtractedReservation {
-  type: 'stay' | 'transport' | 'activity' | null
-  staySubtype: StaySubtype | null
-  transportSubtype: TransportSubtype | null
-  name: string | null
-  address: string | null
-  startDateTime: string | null
-  endDateTime: string | null
-  confirmationNumber: string | null
-  price: { amount: number; currency: string } | null
-}
+type ExtractedReservation = z.infer<typeof ExtractedReservationSchema>
 
 type ExtractResponse = { status: 'ok'; result: ExtractedReservation } | { status: 'error'; error: string }
 
@@ -103,7 +106,13 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Extraction failed' }, 502)
   }
 
-  return jsonResponse<ExtractResponse>({ status: 'ok', result: toolUse.input as ExtractedReservation })
+  const parsed = ExtractedReservationSchema.safeParse(toolUse.input)
+  if (!parsed.success) {
+    console.error('extract-reservation: tool output failed schema validation', parsed.error)
+    return jsonResponse<ExtractResponse>({ status: 'error', error: 'Extraction returned an unexpected format' })
+  }
+
+  return jsonResponse<ExtractResponse>({ status: 'ok', result: parsed.data })
 }
 
 function buildContentBlock(
