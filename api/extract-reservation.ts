@@ -124,8 +124,12 @@ export default async function handler(request: Request): Promise<Response> {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
+        model: 'claude-sonnet-5',
         max_tokens: 2048,
+        // Sonnet 5 runs adaptive thinking by default when this is omitted
+        // (unlike Opus 4.8, where omitting it means no thinking) — disable
+        // explicitly, same reasoning as the Opus thinking removal above.
+        thinking: { type: 'disabled' },
         system: SYSTEM_PROMPT,
         tools: [EXTRACT_TOOL],
         tool_choice: { type: 'tool', name: EXTRACT_TOOL_NAME },
