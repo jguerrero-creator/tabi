@@ -45,8 +45,8 @@ export function OverviewScreen() {
   // TABI-155: "+ Add" on a computed "Getting Around" leg opens the same shared
   // Add sheet, prefilled with that leg's departure/arrival and mode.
   const [legQuickAdd, setLegQuickAdd] = useState<LegQuickAddPayload | null>(null)
-  // TABI-12: minimal paste-text entry point for the extraction-review flow — real upload
-  // channels (email/PDF/photo) are separate backlog work (TABI-15/23/58).
+  // TABI-12: entry point for the extraction-review flow — paste-text, email upload (TABI-15),
+  // PDF upload (TABI-23), and photo upload (TABI-58) all live inside ImportConfirmationModal.
   const [showImportModal, setShowImportModal] = useState(false)
   // TABI-131: tab + selected day live in the URL (not local state) so that
   // navigating to a reservation's detail screen and back restores Planning

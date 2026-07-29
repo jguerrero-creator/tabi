@@ -283,6 +283,95 @@ test('uploaded PDF is sent as a base64 document and extracted into the same revi
   }
 })
 
+// TABI-58 — "Upload d'une photo de billet/reçu (parsing via LLM multimodal)". A photo can't be
+// read into the shared textarea either, so it's sent as a base64 'image' block (with its mime
+// type) straight to the same extraction endpoint (api/extract-reservation.ts already supported
+// this kind since TABI-8) — still one pipeline, just a different request shape for this channel.
+test('uploaded photo is sent as a base64 image and extracted into the same review screen', async ({ page }) => {
+  await page.route('https://maps.googleapis.com/**', (route) => route.abort())
+
+  let requestBody: { kind?: string; data?: string; text?: string; mediaType?: string } | null = null
+  await page.route('**/api/extract-reservation', async (route) => {
+    requestBody = route.request().postDataJSON()
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        result: {
+          type: 'activity',
+          staySubtype: null,
+          transportSubtype: null,
+          name: 'Tsukiji Outer Market Food Tour',
+          address: 'Tsukiji, Tokyo, Japan',
+          startDateTime: '2026-09-05T08:00:00',
+          endDateTime: null,
+          confirmationNumber: 'PHOTO789',
+          price: { amount: 140, currency: 'EUR' },
+        },
+      }),
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({
+      organizer_id: user.id,
+      name: `E2E extraction photo trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'EUR',
+    })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+
+  try {
+    await page.goto(`/trips/${trip.id}`)
+    await page.getByRole('button', { name: 'Import confirmation' }).click()
+    await expect(page.getByRole('heading', { name: 'Import Confirmation Email' })).toBeVisible()
+
+    // A 1x1 PNG — the endpoint is stubbed above, so only the request shape matters here.
+    const pngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+    await page.getByLabel(/Or take\/upload a photo/).setInputFiles({
+      name: 'ticket.png',
+      mimeType: 'image/png',
+      buffer: pngBuffer,
+    })
+
+    await expect(page.getByText('Photo selected: ticket.png')).toBeVisible()
+    // The text field stays empty — the photo is sent as its own image block, not as text.
+    await expect(page.getByLabel('Confirmation email or booking text')).toHaveValue('')
+
+    await page.getByRole('button', { name: 'Extract' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    await expect(page.getByText(/extracted automatically/i)).toBeVisible()
+    await expect(page.getByLabel('Name')).toHaveValue('Tsukiji Outer Market Food Tour')
+
+    expect(requestBody?.kind).toBe('image')
+    expect(requestBody?.data).toBeTruthy()
+    expect(requestBody?.mediaType).toBe('image/png')
+    expect(requestBody?.text).toBeUndefined()
+  } finally {
+    const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
+    if (deleteTripError) throw deleteTripError
+  }
+})
+
 // TABI-11 — "Gestion des cas d'échec d'extraction". When the extraction call itself fails
 // (network error, Claude refusal, schema mismatch — anything api/extract-reservation.ts surfaces
 // as a non-ok response), the import modal must never dead-end: it shows an error and a way into

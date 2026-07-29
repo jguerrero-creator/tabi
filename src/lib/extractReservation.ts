@@ -13,6 +13,15 @@ export async function extractReservationFromPdf(base64Data: string): Promise<Ext
   return extract({ kind: 'pdf', data: base64Data })
 }
 
+// TABI-58: photo upload channel — same endpoint and 'image' kind api/extract-reservation.ts already
+// supported since TABI-8, just not yet wired to a frontend entry point.
+export async function extractReservationFromImage(
+  base64Data: string,
+  mediaType: string,
+): Promise<ExtractedReservation> {
+  return extract({ kind: 'image', data: base64Data, mediaType })
+}
+
 async function extract(body: Record<string, unknown>): Promise<ExtractedReservation> {
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
