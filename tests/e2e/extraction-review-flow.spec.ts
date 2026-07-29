@@ -282,3 +282,68 @@ test('uploaded PDF is sent as a base64 document and extracted into the same revi
     if (deleteTripError) throw deleteTripError
   }
 })
+
+// TABI-11 — "Gestion des cas d'échec d'extraction". When the extraction call itself fails
+// (network error, Claude refusal, schema mismatch — anything api/extract-reservation.ts surfaces
+// as a non-ok response), the import modal must never dead-end: it shows an error and a way into
+// the same manual-entry form used everywhere else, per the "one shared detail screen" rule
+// (no separate failure-recovery screen). The "incomplete but not failed" half of the ticket is
+// already covered by extraction-review-flow's other tests, which extract a reservation with some
+// fields null (e.g. endDateTime above) and land on the same reviewable/editable form.
+test('a failed extraction shows an error and falls back to a clean manual-entry form', async ({ page }) => {
+  await page.route('https://maps.googleapis.com/**', (route) => route.abort())
+  await page.route('**/api/extract-reservation', (route) =>
+    route.fulfill({
+      status: 502,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Failed to extract reservation' }),
+    }),
+  )
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({
+      organizer_id: user.id,
+      name: `E2E extraction failure trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'EUR',
+    })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+
+  try {
+    await page.goto(`/trips/${trip.id}`)
+    await page.getByRole('button', { name: 'Import confirmation' }).click()
+    await expect(page.getByRole('heading', { name: 'Import Confirmation Email' })).toBeVisible()
+
+    await page.getByLabel('Confirmation email or booking text').fill('Some booking confirmation text')
+    await page.getByRole('button', { name: 'Extract' }).click()
+
+    await expect(page.getByText('Could not read this confirmation. You can enter it manually instead.')).toBeVisible()
+    const fallbackCta = page.getByRole('button', { name: 'Enter manually instead' })
+    await expect(fallbackCta).toBeVisible()
+    await fallbackCta.click()
+
+    // Lands on the same shared Add sheet manual entry uses — no prefill, no extraction banner,
+    // and the type selector starts expanded since there's no extracted type to inherit.
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    await expect(page.getByText(/extracted automatically/i)).toHaveCount(0)
+    await expect(page.getByLabel('Name')).toHaveValue('')
+    await expect(page.getByLabel('Type')).toBeVisible()
+  } finally {
+    const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
+    if (deleteTripError) throw deleteTripError
+  }
+})
