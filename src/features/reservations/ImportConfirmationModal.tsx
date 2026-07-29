@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { FormSheet } from '../../components/ui/FormSheet'
-import { extractReservationFromText } from '../../lib/extractReservation'
+import { extractReservationFromPdf, extractReservationFromText } from '../../lib/extractReservation'
 import { strings } from '../../lib/strings'
 import type { NewReservation, Reservation } from '../../types/reservation'
 import { useTrip } from '../trips/useTrip'
@@ -13,26 +13,43 @@ interface ImportConfirmationModalProps {
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
 
-// TABI-15: email import channel — paste text (TABI-12's original entry point) or upload the
-// email file itself (.eml/.txt). Both feed the same text into the same extraction endpoint
-// (TABI-8) and the same review/correction pipeline — no separate parsing path for the upload
-// case, per the "one pipeline" rule (a raw .eml's headers/MIME boilerplate are just more text
-// for the extractor to ignore, same as it already ignores prose around the booking details).
-// The remaining upload channels (PDF/photo, TABI-23/58) are separate backlog work.
+// Comfortably under Claude's 32MB base64 document limit even after base64's ~37% size
+// overhead — a booking confirmation PDF has no legitimate reason to approach either ceiling.
+const MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024
+
+// TABI-15/23: import channels — paste text (TABI-12's original entry point), upload the email
+// file itself (.eml/.txt, read client-side into the same textarea), or upload a PDF confirmation
+// (sent as a base64 document, since a PDF can't be read into a textarea). All three feed the
+// same extraction endpoint (TABI-8) and the same review/correction pipeline — no separate
+// parsing path per channel, per the "one pipeline" rule. Text and PDF are mutually exclusive
+// (selecting one clears the other) since only one is sent per extraction call.
 export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportConfirmationModalProps) {
   const { trip } = useTrip(tripId)
   const [text, setText] = useState('')
   const [extracting, setExtracting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [pdfData, setPdfData] = useState<string | null>(null)
+  const [pdfFileName, setPdfFileName] = useState<string | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const [prefill, setPrefill] = useState<ExtractedReservationPrefill | null>(null)
   const [manualFallback, setManualFallback] = useState(false)
+
+  function handleTextChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    setText(event.target.value)
+    if (pdfData) {
+      setPdfData(null)
+      setPdfFileName(null)
+    }
+  }
 
   function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
     setFileError(null)
+    setPdfData(null)
+    setPdfFileName(null)
     const reader = new FileReader()
     reader.onload = () => setText(typeof reader.result === 'string' ? reader.result : '')
     reader.onerror = () => {
@@ -42,13 +59,43 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
     reader.readAsText(file)
   }
 
+  function handlePdfSelect(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setPdfError(null)
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      setPdfError(strings.importConfirmation.pdfSizeError)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      const base64 = result.slice(result.indexOf(',') + 1)
+      setText('')
+      setPdfData(base64)
+      setPdfFileName(file.name)
+    }
+    reader.onerror = () => {
+      console.error('ImportConfirmationModal: failed to read uploaded PDF', reader.error)
+      setPdfError(strings.importConfirmation.fileErrorGeneric)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleRemovePdf() {
+    setPdfData(null)
+    setPdfFileName(null)
+    setPdfError(null)
+  }
+
   async function handleExtract(event: FormEvent) {
     event.preventDefault()
-    if (!text.trim()) return
+    if (!text.trim() && !pdfData) return
     setExtracting(true)
     setError(null)
     try {
-      const result = await extractReservationFromText(text)
+      const result = pdfData ? await extractReservationFromPdf(pdfData) : await extractReservationFromText(text)
       setPrefill(mapExtractedReservation(result, trip?.currency ?? null))
     } catch {
       // TABI-11: fall back to manual entry rather than dead-ending on an extraction failure.
@@ -93,7 +140,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
       cancelLabel={strings.importConfirmation.cancel}
       submitLabel={strings.importConfirmation.submit}
       submitting={extracting}
-      submitDisabled={!text.trim()}
+      submitDisabled={!text.trim() && !pdfData}
     >
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">
@@ -101,7 +148,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
         </span>
         <textarea
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={handleTextChange}
           placeholder={strings.importConfirmation.textPlaceholder}
           rows={10}
           autoFocus
@@ -121,6 +168,27 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
         />
       </label>
       {fileError && <p className="text-sm text-red-600">{fileError}</p>}
+
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700">
+          {strings.importConfirmation.pdfLabel}
+        </span>
+        <input
+          type="file"
+          accept=".pdf,application/pdf"
+          onChange={handlePdfSelect}
+          className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+        />
+      </label>
+      {pdfFileName && (
+        <p className="text-sm text-slate-600">
+          {strings.importConfirmation.pdfSelectedLabel(pdfFileName)}{' '}
+          <button type="button" onClick={handleRemovePdf} className="text-teal-700 underline">
+            {strings.importConfirmation.pdfRemoveCta}
+          </button>
+        </p>
+      )}
+      {pdfError && <p className="text-sm text-red-600">{pdfError}</p>}
 
       {extracting && <p className="text-sm text-slate-500">{strings.importConfirmation.extracting}</p>}
 

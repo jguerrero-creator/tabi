@@ -198,3 +198,87 @@ test('uploaded .eml file is read into the text field and extracted the same way 
     if (deleteTripError) throw deleteTripError
   }
 })
+
+// TABI-23 — "Upload d'un PDF de confirmation de réservation". A PDF can't be read into the
+// shared textarea like the .eml channel above, so it's sent as a base64 'pdf' document straight
+// to the same extraction endpoint (api/extract-reservation.ts already supported this kind since
+// TABI-8) — still one pipeline, just a different request shape for this one channel.
+test('uploaded PDF is sent as a base64 document and extracted into the same review screen', async ({ page }) => {
+  await page.route('https://maps.googleapis.com/**', (route) => route.abort())
+
+  let requestBody: { kind?: string; data?: string; text?: string } | null = null
+  await page.route('**/api/extract-reservation', async (route) => {
+    requestBody = route.request().postDataJSON()
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        result: {
+          type: 'stay',
+          staySubtype: 'ryokan',
+          transportSubtype: null,
+          name: 'Ryokan Yamashiro',
+          address: '1 Onsen Rd, Hakone, Japan',
+          startDateTime: '2026-09-05T15:00:00',
+          endDateTime: '2026-09-07T10:00:00',
+          confirmationNumber: 'PDF456',
+          price: { amount: 900, currency: 'EUR' },
+        },
+      }),
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({
+      organizer_id: user.id,
+      name: `E2E extraction PDF trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'EUR',
+    })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+
+  try {
+    await page.goto(`/trips/${trip.id}`)
+    await page.getByRole('button', { name: 'Import confirmation' }).click()
+    await expect(page.getByRole('heading', { name: 'Import Confirmation Email' })).toBeVisible()
+
+    // Not real PDF bytes — the endpoint is stubbed above, so only the request shape matters here.
+    await page.getByLabel(/Or upload a PDF confirmation/).setInputFiles({
+      name: 'confirmation.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 fake content for e2e'),
+    })
+
+    await expect(page.getByText('PDF selected: confirmation.pdf')).toBeVisible()
+    // The text field stays empty — the PDF is sent as its own document block, not as text.
+    await expect(page.getByLabel('Confirmation email or booking text')).toHaveValue('')
+
+    await page.getByRole('button', { name: 'Extract' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    await expect(page.getByText(/extracted automatically/i)).toBeVisible()
+    await expect(page.getByLabel('Name')).toHaveValue('Ryokan Yamashiro')
+
+    expect(requestBody?.kind).toBe('pdf')
+    expect(requestBody?.data).toBeTruthy()
+    expect(requestBody?.text).toBeUndefined()
+  } finally {
+    const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
+    if (deleteTripError) throw deleteTripError
+  }
+})
