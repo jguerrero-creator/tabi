@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { FormSheet } from '../../components/ui/FormSheet'
 import { extractReservationFromText } from '../../lib/extractReservation'
 import { strings } from '../../lib/strings'
@@ -13,17 +13,34 @@ interface ImportConfirmationModalProps {
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
 
-// TABI-12: minimal paste-text entry point in front of the extraction endpoint (TABI-8), used
-// to exercise the review/correction flow end-to-end. The real upload channels (email/PDF/photo,
-// TABI-15/23/58) are separate backlog work — this reuses the same extraction + review pipeline
-// they'll eventually feed into.
+// TABI-15: email import channel — paste text (TABI-12's original entry point) or upload the
+// email file itself (.eml/.txt). Both feed the same text into the same extraction endpoint
+// (TABI-8) and the same review/correction pipeline — no separate parsing path for the upload
+// case, per the "one pipeline" rule (a raw .eml's headers/MIME boilerplate are just more text
+// for the extractor to ignore, same as it already ignores prose around the booking details).
+// The remaining upload channels (PDF/photo, TABI-23/58) are separate backlog work.
 export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportConfirmationModalProps) {
   const { trip } = useTrip(tripId)
   const [text, setText] = useState('')
   const [extracting, setExtracting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [prefill, setPrefill] = useState<ExtractedReservationPrefill | null>(null)
   const [manualFallback, setManualFallback] = useState(false)
+
+  function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setFileError(null)
+    const reader = new FileReader()
+    reader.onload = () => setText(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => {
+      console.error('ImportConfirmationModal: failed to read uploaded file', reader.error)
+      setFileError(strings.importConfirmation.fileErrorGeneric)
+    }
+    reader.readAsText(file)
+  }
 
   async function handleExtract(event: FormEvent) {
     event.preventDefault()
@@ -91,6 +108,19 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
       </label>
+
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700">
+          {strings.importConfirmation.fileLabel}
+        </span>
+        <input
+          type="file"
+          accept=".eml,.txt,message/rfc822,text/plain"
+          onChange={handleFileSelect}
+          className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+        />
+      </label>
+      {fileError && <p className="text-sm text-red-600">{fileError}</p>}
 
       {extracting && <p className="text-sm text-slate-500">{strings.importConfirmation.extracting}</p>}
 

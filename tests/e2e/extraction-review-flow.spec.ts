@@ -56,10 +56,10 @@ test('pasted confirmation text is extracted, shown for review, and saved as a re
 
   try {
     await page.goto(`/trips/${trip.id}`)
-    await expect(page.getByRole('button', { name: 'Paste confirmation' })).toBeVisible()
-    await page.getByRole('button', { name: 'Paste confirmation' }).click()
+    await expect(page.getByRole('button', { name: 'Import confirmation' })).toBeVisible()
+    await page.getByRole('button', { name: 'Import confirmation' }).click()
 
-    await expect(page.getByRole('heading', { name: 'Paste Confirmation Text' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Import Confirmation Email' })).toBeVisible()
     await page
       .getByLabel('Confirmation email or booking text')
       .fill(
@@ -112,6 +112,88 @@ test('pasted confirmation text is extracted, shown for review, and saved as a re
   } finally {
     const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)
     if (deleteReservationsError) throw deleteReservationsError
+    const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
+    if (deleteTripError) throw deleteTripError
+  }
+})
+
+// TABI-15 — "Import via copier-coller / upload d'un email de confirmation". The upload half
+// of the same modal: no separate parsing path, the file's raw text is read client-side into the
+// same textarea/extraction call the paste path (above) already exercises.
+test('uploaded .eml file is read into the text field and extracted the same way as pasted text', async ({ page }) => {
+  await page.route('https://maps.googleapis.com/**', (route) => route.abort())
+  await page.route('**/api/extract-reservation', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        result: {
+          type: 'activity',
+          staySubtype: null,
+          transportSubtype: null,
+          name: 'Fushimi Inari Guided Tour',
+          address: 'Fushimi Inari Taisha, Kyoto, Japan',
+          startDateTime: '2026-08-11T09:00:00',
+          endDateTime: null,
+          confirmationNumber: 'XYZ789',
+          price: { amount: 60, currency: 'EUR' },
+        },
+      }),
+    }),
+  )
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({
+      organizer_id: user.id,
+      name: `E2E extraction upload trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'EUR',
+    })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+
+  // A real .eml uses CRLF line endings, but a <textarea>'s .value always normalizes them to
+  // LF on read — assert against LF here so the check reflects what the DOM actually reports.
+  const emlContent =
+    'From: bookings@example.com\nSubject: Your Fushimi Inari Guided Tour\n\n' +
+    'Guided tour confirmed for Aug 11 2026 09:00 at Fushimi Inari Taisha, Kyoto. ' +
+    'Confirmation #XYZ789. Total: 60 EUR'
+
+  try {
+    await page.goto(`/trips/${trip.id}`)
+    await page.getByRole('button', { name: 'Import confirmation' }).click()
+    await expect(page.getByRole('heading', { name: 'Import Confirmation Email' })).toBeVisible()
+
+    await page.getByLabel(/Or upload the email file/).setInputFiles({
+      name: 'confirmation.eml',
+      mimeType: 'message/rfc822',
+      buffer: Buffer.from(emlContent),
+    })
+
+    // The file's raw text lands in the same textarea the paste path uses — proves there's no
+    // separate upload-parsing branch, just a different way of filling the one text field.
+    await expect(page.getByLabel('Confirmation email or booking text')).toHaveValue(emlContent)
+
+    await page.getByRole('button', { name: 'Extract' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    await expect(page.getByText(/extracted automatically/i)).toBeVisible()
+    await expect(page.getByLabel('Name')).toHaveValue('Fushimi Inari Guided Tour')
+  } finally {
     const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
     if (deleteTripError) throw deleteTripError
   }
