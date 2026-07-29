@@ -8,8 +8,8 @@
 // a forced, strict tool call rather than asking the model to emit raw JSON.
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
-import { requireEntitlement } from './_lib/entitlements'
-import { checkRateLimit } from './_lib/rateLimit'
+import { requireEntitlement } from './_lib/entitlements.js'
+import { checkRateLimit } from './_lib/rateLimit.js'
 
 type ExtractKind = 'text' | 'pdf' | 'image'
 

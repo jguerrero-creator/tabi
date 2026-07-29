@@ -4,7 +4,7 @@
 // `plan` itself. Shares the same plan -> features/limits config and
 // checkEntitlement() logic as the client side, so the two can never disagree.
 import { createClient } from '@supabase/supabase-js'
-import { checkEntitlement, type EntitlementCheck, type Plan } from '../../src/lib/entitlements'
+import { checkEntitlement, type EntitlementCheck, type Plan } from '../../src/lib/entitlements.js'
 import type { Database } from '../../src/types/database.types'
 
 export type EntitlementResult =
