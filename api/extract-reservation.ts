@@ -126,7 +126,6 @@ export default async function handler(request: Request): Promise<Response> {
       body: JSON.stringify({
         model: 'claude-opus-4-8',
         max_tokens: 2048,
-        thinking: { type: 'adaptive' },
         system: SYSTEM_PROMPT,
         tools: [EXTRACT_TOOL],
         tool_choice: { type: 'tool', name: EXTRACT_TOOL_NAME },
