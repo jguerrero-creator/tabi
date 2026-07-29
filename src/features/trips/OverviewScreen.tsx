@@ -12,6 +12,7 @@ import type { Reminder } from '../../types/reminder'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { AddReservationModal } from '../reservations/AddReservationModal'
 import { ImportConfirmationModal } from '../reservations/ImportConfirmationModal'
+import { QuickAddModal } from '../reservations/QuickAddModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { OverviewMap } from './OverviewMap'
 import { RemindersSection } from './RemindersSection'
@@ -48,6 +49,9 @@ export function OverviewScreen() {
   // TABI-12: entry point for the extraction-review flow — paste-text, email upload (TABI-15),
   // PDF upload (TABI-23), and photo upload (TABI-58) all live inside ImportConfirmationModal.
   const [showImportModal, setShowImportModal] = useState(false)
+  // TABI-194: ultra-fast placeholder creation — a single free-text line through the same
+  // extraction pipeline/review screen as ImportConfirmationModal, via QuickAddModal.
+  const [showQuickAddModal, setShowQuickAddModal] = useState(false)
   // TABI-131: tab + selected day live in the URL (not local state) so that
   // navigating to a reservation's detail screen and back restores Planning
   // and its selected day instead of remounting to the Overview default.
@@ -142,7 +146,14 @@ export function OverviewScreen() {
 
         {!loading && !error && (
           <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
-            <div className="flex justify-end lg:col-span-2">
+            <div className="flex justify-end gap-2 lg:col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowQuickAddModal(true)}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                {strings.quickAdd.triggerLabel}
+              </button>
               <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
@@ -306,6 +317,18 @@ export function OverviewScreen() {
         <ImportConfirmationModal
           tripId={tripId ?? ''}
           onClose={() => setShowImportModal(false)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+        />
+      )}
+
+      {showQuickAddModal && (
+        <QuickAddModal
+          tripId={tripId ?? ''}
+          onClose={() => setShowQuickAddModal(false)}
           onCreate={async (input) => {
             const created = await createReservation(input)
             await refetchReservations()

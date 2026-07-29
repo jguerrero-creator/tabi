@@ -338,6 +338,17 @@ export const strings = {
     errorGeneric: 'Could not read this confirmation. You can enter it manually instead.',
     manualFallbackCta: 'Enter manually instead',
   },
+  quickAdd: {
+    title: 'Quick Add',
+    triggerLabel: 'Quick add',
+    textLabel: 'Describe the booking in one line',
+    textPlaceholder: 'e.g. Hotel in Kyoto, Aug 10–14',
+    submit: 'Create',
+    cancel: 'Cancel',
+    extracting: 'Reading your entry…',
+    errorGeneric: 'Could not read this entry. You can enter it manually instead.',
+    manualFallbackCta: 'Enter manually instead',
+  },
   addressPicker: {
     title: 'Select an Address',
     cancel: 'Cancel',
