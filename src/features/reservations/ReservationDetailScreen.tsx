@@ -27,6 +27,7 @@ import {
   type GeocodeResult,
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
+import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
@@ -802,6 +803,50 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
           checkInDeadline={reservation.stay_check_in_deadline}
         />
       )}
+      {reservation.type === 'activity' && (
+        <ActivityPlaceFlags
+          rating={reservation.place_rating}
+          userRatingsTotal={reservation.place_user_ratings_total}
+          photoRef={reservation.place_photo_ref}
+          category={reservation.place_category}
+        />
+      )}
+    </div>
+  )
+}
+
+// TABI-49: read-only — this is a Google snapshot taken at bookmark time via the rich
+// Places search (ActivityPlaceSearchModal), never a user-editable field, so unlike the
+// rest of this inline-editable screen there's no edit path for these values.
+function ActivityPlaceFlags({
+  rating,
+  userRatingsTotal,
+  photoRef,
+  category,
+}: {
+  rating: number | null
+  userRatingsTotal: number | null
+  photoRef: string | null
+  category: string | null
+}) {
+  if (rating === null && !photoRef && !category) return null
+  return (
+    <div className="flex items-center gap-3 pt-1">
+      {photoRef && (
+        <img src={placePhotoUrl(photoRef, 100)} alt="" className="h-12 w-12 flex-shrink-0 rounded-md object-cover" />
+      )}
+      <div className="flex flex-wrap gap-2">
+        {rating !== null && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+            {strings.activityPlaceSearch.ratingLabel(rating, userRatingsTotal ?? 0)}
+          </span>
+        )}
+        {category && (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+            {category}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

@@ -105,6 +105,11 @@ export type Database = {
           id: string
           name: string
           note: string | null
+          place_category: string | null
+          place_google_id: string | null
+          place_photo_ref: string | null
+          place_rating: number | null
+          place_user_ratings_total: number | null
           price_amount: number | null
           price_currency: string | null
           start_address: string | null
@@ -139,6 +144,11 @@ export type Database = {
           id?: string
           name: string
           note?: string | null
+          place_category?: string | null
+          place_google_id?: string | null
+          place_photo_ref?: string | null
+          place_rating?: number | null
+          place_user_ratings_total?: number | null
           price_amount?: number | null
           price_currency?: string | null
           start_address?: string | null
@@ -173,6 +183,11 @@ export type Database = {
           id?: string
           name?: string
           note?: string | null
+          place_category?: string | null
+          place_google_id?: string | null
+          place_photo_ref?: string | null
+          place_rating?: number | null
+          place_user_ratings_total?: number | null
           price_amount?: number | null
           price_currency?: string | null
           start_address?: string | null

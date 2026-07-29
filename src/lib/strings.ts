@@ -343,6 +343,17 @@ export const strings = {
     cancel: 'Cancel',
     selectionRequiredError: 'Please select an address from the list, or edit your search.',
   },
+  activityPlaceSearch: {
+    title: 'Find a place',
+    searchLabel: 'Search',
+    searchPlaceholder: 'e.g. a restaurant, museum, or landmark',
+    loading: 'Searching…',
+    emptyResults: 'No places found — try a different search.',
+    errorGeneric: 'Could not search places. Please try again.',
+    manualFallbackCta: 'Enter manually instead',
+    cancel: 'Cancel',
+    ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
+  },
   dayLocation: {
     addCta: '+ Add planned location',
     label: 'Planned location',

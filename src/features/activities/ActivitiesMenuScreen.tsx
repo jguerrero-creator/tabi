@@ -6,12 +6,18 @@ import { MenuSection } from '../../components/menu/MenuSection'
 import { groupByDate } from '../../components/menu/groupByDate'
 import { Spinner } from '../../components/ui/Spinner'
 import { useTrip } from '../trips/useTrip'
-import { AddReservationModal } from '../reservations/AddReservationModal'
+import { AddReservationModal, type ResolvedPlace } from '../reservations/AddReservationModal'
+import { ActivityPlaceSearchModal } from '../reservations/ActivityPlaceSearchModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
 import { formatDateHeader, localDateKey } from '../../lib/datetime'
 import type { Reservation } from '../../types/reservation'
+
+// TABI-49: search box appears before the Activity form (Decision Log:
+// "search-first, prefill form") — a small step machine replaces the single
+// show/hide boolean the Add flow used to need.
+type AddStep = 'search' | 'form' | null
 
 export function ActivitiesMenuScreen() {
   const { tripId } = useParams<{ tripId: string }>()
@@ -23,7 +29,8 @@ export function ActivitiesMenuScreen() {
     refetch: refetchReservations,
   } = useReservationsByType(tripId ?? '', 'activity')
   const { createReservation } = useCreateReservation(tripId ?? '')
-  const [showAddModal, setShowAddModal] = useState(false)
+  const [addStep, setAddStep] = useState<AddStep>(null)
+  const [pendingPlace, setPendingPlace] = useState<ResolvedPlace | null>(null)
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -38,6 +45,11 @@ export function ActivitiesMenuScreen() {
     [reservations],
   )
 
+  function closeAddFlow() {
+    setAddStep(null)
+    setPendingPlace(null)
+  }
+
   return (
     <>
       <MenuHeader
@@ -45,7 +57,7 @@ export function ActivitiesMenuScreen() {
         subtitle={trip?.name}
         count={reservations.length}
         addLabel={strings.activitiesMenu.addCta}
-        onAdd={() => setShowAddModal(true)}
+        onAdd={() => setAddStep('search')}
       />
 
       <main className="px-4 py-4">
@@ -87,11 +99,28 @@ export function ActivitiesMenuScreen() {
         )}
       </main>
 
-      {showAddModal && (
+      {addStep === 'search' && (
+        <ActivityPlaceSearchModal
+          tripId={tripId ?? ''}
+          onSelect={(place) => {
+            setPendingPlace(place)
+            setAddStep('form')
+          }}
+          onSkip={() => {
+            setPendingPlace(null)
+            setAddStep('form')
+          }}
+          onCancel={closeAddFlow}
+        />
+      )}
+
+      {addStep === 'form' && (
         <AddReservationModal
           tripId={tripId ?? ''}
           defaultType="activity"
-          onClose={() => setShowAddModal(false)}
+          initialName={pendingPlace?.placeName ?? null}
+          initialStartPlace={pendingPlace}
+          onClose={closeAddFlow}
           onCreate={async (input) => {
             const created = await createReservation(input)
             await refetchReservations()

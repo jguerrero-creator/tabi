@@ -14,6 +14,12 @@ for (const line of readFileSync(path.join(rootDir, '.env.local'), 'utf8').split(
 
 const geocodeHandler = (await import(path.join(rootDir, 'api/geocode.ts'))).default
 const travelTimeHandler = (await import(path.join(rootDir, 'api/travel-time.ts'))).default
+const placesPhotoHandler = (await import(path.join(rootDir, 'api/places-photo.ts'))).default
+// Note: api/places-search.ts is NOT wired up here, same as api/extract-reservation.ts
+// isn't — both import from ./_lib/*.js, which plain Node ESM can't resolve to the
+// sibling .ts file the way Vite/Vercel's bundlers do. Its e2e coverage stubs the
+// endpoint via page.route() instead (see activity-place-search.spec.ts), matching
+// extraction-review-flow.spec.ts's existing precedent for the same limitation.
 
 const vite = await createServer({
   root: rootDir,
@@ -24,10 +30,12 @@ const vite = await createServer({
 const apiHandlers = {
   '/api/geocode': geocodeHandler,
   '/api/travel-time': travelTimeHandler,
+  '/api/places-photo': placesPhotoHandler,
 }
 
 const server = createHttpServer(async (req, res) => {
-  const handler = req.url ? apiHandlers[req.url] : undefined
+  const pathname = req.url ? new URL(req.url, 'http://localhost').pathname : undefined
+  const handler = pathname ? apiHandlers[pathname] : undefined
   if (req.url?.startsWith('/api/')) {
     if (!handler) {
       res.writeHead(404)

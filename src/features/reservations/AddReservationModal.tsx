@@ -44,7 +44,22 @@ import { useReservationsByType } from './useReservationsByType'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
-export type ResolvedPlace = GeocodeResult & { placeName: string | null }
+export type ResolvedPlace = GeocodeResult & {
+  placeName: string | null
+  /**
+   * TABI-49: only set when this place came from the rich Google Places search
+   * (ActivityPlaceSearchModal) — the plain PlaceAutocompleteField fallback never
+   * populates this, so `place_*` columns stay null for that path, per the Decision
+   * Log's "explicitly distinct from plain autocomplete" requirement.
+   */
+  placeDetails?: {
+    googlePlaceId: string
+    rating: number | null
+    userRatingsTotal: number | null
+    photoRef: string | null
+    category: string | null
+  } | null
+}
 
 // TABI-144: check-in/check-out time is optional for Stay — a standard default
 // (15:00/11:00) is applied when left blank, per TABI-16's original spec.
@@ -440,6 +455,11 @@ export function AddReservationModal({
       end_place_name: option.requiresEndAddress ? (endGeo?.placeName ?? null) : null,
       end_timezone: endAt ? endTimezone : null,
       end_city: option.requiresEndAddress ? (endGeo?.city ?? null) : null,
+      place_google_id: startGeo?.placeDetails?.googlePlaceId ?? null,
+      place_rating: startGeo?.placeDetails?.rating ?? null,
+      place_user_ratings_total: startGeo?.placeDetails?.userRatingsTotal ?? null,
+      place_photo_ref: startGeo?.placeDetails?.photoRef ?? null,
+      place_category: startGeo?.placeDetails?.category ?? null,
     }
 
     if (startAt && endAt && option.dbType !== 'activity') {
