@@ -84,6 +84,14 @@ export default async function handler(request: Request): Promise<Response> {
         continue
       }
 
+      // TABI-36 incident: `sent` previously counted every `resendResponse.ok`
+      // as a real send, but 31 "sent" recaps had zero matching entries in
+      // Resend's own logs — meaning `.ok` alone isn't proof Resend actually
+      // accepted and logged the email. Logging the call and requiring
+      // Resend's own success payload (`{ id: string }`) before counting a
+      // send is how that gap gets caught instead of assumed away.
+      console.log('send-daily-recap: calling Resend', { tripId: trip.id, to: recipient, from: fromAddress })
+
       const resendResponse = await fetch(RESEND_SEND_URL, {
         method: 'POST',
         headers: {
@@ -98,8 +106,26 @@ export default async function handler(request: Request): Promise<Response> {
         }),
       })
 
-      if (!resendResponse.ok) {
-        console.error('send-daily-recap: Resend API error', resendResponse.status, await resendResponse.text())
+      const resendRawBody = await resendResponse.text()
+      let resendParsedBody: { id?: string } | null = null
+      try {
+        resendParsedBody = JSON.parse(resendRawBody)
+      } catch {
+        resendParsedBody = null
+      }
+
+      console.log('send-daily-recap: Resend response', {
+        tripId: trip.id,
+        status: resendResponse.status,
+        body: resendRawBody,
+      })
+
+      if (!resendResponse.ok || !resendParsedBody?.id) {
+        console.error('send-daily-recap: Resend did not confirm a send', {
+          tripId: trip.id,
+          status: resendResponse.status,
+          body: resendRawBody,
+        })
         skipped++
         continue
       }
