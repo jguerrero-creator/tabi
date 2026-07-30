@@ -36,10 +36,12 @@ export default async function handler(request: Request): Promise<Response> {
   const supabase = createClient<Database>(supabaseUrl, serviceRoleKey)
   const today = new Date().toISOString().slice(0, 10)
 
-  const { data: trips, error: tripsError } = await supabase
-    .from('trips')
-    .select('*')
-    .or(`end_date.is.null,end_date.gte.${today}`)
+  // A null end_date is a draft/undated trip, not an "active forever" one —
+  // treating it as still-active fired a recap for every stale test trip ever
+  // created without a date range set (TABI-36 incident: 65 trips matched
+  // instead of the ~31 with a real future end_date). `.gte` already excludes
+  // NULL rows on its own (SQL: NULL >= anything is neither true nor false).
+  const { data: trips, error: tripsError } = await supabase.from('trips').select('*').gte('end_date', today)
 
   if (tripsError) {
     console.error('send-daily-recap: failed to load trips', tripsError)
