@@ -1,5 +1,6 @@
 import { groupByDate, UNSCHEDULED_KEY, type DateGroup } from '../../components/menu/groupByDate'
-import { formatDayPillLabel, localDateKey, localTimeZone } from '../../lib/datetime'
+import { buildDayOccurrences } from '../../lib/dayOccurrences'
+import { formatDayPillLabel, localTimeZone } from '../../lib/datetime'
 import {
   computeDayEdgeFreeBlocks,
   computeFreeTimeBlocks,
@@ -287,34 +288,3 @@ function buildDayEdgesByKey(
   return byKey
 }
 
-/**
- * Expands each multi-night Stay into two occurrences of the same reservation
- * — a check-in entry on its start day, a check-out entry on its end day — so
- * the checkout shows up as a real, timed rail item on its own day instead of
- * only ever being folded into the check-in day's trailing free time. Every
- * other reservation (and a same-day Stay, if one ever existed) passes through
- * as a single occurrence, unchanged.
- */
-function buildDayOccurrences(reservations: Reservation[]): DayItem[] {
-  const occurrences: DayItem[] = []
-
-  for (const reservation of reservations) {
-    if (reservation.type === 'stay' && reservation.start_at && reservation.end_at) {
-      const checkInDay = localDateKey(reservation.start_at, reservation.start_timezone)
-      const checkOutDay = localDateKey(reservation.end_at, reservation.end_timezone)
-      if (checkInDay !== checkOutDay) {
-        occurrences.push({ ...reservation, suppressTrailingFreeBlock: true })
-        occurrences.push({
-          ...reservation,
-          start_at: reservation.end_at,
-          start_timezone: reservation.end_timezone,
-          isCheckoutOccurrence: true,
-        })
-        continue
-      }
-    }
-    occurrences.push(reservation)
-  }
-
-  return occurrences.sort((a, b) => (a.start_at ?? '').localeCompare(b.start_at ?? ''))
-}

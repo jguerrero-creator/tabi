@@ -3,5 +3,8 @@
   "devCommand": "vite --port $PORT",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/send-daily-recap", "schedule": "0 10 * * *" }
   ]
 }
