@@ -122,7 +122,6 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [name, setName] = useState(reservation.name)
   const [note, setNote] = useState(reservation.note ?? '')
   const [priceAmount, setPriceAmount] = useState(reservation.price_amount?.toString() ?? '')
-  const [priceCurrency, setPriceCurrency] = useState(reservation.price_currency ?? '')
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(reservation.stay_parking_included)
   const [checkInDeadline, setCheckInDeadline] = useState(reservation.stay_check_in_deadline?.slice(0, 5) ?? '')
   // TABI-144: check-in/check-out time may be a standard default (see AddReservationModal) —
@@ -372,7 +371,6 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       ...(isAutoNamedTransport ? {} : { name: name.trim() }),
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
-      price_currency: priceCurrency.trim() || null,
       ...(reservation.type === 'stay'
         ? {
             stay_parking_included: parkingIncluded,
@@ -642,13 +640,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
               </Field>
-              <Field label="Currency" className="w-24">
+              <Field label={strings.reservationDetail.currencyLabel} className="w-24">
                 <input
-                  value={priceCurrency}
-                  onChange={(e) => setPriceCurrency(e.target.value.toUpperCase())}
-                  maxLength={3}
-                  placeholder="USD"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-teal-600 focus:outline-none"
+                  value={reservation.price_currency ?? ''}
+                  disabled
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm uppercase text-slate-500"
                 />
               </Field>
             </div>

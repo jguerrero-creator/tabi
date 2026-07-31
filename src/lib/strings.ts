@@ -116,6 +116,7 @@ export const strings = {
     notesLabel: 'Notes',
     notesPlaceholder: 'Add a note…',
     priceLabel: 'Price',
+    currencyLabel: 'Currency',
     startLabel: 'Start',
     endLabel: 'End',
     parkingLabel: 'Parking included',
