@@ -333,6 +333,8 @@ export const strings = {
     photoRemoveCta: 'Remove',
     photoSizeError: 'This photo is too large — try a smaller file, or paste the text instead.',
     photoTypeError: 'Unsupported image format — try a JPEG, PNG, GIF, or WebP file.',
+    urlLabel: 'Or paste a link to a confirmation page',
+    urlPlaceholder: 'https://…',
     submit: 'Extract',
     cancel: 'Cancel',
     extracting: 'Reading your confirmation…',

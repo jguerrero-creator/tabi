@@ -12,6 +12,7 @@ import type { Database } from '../../src/types/database.types'
 // Endpoint name -> max calls per user per day.
 const DAILY_LIMITS = {
   'extract-reservation': 20,
+  'import-url': 20,
   'places-search': 50,
 } as const
 

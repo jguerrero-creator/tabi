@@ -22,11 +22,18 @@ export async function extractReservationFromImage(
   return extract({ kind: 'image', data: base64Data, mediaType })
 }
 
-async function extract(body: Record<string, unknown>): Promise<ExtractedReservation> {
+// TABI-193: URL/crawling channel — fetches the page server-side (api/import-url.ts) and runs it
+// through the same extraction pipeline. Separate endpoint from the others since it does its own
+// SSRF-guarded fetch first, but the same review/correction flow downstream.
+export async function extractReservationFromUrl(url: string): Promise<ExtractedReservation> {
+  return extract({ url }, '/api/import-url')
+}
+
+async function extract(body: Record<string, unknown>, endpoint = '/api/extract-reservation'): Promise<ExtractedReservation> {
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
 
-  const response = await fetch('/api/extract-reservation', {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

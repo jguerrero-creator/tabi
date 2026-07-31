@@ -4,6 +4,7 @@ import {
   extractReservationFromImage,
   extractReservationFromPdf,
   extractReservationFromText,
+  extractReservationFromUrl,
 } from '../../lib/extractReservation'
 import { strings } from '../../lib/strings'
 import type { NewReservation, Reservation } from '../../types/reservation'
@@ -26,12 +27,13 @@ const MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024
 const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
-// TABI-15/23/58: import channels — paste text (TABI-12's original entry point), upload the email
-// file itself (.eml/.txt, read client-side into the same textarea), upload a PDF confirmation
-// (sent as a base64 document, since a PDF can't be read into a textarea), or take/upload a photo
-// of a ticket/receipt (sent as a base64 image). All four feed the same extraction endpoint
-// (TABI-8) and the same review/correction pipeline — no separate parsing path per channel, per
-// the "one pipeline" rule. Text, PDF, and photo are mutually exclusive (selecting one clears the
+// TABI-15/23/58/193: import channels — paste text (TABI-12's original entry point), upload the
+// email file itself (.eml/.txt, read client-side into the same textarea), upload a PDF
+// confirmation (sent as a base64 document, since a PDF can't be read into a textarea), take/upload
+// a photo of a ticket/receipt (sent as a base64 image), or paste a link to a confirmation page
+// (fetched server-side in api/import-url.ts). All five feed the same extraction pipeline (TABI-8)
+// and the same review/correction screen — no separate parsing path per channel, per the "one
+// pipeline" rule. Text, PDF, photo, and URL are mutually exclusive (selecting one clears the
 // others) since only one content block is sent per extraction call.
 export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportConfirmationModalProps) {
   const { trip } = useTrip(tripId)
@@ -46,11 +48,27 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
   const [photoMediaType, setPhotoMediaType] = useState<string | null>(null)
   const [photoFileName, setPhotoFileName] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [url, setUrl] = useState('')
   const [prefill, setPrefill] = useState<ExtractedReservationPrefill | null>(null)
   const [manualFallback, setManualFallback] = useState(false)
 
   function handleTextChange(event: ChangeEvent<HTMLTextAreaElement>) {
     setText(event.target.value)
+    if (pdfData) {
+      setPdfData(null)
+      setPdfFileName(null)
+    }
+    if (photoData) {
+      setPhotoData(null)
+      setPhotoMediaType(null)
+      setPhotoFileName(null)
+    }
+    if (url) setUrl('')
+  }
+
+  function handleUrlChange(event: ChangeEvent<HTMLInputElement>) {
+    setUrl(event.target.value)
+    if (text) setText('')
     if (pdfData) {
       setPdfData(null)
       setPdfFileName(null)
@@ -92,6 +110,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
       const result = typeof reader.result === 'string' ? reader.result : ''
       const base64 = result.slice(result.indexOf(',') + 1)
       setText('')
+      setUrl('')
       setPhotoData(null)
       setPhotoMediaType(null)
       setPhotoFileName(null)
@@ -129,6 +148,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
       const result = typeof reader.result === 'string' ? reader.result : ''
       const base64 = result.slice(result.indexOf(',') + 1)
       setText('')
+      setUrl('')
       setPdfData(null)
       setPdfFileName(null)
       setPhotoData(base64)
@@ -151,7 +171,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
 
   async function handleExtract(event: FormEvent) {
     event.preventDefault()
-    if (!text.trim() && !pdfData && !photoData) return
+    if (!text.trim() && !pdfData && !photoData && !url.trim()) return
     setExtracting(true)
     setError(null)
     try {
@@ -159,7 +179,9 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
         ? await extractReservationFromImage(photoData, photoMediaType ?? 'image/jpeg')
         : pdfData
           ? await extractReservationFromPdf(pdfData)
-          : await extractReservationFromText(text)
+          : url.trim()
+            ? await extractReservationFromUrl(url.trim())
+            : await extractReservationFromText(text)
       setPrefill(mapExtractedReservation(result, trip?.currency ?? null))
     } catch {
       // TABI-11: fall back to manual entry rather than dead-ending on an extraction failure.
@@ -204,7 +226,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
       cancelLabel={strings.importConfirmation.cancel}
       submitLabel={strings.importConfirmation.submit}
       submitting={extracting}
-      submitDisabled={!text.trim() && !pdfData && !photoData}
+      submitDisabled={!text.trim() && !pdfData && !photoData && !url.trim()}
     >
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">
@@ -275,6 +297,17 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
         </p>
       )}
       {photoError && <p className="text-sm text-red-600">{photoError}</p>}
+
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-slate-700">{strings.importConfirmation.urlLabel}</span>
+        <input
+          type="url"
+          value={url}
+          onChange={handleUrlChange}
+          placeholder={strings.importConfirmation.urlPlaceholder}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        />
+      </label>
 
       {extracting && <p className="text-sm text-slate-500">{strings.importConfirmation.extracting}</p>}
 
