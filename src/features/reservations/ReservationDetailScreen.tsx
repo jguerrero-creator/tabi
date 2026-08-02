@@ -122,6 +122,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [name, setName] = useState(reservation.name)
   const [note, setNote] = useState(reservation.note ?? '')
   const [priceAmount, setPriceAmount] = useState(reservation.price_amount?.toString() ?? '')
+  const [confirmationNumber, setConfirmationNumber] = useState(reservation.confirmation_number ?? '')
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(reservation.stay_parking_included)
   const [checkInDeadline, setCheckInDeadline] = useState(reservation.stay_check_in_deadline?.slice(0, 5) ?? '')
   // TABI-144: check-in/check-out time may be a standard default (see AddReservationModal) —
@@ -370,6 +371,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     let patch: Partial<Reservation> = {
       ...(isAutoNamedTransport ? {} : { name: name.trim() }),
       note: note.trim() || null,
+      confirmation_number: confirmationNumber.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
       ...(reservation.type === 'stay'
         ? {
@@ -648,6 +650,15 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 />
               </Field>
             </div>
+            <Field label={strings.reservationDetail.confirmationNumberLabel}>
+              <input
+                type="text"
+                value={confirmationNumber}
+                onChange={(e) => setConfirmationNumber(e.target.value)}
+                placeholder={strings.reservationDetail.confirmationNumberPlaceholder}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
             <Field label={strings.reservationDetail.notesLabel}>
               <textarea
                 value={note}

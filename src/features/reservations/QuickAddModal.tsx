@@ -58,6 +58,7 @@ export function QuickAddModal({ tripId, onClose, onCreate }: QuickAddModalProps)
         initialEndDate={prefill.initialEndDate}
         initialEndTime={prefill.initialEndTime}
         initialPriceAmount={prefill.initialPriceAmount}
+        initialConfirmationNumber={prefill.initialConfirmationNumber}
         initialNote={prefill.initialNote}
         extractionNotice
         onClose={onClose}

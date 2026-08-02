@@ -79,7 +79,7 @@ test('pasted confirmation text is extracted, shown for review, and saved as a re
     await expect(page.getByLabel('End date')).toHaveValue('2026-08-13')
     await expect(page.getByLabel('End time')).toHaveValue('11:00')
     await expect(page.getByLabel('Price')).toHaveValue('450')
-    await expect(page.getByLabel('Notes')).toHaveValue('Confirmation: ABC123')
+    await expect(page.getByLabel('Confirmation number')).toHaveValue('ABC123')
 
     // Correct one extracted field, as the ticket's spec requires the user be able to.
     await page.getByLabel('Name').fill('Hotel Sakura Kyoto (corrected)')
@@ -102,7 +102,7 @@ test('pasted confirmation text is extracted, shown for review, and saved as a re
     expect(created.name).toBe('Hotel Sakura Kyoto (corrected)')
     expect(created.type).toBe('stay')
     expect(created.stay_subtype).toBe('hotel')
-    expect(created.note).toBe('Confirmation: ABC123')
+    expect(created.confirmation_number).toBe('ABC123')
     expect(created.price_amount).toBe(450)
     expect(created.price_currency).toBe('EUR')
     expect(created.status).toBe('to_book')

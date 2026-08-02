@@ -14,6 +14,7 @@ export interface ExtractedReservationPrefill {
   initialEndDate: string | null
   initialEndTime: string | null
   initialPriceAmount: number | null
+  initialConfirmationNumber: string | null
   initialNote: string | null
 }
 
@@ -32,7 +33,6 @@ export function mapExtractedReservation(
   const priceMatchesTripCurrency = extracted.price !== null && (!tripCurrency || extracted.price.currency === tripCurrency)
 
   const noteLines: string[] = []
-  if (extracted.confirmationNumber) noteLines.push(`Confirmation: ${extracted.confirmationNumber}`)
   if (extracted.price && !priceMatchesTripCurrency) {
     noteLines.push(`Extracted price: ${extracted.price.amount} ${extracted.price.currency}`)
   }
@@ -50,6 +50,7 @@ export function mapExtractedReservation(
     initialEndDate: end?.date ?? null,
     initialEndTime: end?.time ?? null,
     initialPriceAmount: priceMatchesTripCurrency ? (extracted.price?.amount ?? null) : null,
+    initialConfirmationNumber: extracted.confirmationNumber,
     initialNote: noteLines.length > 0 ? noteLines.join('\n') : null,
   }
 }

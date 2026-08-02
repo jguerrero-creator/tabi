@@ -116,6 +116,7 @@ interface AddReservationModalProps {
   initialEndDate?: string | null
   initialEndTime?: string | null
   initialPriceAmount?: number | null
+  initialConfirmationNumber?: string | null
   initialNote?: string | null
   extractionNotice?: boolean
   onClose: () => void
@@ -142,6 +143,7 @@ export function AddReservationModal({
   initialEndDate = null,
   initialEndTime = null,
   initialPriceAmount = null,
+  initialConfirmationNumber = null,
   initialNote = null,
   extractionNotice = false,
   onClose,
@@ -190,6 +192,7 @@ export function AddReservationModal({
   const [durationHours, setDurationHours] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
   const [priceAmount, setPriceAmount] = useState(() => (initialPriceAmount != null ? String(initialPriceAmount) : ''))
+  const [confirmationNumber, setConfirmationNumber] = useState(initialConfirmationNumber ?? '')
   const [note, setNote] = useState(initialNote ?? '')
   const [geocoding, setGeocoding] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -439,6 +442,7 @@ export function AddReservationModal({
       stay_check_in_deadline: option.dbType === 'stay' && checkInDeadline ? checkInDeadline : null,
       name: resolvedName,
       status,
+      confirmation_number: confirmationNumber.trim() || null,
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
       // TABI-16: no currency selector here — currency is always inherited from the trip.
@@ -825,6 +829,16 @@ export function AddReservationModal({
             />
             {trip?.currency && <span className="shrink-0 text-sm text-slate-500">{trip.currency}</span>}
           </div>
+        </Field>
+
+        <Field label={strings.addReservation.confirmationNumberLabel}>
+          <input
+            type="text"
+            value={confirmationNumber}
+            onChange={(event) => setConfirmationNumber(event.target.value)}
+            placeholder={strings.addReservation.confirmationNumberPlaceholder}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </Field>
 
         <Field label={strings.addReservation.notesLabel}>

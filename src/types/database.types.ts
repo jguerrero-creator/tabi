@@ -93,6 +93,7 @@ export type Database = {
       }
       reservations: {
         Row: {
+          confirmation_number: string | null
           created_at: string
           end_address: string | null
           end_at: string | null
@@ -132,6 +133,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          confirmation_number?: string | null
           created_at?: string
           end_address?: string | null
           end_at?: string | null
@@ -171,6 +173,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          confirmation_number?: string | null
           created_at?: string
           end_address?: string | null
           end_at?: string | null

@@ -49,11 +49,13 @@ test('a reservation can be edited and deleted from the detail screen', async ({ 
     await expect(page.getByRole('heading', { name: `E2E activity ${runId}` })).toBeVisible()
 
     // Edit: the form is always editable — no "Edit" button to unlock it first.
-    // Change the name and a note, save, and confirm it persisted (both in the
-    // UI and via a direct re-fetch from the DB).
+    // Change the name, a note, and the confirmation number (TABI-197 — its own
+    // field, not folded into Notes), save, and confirm it persisted (both in
+    // the UI and via a direct re-fetch from the DB).
     const updatedName = `E2E activity EDITED ${runId}`
     await page.getByLabel('Name').fill(updatedName)
     await page.getByLabel('Notes').fill('Edited via e2e test')
+    await page.getByLabel('Confirmation number').fill('CONF-999')
 
     const [updateResponse] = await Promise.all([
       page.waitForResponse(
@@ -74,6 +76,7 @@ test('a reservation can be edited and deleted from the detail screen', async ({ 
     if (afterEditError) throw afterEditError
     expect(afterEdit.name).toBe(updatedName)
     expect(afterEdit.note).toBe('Edited via e2e test')
+    expect(afterEdit.confirmation_number).toBe('CONF-999')
 
     // Delete: confirm dialog, then verify navigation away and DB removal.
     page.once('dialog', (dialog) => dialog.accept())
