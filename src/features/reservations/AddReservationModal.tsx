@@ -110,6 +110,7 @@ interface AddReservationModalProps {
   defaultStaySubtype?: StaySubtype
   initialName?: string | null
   initialStartAddressText?: string | null
+  initialEndAddressText?: string | null
   initialStartDate?: string | null
   initialStartTime?: string | null
   initialEndDate?: string | null
@@ -135,6 +136,7 @@ export function AddReservationModal({
   initialEndPlace = null,
   initialName = null,
   initialStartAddressText = null,
+  initialEndAddressText = null,
   initialStartDate = null,
   initialStartTime = null,
   initialEndDate = null,
@@ -162,7 +164,9 @@ export function AddReservationModal({
   const [startAddress, setStartAddress] = useState(
     () => initialStartPlace?.formattedAddress ?? initialStartAddressText ?? '',
   )
-  const [endAddress, setEndAddress] = useState(() => initialEndPlace?.formattedAddress ?? '')
+  const [endAddress, setEndAddress] = useState(
+    () => initialEndPlace?.formattedAddress ?? initialEndAddressText ?? '',
+  )
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(() => initialStartPlace)
   const [endPlace, setEndPlace] = useState<ResolvedPlace | null>(() => initialEndPlace)
   const [startDate, setStartDate] = useState(() =>

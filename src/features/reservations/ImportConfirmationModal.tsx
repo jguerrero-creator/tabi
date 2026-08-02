@@ -201,6 +201,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
         defaultTransportSubtype={prefill.defaultTransportSubtype}
         initialName={prefill.initialName}
         initialStartAddressText={prefill.initialStartAddressText}
+        initialEndAddressText={prefill.initialEndAddressText}
         initialStartDate={prefill.initialStartDate}
         initialStartTime={prefill.initialStartTime}
         initialEndDate={prefill.initialEndDate}

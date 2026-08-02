@@ -8,7 +8,8 @@ export interface ExtractedReservation {
   staySubtype: StaySubtype | null
   transportSubtype: TransportSubtype | null
   name: string | null
-  address: string | null
+  startAddress: string | null
+  endAddress: string | null
   startDateTime: string | null
   endDateTime: string | null
   confirmationNumber: string | null

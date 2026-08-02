@@ -8,6 +8,7 @@ export interface ExtractedReservationPrefill {
   defaultTransportSubtype: TransportSubtype
   initialName: string | null
   initialStartAddressText: string | null
+  initialEndAddressText: string | null
   initialStartDate: string | null
   initialStartTime: string | null
   initialEndDate: string | null
@@ -42,7 +43,8 @@ export function mapExtractedReservation(
     defaultStaySubtype: extracted.staySubtype ?? 'hotel',
     defaultTransportSubtype: extracted.transportSubtype ?? 'point_to_point',
     initialName: extracted.name,
-    initialStartAddressText: extracted.address,
+    initialStartAddressText: extracted.startAddress,
+    initialEndAddressText: extracted.endAddress,
     initialStartDate: start?.date ?? null,
     initialStartTime: start?.time ?? null,
     initialEndDate: end?.date ?? null,
