@@ -39,7 +39,7 @@ V0.5 scope is built, tested, and verified in production. V1 work has started (se
 11. **Errors must never be swallowed silently.** Every catch block that discards the real error (Supabase error, network failure) and falls back to a generic string is a bug — always `console.error` the real error (dev-visible, never user-facing) via the shared `logError`-style helper, even if the user-facing message stays simple.
  
 **Entitlements & compliance**
-12. **Entitlements layer** — client- and server-side both wired now (`requireEntitlement()` gates `/api/extract-reservation` on `aiAccess`, verified in prod). `free.aiAccess` is deliberately `true` today (no paid plan exists yet) — the gate is real infrastructure, just not restricting anyone yet. When a real paid tier is introduced, flip the relevant `free.*` flags rather than adding new ad-hoc checks.
+12. **Entitlements layer** — client- and server-side both wired now (`requireEntitlement()` gates `/api/extract-reservation` and `/api/import-url` on `aiAccess`; the AI trigger buttons on Overview grey out client-side via the same check, TABI-99). `free.aiAccess` is deliberately `true` today (no paid plan exists yet) — the gate is real infrastructure, just not restricting anyone yet. When a real paid tier is introduced, flip the relevant `free.*` flags rather than adding new ad-hoc checks.
 13. **Public privacy policy is mandatory**, independent of any analytics decision — required by Google Maps Platform's terms and GDPR. Broader analytics is opt-in, anonymized, and a separate lower-priority decision.
  
 **UI conventions**

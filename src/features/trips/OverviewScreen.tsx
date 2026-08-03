@@ -5,6 +5,7 @@ import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDayPillLabel, formatInZone, formatTripDateRange } from '../../lib/datetime'
 import { strings } from '../../lib/strings'
+import { useProfile } from '../../lib/useProfile'
 import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
@@ -52,6 +53,12 @@ export function OverviewScreen() {
   // TABI-194: ultra-fast placeholder creation — a single free-text line through the same
   // extraction pipeline/review screen as ImportConfirmationModal, via QuickAddModal.
   const [showQuickAddModal, setShowQuickAddModal] = useState(false)
+  // TABI-99: client-side entitlement check, display-only (greys out the trigger and
+  // explains why) — the server-side gate on /api/extract-reservation and /api/import-url
+  // is what actually enforces this. `free.aiAccess` is true today (TABI-177), so this never
+  // disables the buttons as a side effect until a real paid tier changes that flag.
+  const { profile, can } = useProfile()
+  const aiAccessDenied = profile !== null && !can({ feature: 'aiAccess' })
   // TABI-131: tab + selected day live in the URL (not local state) so that
   // navigating to a reservation's detail screen and back restores Planning
   // and its selected day instead of remounting to the Overview default.
@@ -150,14 +157,18 @@ export function OverviewScreen() {
               <button
                 type="button"
                 onClick={() => setShowQuickAddModal(true)}
-                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                disabled={aiAccessDenied}
+                title={aiAccessDenied ? strings.overview.aiAccessRequired : undefined}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 {strings.quickAdd.triggerLabel}
               </button>
               <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
-                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                disabled={aiAccessDenied}
+                title={aiAccessDenied ? strings.overview.aiAccessRequired : undefined}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 {strings.importConfirmation.triggerLabel}
               </button>

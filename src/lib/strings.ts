@@ -158,6 +158,7 @@ export const strings = {
     expandMap: 'Expand map',
     needsAttentionTitle: 'Needs attention',
     needsAttentionEmpty: 'Nothing needs attention right now.',
+    aiAccessRequired: "AI-assisted import isn't available on your plan.",
   },
   planning: {
     unscheduledLabel: 'Unscheduled',
