@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-172 — the "Planning" nav button is lg:hidden on the desktop layout
@@ -23,6 +23,7 @@ test.use({ viewport: { width: 390, height: 844 } })
 
 test('Planning shows one day at a time via day-tabs, with a cross-day free/travel block correctly placed', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -41,6 +42,7 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const stayName = `E2E timeline stay ${runId}`

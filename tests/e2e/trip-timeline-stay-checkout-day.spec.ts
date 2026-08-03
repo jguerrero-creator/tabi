@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // Forces the mobile layout — see trip-timeline-day-edge-arrival-timezone.spec.ts
@@ -17,6 +17,7 @@ test.use({ viewport: { width: 390, height: 844 } })
 
 test('a multi-night Stay shows a Check-out row and correctly split free time on its own checkout day', async ({
   page,
+  registerTrip,
 }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.goto('/')
@@ -44,6 +45,7 @@ test('a multi-night Stay shows a Check-out row and correctly split free time on 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const stayName = `E2E stay checkout ${runId}`

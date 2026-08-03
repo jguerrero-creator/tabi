@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-111 — "Date de début pré-remplie intelligemment (première date non
@@ -7,7 +7,7 @@ import { authenticatedClientFor } from './support/auth'
 // Stay reservation (reusing TABI-81's coverage-gap detection) — or the
 // trip's own start date if nothing is booked yet.
 
-test('the Add Reservation start date prefills to the trip start when no stay is booked yet', async ({ page }) => {
+test('the Add Reservation start date prefills to the trip start when no stay is booked yet', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -31,6 +31,7 @@ test('the Add Reservation start date prefills to the trip start when no stay is 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)
@@ -46,7 +47,7 @@ test('the Add Reservation start date prefills to the trip start when no stay is 
   }
 })
 
-test('the Add Reservation start date prefills to the first uncovered night when a gap exists', async ({ page }) => {
+test('the Add Reservation start date prefills to the first uncovered night when a gap exists', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -70,6 +71,7 @@ test('the Add Reservation start date prefills to the first uncovered night when 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     // Covers the first three nights (Dec 1-4 UTC, matching the trip's UTC date keys); Dec 4
@@ -102,7 +104,7 @@ test('the Add Reservation start date prefills to the first uncovered night when 
   }
 })
 
-test('the Add Reservation start date is not prefilled for a non-Stay type', async ({ page }) => {
+test('the Add Reservation start date is not prefilled for a non-Stay type', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -126,6 +128,7 @@ test('the Add Reservation start date is not prefilled for a non-Stay type', asyn
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/transport`)

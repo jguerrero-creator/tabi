@@ -1,11 +1,11 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-194 — "Ajout rapide en une ligne de texte libre (même pipeline d'extraction IA)". Same
 // extraction endpoint and review screen as ImportConfirmationModal (TABI-12), just a lighter
 // single-line entry point — this proves it's wired into the SAME pipeline, not a separate one.
 
-test('one-line quick add is extracted and reviewed on the same shared Add sheet', async ({ page }) => {
+test('one-line quick add is extracted and reviewed on the same shared Add sheet', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
 
   let requestBody: { kind?: string; text?: string } | null = null
@@ -53,6 +53,7 @@ test('one-line quick add is extracted and reviewed on the same shared Add sheet'
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)
@@ -101,7 +102,7 @@ test('one-line quick add is extracted and reviewed on the same shared Add sheet'
 
 // TABI-11 applies here too: a failed extraction on the quick-add path must fall back to the
 // same clean manual-entry form, not dead-end.
-test('a failed quick-add extraction falls back to manual entry', async ({ page }) => {
+test('a failed quick-add extraction falls back to manual entry', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.route('**/api/extract-reservation', (route) =>
     route.fulfill({
@@ -133,6 +134,7 @@ test('a failed quick-add extraction falls back to manual entry', async ({ page }
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)

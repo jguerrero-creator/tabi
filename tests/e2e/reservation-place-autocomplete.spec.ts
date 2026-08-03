@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-133 — Google Places Autocomplete on address fields. Exercises the
@@ -12,7 +12,7 @@ test.skip(
   'requires VITE_GOOGLE_MAPS_API_KEY configured in .env.local to hit the real Places Autocomplete API',
 )
 
-test('selecting an Autocomplete suggestion by click fills the address and saves coordinates', async ({ page }) => {
+test('selecting an Autocomplete suggestion by click fills the address and saves coordinates', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -36,6 +36,7 @@ test('selecting an Autocomplete suggestion by click fills the address and saves 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)
@@ -88,6 +89,7 @@ test('selecting an Autocomplete suggestion by click fills the address and saves 
 
 test('selecting an Autocomplete suggestion via keyboard fills the address and saves coordinates', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -112,6 +114,7 @@ test('selecting an Autocomplete suggestion via keyboard fills the address and sa
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)

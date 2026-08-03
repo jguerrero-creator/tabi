@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-12 — "Écran de vérification/correction des données extraites". The AI extraction
@@ -7,7 +7,7 @@ import { authenticatedClientFor } from './support/auth'
 // paste-text entry point, mapping the extraction onto the shared Add sheet's prefill fields,
 // the "extracted automatically" review banner, and saving the (possibly corrected) result.
 
-test('pasted confirmation text is extracted, shown for review, and saved as a reservation', async ({ page }) => {
+test('pasted confirmation text is extracted, shown for review, and saved as a reservation', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.route('**/api/extract-reservation', (route) =>
     route.fulfill({
@@ -54,6 +54,7 @@ test('pasted confirmation text is extracted, shown for review, and saved as a re
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)
@@ -121,7 +122,7 @@ test('pasted confirmation text is extracted, shown for review, and saved as a re
 // TABI-15 — "Import via copier-coller / upload d'un email de confirmation". The upload half
 // of the same modal: no separate parsing path, the file's raw text is read client-side into the
 // same textarea/extraction call the paste path (above) already exercises.
-test('uploaded .eml file is read into the text field and extracted the same way as pasted text', async ({ page }) => {
+test('uploaded .eml file is read into the text field and extracted the same way as pasted text', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.route('**/api/extract-reservation', (route) =>
     route.fulfill({
@@ -167,6 +168,7 @@ test('uploaded .eml file is read into the text field and extracted the same way 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   // A real .eml uses CRLF line endings, but a <textarea>'s .value always normalizes them to
   // LF on read — assert against LF here so the check reflects what the DOM actually reports.
@@ -205,7 +207,7 @@ test('uploaded .eml file is read into the text field and extracted the same way 
 // shared textarea like the .eml channel above, so it's sent as a base64 'pdf' document straight
 // to the same extraction endpoint (api/extract-reservation.ts already supported this kind since
 // TABI-8) — still one pipeline, just a different request shape for this one channel.
-test('uploaded PDF is sent as a base64 document and extracted into the same review screen', async ({ page }) => {
+test('uploaded PDF is sent as a base64 document and extracted into the same review screen', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
 
   let requestBody: { kind?: string; data?: string; text?: string } | null = null
@@ -254,6 +256,7 @@ test('uploaded PDF is sent as a base64 document and extracted into the same revi
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)
@@ -290,7 +293,7 @@ test('uploaded PDF is sent as a base64 document and extracted into the same revi
 // read into the shared textarea either, so it's sent as a base64 'image' block (with its mime
 // type) straight to the same extraction endpoint (api/extract-reservation.ts already supported
 // this kind since TABI-8) — still one pipeline, just a different request shape for this channel.
-test('uploaded photo is sent as a base64 image and extracted into the same review screen', async ({ page }) => {
+test('uploaded photo is sent as a base64 image and extracted into the same review screen', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
 
   let requestBody: { kind?: string; data?: string; text?: string; mediaType?: string } | null = null
@@ -339,6 +342,7 @@ test('uploaded photo is sent as a base64 image and extracted into the same revie
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)
@@ -383,7 +387,7 @@ test('uploaded photo is sent as a base64 image and extracted into the same revie
 // (no separate failure-recovery screen). The "incomplete but not failed" half of the ticket is
 // already covered by extraction-review-flow's other tests, which extract a reservation with some
 // fields null (e.g. endDateTime above) and land on the same reviewable/editable form.
-test('a failed extraction shows an error and falls back to a clean manual-entry form', async ({ page }) => {
+test('a failed extraction shows an error and falls back to a clean manual-entry form', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.route('**/api/extract-reservation', (route) =>
     route.fulfill({
@@ -415,6 +419,7 @@ test('a failed extraction shows an error and falls back to a clean manual-entry 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)

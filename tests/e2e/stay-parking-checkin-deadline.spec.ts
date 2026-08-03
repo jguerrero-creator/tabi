@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-70 — "Deadline de check-in + parking mis en avant pour chaque
@@ -8,7 +8,7 @@ import { authenticatedClientFor } from './support/auth'
 // sheet, seeing the resulting flag badges in the Stay list and on the detail
 // screen, then editing them from the detail screen.
 
-test('parking + check-in deadline flags on a Stay reservation', async ({ page }) => {
+test('parking + check-in deadline flags on a Stay reservation', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -32,6 +32,7 @@ test('parking + check-in deadline flags on a Stay reservation', async ({ page })
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)

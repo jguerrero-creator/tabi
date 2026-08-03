@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-63 — "Stockage des timestamps en UTC + fuseau horaire par lieu".
@@ -11,7 +11,7 @@ import { authenticatedClientFor } from './support/auth'
 
 const SHARED_INSTANT_UTC = '2026-08-10T23:30:00.000Z'
 
-test('the same UTC instant renders as the correct local time for each leg timezone', async ({ page }) => {
+test('the same UTC instant renders as the correct local time for each leg timezone', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -35,6 +35,7 @@ test('the same UTC instant renders as the correct local time for each leg timezo
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { data: created, error: reservationError } = await client

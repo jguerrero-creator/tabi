@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import type { Page } from '@playwright/test'
 import { authenticatedClientFor } from './support/auth'
 
@@ -8,7 +8,7 @@ import { authenticatedClientFor } from './support/auth'
 // (anonymous) user never sees another user's trips — trips are scoped to the
 // user identity, not global.
 
-test('a user can create multiple trips, and another user never sees them', async ({ browser }) => {
+test('a user can create multiple trips, and another user never sees them', async ({ browser, registerTrip }) => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const tripAlpha = `E2E Alpha ${runId}`
   const tripBeta = `E2E Beta ${runId}`
@@ -24,7 +24,9 @@ test('a user can create multiple trips, and another user never sees them', async
 
   try {
     const idAlpha = await createTrip(pageA, tripAlpha)
+    registerTrip(clientA, idAlpha)
     const idBeta = await createTrip(pageA, tripBeta)
+    registerTrip(clientA, idBeta)
     createdTripIds.push(idAlpha, idBeta)
 
     // Same user, both trips visible together — multi-trip support.

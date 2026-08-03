@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-167 — billing-disabled/quota-exceeded/invalid-key failures on the Maps
@@ -16,6 +16,7 @@ test.skip(
 
 test('window.gm_authFailure shows the map fallback instead of leaving the map silently broken', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -40,6 +41,7 @@ test('window.gm_authFailure shows the map fallback instead of leaving the map si
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { data: reservation, error: reservationError } = await client

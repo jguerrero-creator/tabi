@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-5 — "Support de plusieurs types de réservation". Spec: "Le type de
@@ -12,7 +12,7 @@ import { authenticatedClientFor } from './support/auth'
 const START_AT = '2026-09-01T10:00:00.000Z'
 const END_AT = '2026-09-01T14:00:00.000Z'
 
-test('reservation type determines the icon and the fields shown on the detail screen', async ({ page }) => {
+test('reservation type determines the icon and the fields shown on the detail screen', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -36,6 +36,7 @@ test('reservation type determines the icon and the fields shown on the detail sc
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { data: reservations, error: reservationsError } = await client

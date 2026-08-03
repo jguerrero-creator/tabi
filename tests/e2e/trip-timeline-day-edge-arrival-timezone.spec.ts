@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // Forces the mobile layout (the desktop responsive layout, `lg:hidden`,
@@ -27,6 +27,7 @@ test.use({ viewport: { width: 390, height: 844 } })
 
 test('trailing free block after an international arrival uses the arrival timezone, not the departure timezone (TABI-165)', async ({
   page,
+  registerTrip,
 }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.goto('/')
@@ -54,6 +55,7 @@ test('trailing free block after an international arrival uses the arrival timezo
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const flightName = `E2E CDG-HND overnight ${runId}`

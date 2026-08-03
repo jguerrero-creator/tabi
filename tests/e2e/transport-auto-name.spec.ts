@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-122 — "Nom auto-généré à partir du trajet (transport point-à-point)". Spec: for
@@ -9,6 +9,7 @@ import { authenticatedClientFor } from './support/auth'
 
 test('point-to-point transport gets its name auto-generated from the route, with no free-text name field', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -33,6 +34,7 @@ test('point-to-point transport gets its name auto-generated from the route, with
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/transport`)

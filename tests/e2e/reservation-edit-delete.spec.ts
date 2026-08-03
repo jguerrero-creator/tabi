@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-27 — "Édition / suppression d'une réservation". Verifies both halves
@@ -7,7 +7,7 @@ import { authenticatedClientFor } from './support/auth'
 // the row and navigates away. Per TABI-85's correction, the form is always
 // editable — there is no separate "Edit" button to unlock it first.
 
-test('a reservation can be edited and deleted from the detail screen', async ({ page }) => {
+test('a reservation can be edited and deleted from the detail screen', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -31,6 +31,7 @@ test('a reservation can be edited and deleted from the detail screen', async ({ 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { data: reservation, error: reservationError } = await client

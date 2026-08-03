@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-108/109 — overlap detection reuses the trip's date-range semantics
@@ -8,6 +8,7 @@ import { authenticatedClientFor } from './support/auth'
 
 test('adding a reservation that overlaps an existing same-type reservation asks for confirmation', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -32,6 +33,7 @@ test('adding a reservation that overlaps an existing same-type reservation asks 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const existingName = `E2E overlap existing ${runId}`

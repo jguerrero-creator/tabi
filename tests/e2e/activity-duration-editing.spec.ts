@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-181 — Add Reservation: Activity replaces the end date/time fields with a duration
@@ -6,7 +6,7 @@ import { authenticatedClientFor } from './support/auth'
 // TABI-182 — Detail screen: previously there was no UI at all to edit an Activity's start
 // date/time or add a missing end/duration once it existed without one.
 
-test('Activity duration is entered on add and editable on the detail screen', async ({ page }) => {
+test('Activity duration is entered on add and editable on the detail screen', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -30,6 +30,7 @@ test('Activity duration is entered on add and editable on the detail screen', as
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     // --- TABI-182: an Activity that already exists with a start but no end/duration ---

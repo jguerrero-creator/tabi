@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-112 — "Saisie par nombre de nuitées plutôt que date de sortie
@@ -6,7 +6,7 @@ import { authenticatedClientFor } from './support/auth'
 // entry. Checkout date is computed (check-in + nights) and shown read-only,
 // with a toggle to fall back to manual checkout-date entry if needed.
 
-test('entering nights computes a read-only checkout date for a Stay reservation', async ({ page }) => {
+test('entering nights computes a read-only checkout date for a Stay reservation', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -30,6 +30,7 @@ test('entering nights computes a read-only checkout date for a Stay reservation'
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)
@@ -77,7 +78,7 @@ test('entering nights computes a read-only checkout date for a Stay reservation'
   }
 })
 
-test('the manual checkout toggle switches to a directly editable end date and back', async ({ page }) => {
+test('the manual checkout toggle switches to a directly editable end date and back', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -101,6 +102,7 @@ test('the manual checkout toggle switches to a directly editable end date and ba
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)
@@ -130,7 +132,7 @@ test('the manual checkout toggle switches to a directly editable end date and ba
   }
 })
 
-test('submitting a Stay reservation without nights shows a nights-specific error', async ({ page }) => {
+test('submitting a Stay reservation without nights shows a nights-specific error', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -154,6 +156,7 @@ test('submitting a Stay reservation without nights shows a nights-specific error
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)
@@ -183,7 +186,7 @@ test('submitting a Stay reservation without nights shows a nights-specific error
 // (reservation-detail-nights-validation.spec.ts); this closes the matching gap on the
 // add flow, which only had blank-nights coverage until now.
 for (const invalidNights of ['0', '-1']) {
-  test(`entering ${invalidNights} nights shows a clear error, not a silent block`, async ({ page }) => {
+  test(`entering ${invalidNights} nights shows a clear error, not a silent block`, async ({ page, registerTrip }) => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -207,6 +210,7 @@ for (const invalidNights of ['0', '-1']) {
       .select()
       .single()
     if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+    registerTrip(client, trip.id)
 
     try {
       await page.goto(`/trips/${trip.id}/stay`)

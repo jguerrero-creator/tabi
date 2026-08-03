@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-124 — "Location de véhicule: jours couverts suivent les lieux
@@ -18,6 +18,7 @@ const NARA_PARK = { lat: 34.688643, lng: 135.840406 }
 
 test('an at-disposal rental leg to a mid-rental activity uses the day planned location, not drop-off', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -42,6 +43,7 @@ test('an at-disposal rental leg to a mid-rental activity uses the day planned lo
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   const activityName = `E2E mid-rental activity ${runId}`
 

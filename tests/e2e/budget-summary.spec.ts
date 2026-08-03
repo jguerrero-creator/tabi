@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-55 — "Vue Budget agrégée automatiquement depuis les réservations". Spec:
@@ -12,7 +12,7 @@ import { authenticatedClientFor } from './support/auth'
 const START_AT = '2026-09-01T10:00:00.000Z'
 const END_AT = '2026-09-01T14:00:00.000Z'
 
-test('budget screen sums prices by category and flags partially-priced trips', async ({ page }) => {
+test('budget screen sums prices by category and flags partially-priced trips', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -36,6 +36,7 @@ test('budget screen sums prices by category and flags partially-priced trips', a
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { error: reservationsError } = await client.from('reservations').insert([
@@ -94,7 +95,7 @@ test('budget screen sums prices by category and flags partially-priced trips', a
   }
 })
 
-test('budget screen shows the empty state when the trip has no reservations', async ({ page }) => {
+test('budget screen shows the empty state when the trip has no reservations', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -118,6 +119,7 @@ test('budget screen shows the empty state when the trip has no reservations', as
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/budget`)

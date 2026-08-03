@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-144 — "Indicateur + édition de l'heure de check-in par défaut, modifiable
@@ -8,7 +8,7 @@ import { authenticatedClientFor } from './support/auth'
 // sheet, seeing the resulting default flags + badges, then editing the check-in
 // time from the detail screen to confirm it clears the flag.
 
-test('Stay check-in/check-out defaults to 15:00/11:00 when left blank, editable later', async ({ page }) => {
+test('Stay check-in/check-out defaults to 15:00/11:00 when left blank, editable later', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -32,6 +32,7 @@ test('Stay check-in/check-out defaults to 15:00/11:00 when left blank, editable 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)

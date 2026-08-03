@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // Mobile viewport: the day-tab pills and single-day rail (where the "+" on a
@@ -14,7 +14,7 @@ test.use({ viewport: { width: 390, height: 844 } })
 // type selector opens expanded (Activity/Stay/Transport), forcing an
 // explicit choice instead of silently assuming one.
 
-test('a manual block can be added from a free-time slot on the Planning rail', async ({ page }) => {
+test('a manual block can be added from a free-time slot on the Planning rail', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -32,6 +32,7 @@ test('a manual block can be added from a free-time slot on the Planning rail', a
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const stayName = `E2E manual-block stay ${runId}`

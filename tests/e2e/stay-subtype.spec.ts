@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-125 — "Sous-type Hébergement sélectionnable (Hôtel/Camping/Airbnb/
@@ -8,7 +8,7 @@ import { authenticatedClientFor } from './support/auth'
 // origin menu, not re-selected. Symmetric to TABI-121 (transport sub-type).
 // Exercises picking a non-default sub-type (Camping) end to end.
 
-test('selecting a Stay sub-type in the Add sheet persists stay_subtype', async ({ page }) => {
+test('selecting a Stay sub-type in the Add sheet persists stay_subtype', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -32,6 +32,7 @@ test('selecting a Stay sub-type in the Add sheet persists stay_subtype', async (
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)

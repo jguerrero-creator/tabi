@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-110 — a same-type overlap confirmed at save time (TABI-108/109) renders
@@ -15,6 +15,7 @@ function dateHeader(isoUtc: string, timeZone: string): string {
 
 test('a confirmed overlapping stay renders nested under the longer stay, not as its own date section', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -33,6 +34,7 @@ test('a confirmed overlapping stay renders nested under the longer stay, not as 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const mainName = `E2E nesting main stay ${runId}`
@@ -93,7 +95,7 @@ test('a confirmed overlapping stay renders nested under the longer stay, not as 
   }
 })
 
-test('a confirmed overlapping transport reservation renders nested under the longer one', async ({ page }) => {
+test('a confirmed overlapping transport reservation renders nested under the longer one', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -111,6 +113,7 @@ test('a confirmed overlapping transport reservation renders nested under the lon
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const mainName = `E2E nesting main rental ${runId}`

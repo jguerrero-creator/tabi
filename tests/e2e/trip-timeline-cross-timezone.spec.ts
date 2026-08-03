@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-172 — the "Planning" nav button is lg:hidden on the desktop layout
@@ -15,7 +15,7 @@ test.use({ viewport: { width: 390, height: 844 } })
 // so no travel-time lookup runs and the gap between them is pure free time;
 // the only thing under test is which timezone each rail entry renders in.
 
-test('Planning rail shows each entry in its own local timezone, not one day-wide anchor', async ({ page }) => {
+test('Planning rail shows each entry in its own local timezone, not one day-wide anchor', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -33,6 +33,7 @@ test('Planning rail shows each entry in its own local timezone, not one day-wide
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const nyName = `E2E TZ rail NY ${runId}`

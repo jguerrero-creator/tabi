@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-155 — "Bouton Add pour transformer un trajet calculé en réservation Transport
@@ -10,6 +10,7 @@ import { authenticatedClientFor } from './support/auth'
 
 test('"+ Add" on a computed Getting Around leg opens the Add sheet prefilled as a To-book Transport reservation', async ({
   page,
+  registerTrip,
 }) => {
   // Local dev's Maps JS API key referrer allowlist doesn't cover this Playwright-driven
   // localhost port (TABI-162, a known, unrelated infra gap — see CLAUDE.md's Maps referrer
@@ -41,6 +42,7 @@ test('"+ Add" on a computed Getting Around leg opens the Add sheet prefilled as 
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     // Two Stay reservations on different days/cities, geocoded directly (no UI/geocoder

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-121 — "Sous-type de transport sélectionnable (point-à-point vs à
@@ -12,6 +12,7 @@ import { authenticatedClientFor } from './support/auth'
 
 test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off fields and persists', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -36,6 +37,7 @@ test('selecting Vehicle rental as the transport sub-type shows pickup/drop-off f
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/transport`)

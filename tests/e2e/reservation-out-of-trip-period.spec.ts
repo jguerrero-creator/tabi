@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-113 — a reservation whose start or end falls outside the trip's current
@@ -6,7 +6,7 @@ import { authenticatedClientFor } from './support/auth'
 // non-blocking confirmation with two resolutions — extend the trip to cover
 // it, or confirm the extra night before/after the trip is intentional.
 
-test('adding a reservation outside the trip dates asks to extend or keep as is', async ({ page }) => {
+test('adding a reservation outside the trip dates asks to extend or keep as is', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -30,6 +30,7 @@ test('adding a reservation outside the trip dates asks to extend or keep as is',
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)

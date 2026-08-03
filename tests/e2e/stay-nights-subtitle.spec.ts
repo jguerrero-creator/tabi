@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-120 — "Sous-titre des lignes Hébergement = nombre de nuits (pas la
@@ -9,6 +9,7 @@ import { authenticatedClientFor } from './support/auth'
 
 test('Stay menu row shows a nights count instead of an end-date arrow, and hides it for a same-day stay', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -33,6 +34,7 @@ test('Stay menu row shows a nights count instead of an end-date arrow, and hides
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { error: multiNightError } = await client.from('reservations').insert({

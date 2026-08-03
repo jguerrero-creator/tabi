@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-16 — "Formulaire de saisie manuelle d'une réservation". Spec: type
@@ -10,7 +10,7 @@ import { authenticatedClientFor } from './support/auth'
 // conversion from the JST wall-clock input, resolved timezone stored on
 // both legs) and that the Stay list / detail screen render it correctly.
 
-test('a reservation can be created from the Stay menu via the Add Reservation form', async ({ page }) => {
+test('a reservation can be created from the Stay menu via the Add Reservation form', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -34,6 +34,7 @@ test('a reservation can be created from the Stay menu via the Add Reservation fo
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/stay`)

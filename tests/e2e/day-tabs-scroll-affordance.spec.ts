@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-139 — the day-tab pill row in Planning is horizontally scrollable, but
@@ -10,7 +10,7 @@ import { authenticatedClientFor } from './support/auth'
 // affordance to test.
 test.use({ viewport: { width: 390, height: 720 } })
 
-test('Day-tab pill row shows a scroll-edge chevron only on sides with hidden days', async ({ page }) => {
+test('Day-tab pill row shows a scroll-edge chevron only on sides with hidden days', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -37,6 +37,7 @@ test('Day-tab pill row shows a scroll-edge chevron only on sides with hidden day
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}`)

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-49 — rich Google Places search launched from the Activities menu's Add flow.
@@ -53,7 +53,7 @@ async function cleanupTrip(client: Awaited<ReturnType<typeof authenticatedClient
   if (deleteTripError) throw deleteTripError
 }
 
-test('picking a rich search result prefills and saves the place metadata', async ({ page }) => {
+test('picking a rich search result prefills and saves the place metadata', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
   await page.route('**/api/places-search', (route) =>
     route.fulfill({
@@ -76,6 +76,7 @@ test('picking a rich search result prefills and saves the place metadata', async
   const client = await authenticatedClientFor(page)
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const trip = await createTrip(client, `E2E place search trip ${runId}`)
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/activities`)
@@ -116,7 +117,7 @@ test('picking a rich search result prefills and saves the place metadata', async
   }
 })
 
-test('skipping search still saves a normal activity with no place metadata', async ({ page }) => {
+test('skipping search still saves a normal activity with no place metadata', async ({ page, registerTrip }) => {
   await page.route('https://maps.googleapis.com/**', (route) => route.abort())
 
   await page.goto('/')
@@ -125,6 +126,7 @@ test('skipping search still saves a normal activity with no place metadata', asy
   const client = await authenticatedClientFor(page)
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const trip = await createTrip(client, `E2E place search skip trip ${runId}`)
+  registerTrip(client, trip.id)
 
   try {
     await page.goto(`/trips/${trip.id}/activities`)

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
 
 // TABI-112 addendum (25/07) + TABI-160 — the detail screen's nights field
@@ -10,6 +10,7 @@ import { authenticatedClientFor } from './support/auth'
 
 test('editing a Stay to 0 nights in the detail screen shows a clear error, not a silent block', async ({
   page,
+  registerTrip,
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
@@ -34,6 +35,7 @@ test('editing a Stay to 0 nights in the detail screen shows a clear error, not a
     .select()
     .single()
   if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
 
   try {
     const { data: reservation, error: reservationError } = await client
