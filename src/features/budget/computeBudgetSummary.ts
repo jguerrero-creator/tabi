@@ -1,3 +1,4 @@
+import type { BudgetCategory } from '../../types/budgetCategory'
 import type { Reservation, ReservationType } from '../../types/reservation'
 
 export interface BudgetCategoryTotal {
@@ -9,6 +10,7 @@ export interface BudgetCategoryTotal {
 
 export interface BudgetSummary {
   categories: BudgetCategoryTotal[]
+  manualTotal: number
   total: number
   count: number
   pricedCount: number
@@ -16,7 +18,10 @@ export interface BudgetSummary {
 
 const categoryOrder: ReservationType[] = ['stay', 'transport', 'activity']
 
-export function computeBudgetSummary(reservations: Reservation[]): BudgetSummary {
+export function computeBudgetSummary(
+  reservations: Reservation[],
+  budgetCategories: BudgetCategory[] = [],
+): BudgetSummary {
   const categories = categoryOrder.map((type): BudgetCategoryTotal => {
     const items = reservations.filter((reservation) => reservation.type === type)
     const priced = items.filter((reservation) => reservation.price_amount != null)
@@ -28,9 +33,13 @@ export function computeBudgetSummary(reservations: Reservation[]): BudgetSummary
     }
   })
 
+  const manualTotal = budgetCategories.reduce((sum, category) => sum + category.amount, 0)
+  const reservationsTotal = categories.reduce((sum, category) => sum + category.total, 0)
+
   return {
     categories,
-    total: categories.reduce((sum, category) => sum + category.total, 0),
+    manualTotal,
+    total: reservationsTotal + manualTotal,
     count: reservations.length,
     pricedCount: categories.reduce((sum, category) => sum + category.pricedCount, 0),
   }
