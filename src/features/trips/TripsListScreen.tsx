@@ -22,13 +22,13 @@ export function TripsListScreen() {
 
   const { upcoming, past } = useMemo(() => splitByDate(trips), [trips])
 
-  // TABI-98: the shared entitlement check, actually invoked client-side (display-only —
-  // greys out the trigger; the real enforcement is server-side, see api/_lib/entitlements.ts).
-  // `profile` is null while loading or on a transient fetch error, and `maxActiveTrips` is
-  // still unlimited for every plan today (TABI-97), so this never disables trip creation as
-  // a side effect of either of those — it only starts doing anything once a real limit exists.
+  // TABI-101: client-side only — trip creation writes straight from the browser to
+  // Supabase with no /api route in front of it (unlike aiAccess), so there's no
+  // server-side enforcement of this limit yet. `profile` is null while loading or on a
+  // transient fetch error, which fails this check closed (button stays enabled) rather
+  // than blocking creation on a fetch hiccup.
   const { profile, can } = useProfile()
-  const atTripLimit = profile !== null && !can({ limit: 'maxActiveTrips', currentValue: trips.length })
+  const atTripLimit = profile !== null && !can({ limit: 'maxActiveTrips', currentValue: upcoming.length })
 
   async function handleConfirmDelete() {
     if (!deletingTrip) return
