@@ -6,15 +6,26 @@ import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import type { Trip } from '../../types/trip'
+import type { Enums } from '../../types/database.types'
 
 const DEFAULT_DAY_START_TIME = '08:00'
 const DEFAULT_DAY_END_TIME = '22:00'
+
+type TripType = Enums<'trip_type'>
+
+const TRIP_TYPE_OPTIONS: { value: TripType; label: keyof typeof strings.createTrip }[] = [
+  { value: 'city_trip', label: 'tripTypeCityTrip' },
+  { value: 'road_trip', label: 'tripTypeRoadTrip' },
+  { value: 'multi_destination', label: 'tripTypeMultiDestination' },
+  { value: 'other', label: 'tripTypeOther' },
+]
 
 export interface TripFormValues {
   name: string
   start_date: string | null
   end_date: string | null
   destinations: string[]
+  trip_type: TripType | null
   currency: string
   day_start_time: string
   day_end_time: string
@@ -33,6 +44,7 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
   const [startDate, setStartDate] = useState(trip?.start_date ?? '')
   const [endDate, setEndDate] = useState(trip?.end_date ?? '')
   const [destinations, setDestinations] = useState<string[]>(trip?.destinations ?? [])
+  const [tripType, setTripType] = useState<TripType | ''>(trip?.trip_type ?? '')
   const [currency, setCurrency] = useState(() => trip?.currency ?? getDefaultCurrency())
   const [dayStartTime, setDayStartTime] = useState(trip?.day_start_time.slice(0, 5) ?? DEFAULT_DAY_START_TIME)
   const [dayEndTime, setDayEndTime] = useState(trip?.day_end_time.slice(0, 5) ?? DEFAULT_DAY_END_TIME)
@@ -61,6 +73,7 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
         start_date: startDate || null,
         end_date: endDate || null,
         destinations,
+        trip_type: tripType || null,
         currency,
         day_start_time: dayStartTime,
         day_end_time: dayEndTime,
@@ -107,6 +120,24 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
         onChange={setDestinations}
         placeholder={strings.createTrip.destinationsPlaceholder}
       />
+      <div>
+        <label htmlFor="trip-type" className="mb-1 block text-sm font-medium text-slate-700">
+          {strings.createTrip.tripTypeLabel}
+        </label>
+        <select
+          id="trip-type"
+          value={tripType}
+          onChange={(event) => setTripType(event.target.value as TripType | '')}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        >
+          <option value="">{strings.createTrip.tripTypeUnset}</option>
+          {TRIP_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {strings.createTrip[option.label]}
+            </option>
+          ))}
+        </select>
+      </div>
       <div>
         <label htmlFor="trip-currency" className="mb-1 block text-sm font-medium text-slate-700">
           {strings.createTrip.currencyLabel}

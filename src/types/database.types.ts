@@ -355,6 +355,7 @@ export type Database = {
           note: string | null
           organizer_id: string
           start_date: string | null
+          trip_type: Database["public"]["Enums"]["trip_type"] | null
           updated_at: string
         }
         Insert: {
@@ -369,6 +370,7 @@ export type Database = {
           note?: string | null
           organizer_id: string
           start_date?: string | null
+          trip_type?: Database["public"]["Enums"]["trip_type"] | null
           updated_at?: string
         }
         Update: {
@@ -383,6 +385,7 @@ export type Database = {
           note?: string | null
           organizer_id?: string
           start_date?: string | null
+          trip_type?: Database["public"]["Enums"]["trip_type"] | null
           updated_at?: string
         }
         Relationships: []
@@ -402,6 +405,7 @@ export type Database = {
       reservation_type: "stay" | "transport" | "activity"
       stay_subtype: "hotel" | "camping" | "airbnb" | "ryokan" | "other"
       transport_subtype: "point_to_point" | "at_disposal"
+      trip_type: "city_trip" | "road_trip" | "multi_destination" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -533,6 +537,7 @@ export const Constants = {
       reservation_type: ["stay", "transport", "activity"],
       stay_subtype: ["hotel", "camping", "airbnb", "ryokan", "other"],
       transport_subtype: ["point_to_point", "at_disposal"],
+      trip_type: ["city_trip", "road_trip", "multi_destination", "other"],
     },
   },
 } as const

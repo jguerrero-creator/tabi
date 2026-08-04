@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { logClientError } from '../../lib/logError'
 import { supabase } from '../../lib/supabase'
 import type { NewTrip, Trip } from '../../types/trip'
+import type { Enums } from '../../types/database.types'
 
 interface CreateTripInput {
   name: string
   start_date: string | null
   end_date: string | null
   destinations: string[]
+  trip_type?: Enums<'trip_type'> | null
   currency: string
   day_start_time: string
   day_end_time: string
@@ -52,6 +54,7 @@ export function useTrips() {
       start_date: input.start_date,
       end_date: input.end_date,
       destinations: input.destinations,
+      trip_type: input.trip_type ?? null,
       currency: input.currency,
       day_start_time: input.day_start_time,
       day_end_time: input.day_end_time,
@@ -78,6 +81,7 @@ export function useTrips() {
         start_date: input.start_date,
         end_date: input.end_date,
         destinations: input.destinations,
+        trip_type: input.trip_type ?? null,
         currency: input.currency,
         day_start_time: input.day_start_time,
         day_end_time: input.day_end_time,
