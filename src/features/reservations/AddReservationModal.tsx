@@ -62,9 +62,9 @@ export type ResolvedPlace = GeocodeResult & {
 }
 
 // TABI-144: check-in/check-out time is optional for Stay — a standard default
-// (15:00/11:00) is applied when left blank, per TABI-16's original spec.
-const STAY_DEFAULT_CHECK_IN_TIME = '15:00'
-const STAY_DEFAULT_CHECK_OUT_TIME = '11:00'
+// (14:00/10:00, per TABI-205) is applied when left blank.
+const STAY_DEFAULT_CHECK_IN_TIME = '14:00'
+const STAY_DEFAULT_CHECK_OUT_TIME = '10:00'
 
 const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
@@ -412,7 +412,7 @@ export function AddReservationModal({
     // Vehicle rental collects a date range, not exact times (TABI-123) — anchor to midday so
     // the stored timestamp never drifts to an adjacent calendar day across timezone conversion.
     // TABI-144: Stay check-in/check-out time is optional — fall back to a standard default
-    // (15:00/11:00) when left blank, flagged so the detail screen can surface it as unconfirmed.
+    // (14:00/10:00, per TABI-205) when left blank, flagged so the detail screen can surface it as unconfirmed.
     const startTimeDefaulted = option.dbType === 'stay' && !startTime
     const endTimeDefaulted = option.dbType === 'stay' && !endTime
     const effectiveStartTime = isAtDisposal ? '12:00' : startTimeDefaulted ? STAY_DEFAULT_CHECK_IN_TIME : startTime

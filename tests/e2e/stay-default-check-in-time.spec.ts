@@ -3,12 +3,12 @@ import { authenticatedClientFor } from './support/auth'
 
 // TABI-144 — "Indicateur + édition de l'heure de check-in par défaut, modifiable
 // ultérieurement". Spec: when a Stay's check-in/check-out time is left blank, a
-// standard default (15:00/11:00, per TABI-16) is applied and the row is flagged as
+// standard default (14:00/10:00, per TABI-205) is applied and the row is flagged as
 // unconfirmed on the detail screen. Exercises leaving both times blank in the Add
 // sheet, seeing the resulting default flags + badges, then editing the check-in
 // time from the detail screen to confirm it clears the flag.
 
-test('Stay check-in/check-out defaults to 15:00/11:00 when left blank, editable later', async ({ page, registerTrip }) => {
+test('Stay check-in/check-out defaults to 14:00/10:00 when left blank, editable later', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -65,17 +65,17 @@ test('Stay check-in/check-out defaults to 15:00/11:00 when left blank, editable 
     if (fetchError || !created) throw fetchError ?? new Error('Reservation was not created')
     expect(created.start_time_is_default).toBe(true)
     expect(created.end_time_is_default).toBe(true)
-    // 2026-09-10 15:00 JST (UTC+9) => 2026-09-10T06:00:00.000Z
-    expect(created.start_at).toBe('2026-09-10T06:00:00+00:00')
-    // 2026-09-12 11:00 JST (UTC+9) => 2026-09-12T02:00:00.000Z
-    expect(created.end_at).toBe('2026-09-12T02:00:00+00:00')
+    // 2026-09-10 14:00 JST (UTC+9) => 2026-09-10T05:00:00.000Z
+    expect(created.start_at).toBe('2026-09-10T05:00:00+00:00')
+    // 2026-09-12 10:00 JST (UTC+9) => 2026-09-12T01:00:00.000Z
+    expect(created.end_at).toBe('2026-09-12T01:00:00+00:00')
 
     // Detail screen: "Default" badge shown next to both check-in and check-out times.
     await page.goto(`/reservations/${created.id}`)
     await expect(page.getByRole('heading', { name: reservationName })).toBeVisible()
     await expect(page.getByText('Default', { exact: true })).toHaveCount(2)
-    await expect(page.getByLabel('Check-in time')).toHaveValue('15:00')
-    await expect(page.getByLabel('Check-out time')).toHaveValue('11:00')
+    await expect(page.getByLabel('Check-in time')).toHaveValue('14:00')
+    await expect(page.getByLabel('Check-out time')).toHaveValue('10:00')
 
     // Editing the check-in time confirms it and clears the default flag.
     await page.getByLabel('Check-in time').fill('16:30')
