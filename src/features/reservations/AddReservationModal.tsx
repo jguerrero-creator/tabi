@@ -35,6 +35,8 @@ import type {
 import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
 import { useTripDayLocations } from '../trips/useTripDayLocations'
+import { useTripReservations } from '../trips/useTripReservations'
+import { lastKnownTripLocation } from './lastKnownTripLocation'
 import { findLocationMismatch, type LocationMismatch } from './locationMismatch'
 import { findOverlappingReservation } from './reservationOverlap'
 import { transportRouteName } from './transportRouteName'
@@ -244,6 +246,10 @@ export function AddReservationModal({
   )
   const { trip, loading: tripLoading, updateDates: updateTripDates } = useTrip(tripId)
   const { locationsByDate: dayLocationsByDate } = useTripDayLocations(tripId)
+  // TABI-204: last-known-location prefill draws from every reservation in the trip
+  // (not just the current type), since the goal is "where did the traveler's plan
+  // leave off", regardless of what kind of booking put them there.
+  const { reservations: allTripReservations, loading: allTripReservationsLoading } = useTripReservations(tripId)
 
   // TABI-111: prefill the start date with the trip's first night not yet covered by a Stay
   // reservation (reusing the accommodation coverage-gap logic) — or the trip's own start date
@@ -265,6 +271,33 @@ export function AddReservationModal({
       hasPrefilledStartDateRef.current = true
     }
   }, [option.dbType, trip, tripLoading, sameTypeReservations, sameTypeLoading, startDate])
+
+  // TABI-204: prefill the start address with the trip's last known location — its most
+  // recently-dated planned day-location or geocoded reservation address — so back-to-back
+  // reservations in the same area don't start from a blank field. Only while the field is
+  // still untouched (covers the plain "Add" entry point; the AI-extraction and Getting-Around
+  // prefill paths above already seed a non-empty value via `initialStart*`, so this never
+  // overwrites those) and applied once, same guard shape as the TABI-111 start-date prefill.
+  const hasPrefilledLocationRef = useRef(false)
+  useEffect(() => {
+    if (hasPrefilledLocationRef.current) return
+    if (allTripReservationsLoading) return
+    if (startAddress !== '') return
+
+    const known = lastKnownTripLocation(allTripReservations, dayLocationsByDate)
+    if (known) {
+      setStartAddress(known.formattedAddress)
+      setStartPlace({
+        lat: known.lat,
+        lng: known.lng,
+        formattedAddress: known.formattedAddress,
+        timezone: known.timezone ?? localTimeZone(),
+        city: known.city,
+        placeName: known.placeName,
+      })
+      hasPrefilledLocationRef.current = true
+    }
+  }, [allTripReservations, allTripReservationsLoading, dayLocationsByDate, startAddress])
 
   // TABI-112: for Stay, derive the checkout date from check-in + nights instead of asking the
   // user to pick it directly. Only while manualEndDate is off — flipping it hands endDate back
