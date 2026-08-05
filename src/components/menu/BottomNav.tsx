@@ -28,6 +28,8 @@ export function BottomNav({ tripId }: BottomNavProps) {
                 <OverviewIcon className="h-5 w-5" />
               ) : tab === 'budget' ? (
                 <BudgetIcon className="h-5 w-5" />
+              ) : tab === 'souvenirs' ? (
+                <SouvenirsIcon className="h-5 w-5" />
               ) : (
                 <ReservationTypeIcon type={tab} className="h-5 w-5" />
               )}
@@ -74,6 +76,25 @@ export function BudgetIcon({ className }: { className: string }) {
       <rect x="2" y="6" width="20" height="14" rx="2" />
       <path d="M2 10h20" />
       <circle cx="16" cy="15" r="1.5" />
+    </svg>
+  )
+}
+
+export function SouvenirsIcon({ className }: { className: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M6 8h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 8Z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+      <path d="m9 12 2 2 4-4" />
     </svg>
   )
 }

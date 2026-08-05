@@ -189,6 +189,7 @@ export const strings = {
     transport: 'Transport',
     activities: 'Activities',
     budget: 'Budget',
+    souvenirs: 'Souvenirs',
   },
   sidebar: {
     allTrips: 'All trips',
@@ -260,6 +261,20 @@ export const strings = {
     edit: 'Edit',
     delete: 'Delete',
     errorGeneric: 'Could not save this category. Please try again.',
+  },
+  souvenirsMenu: {
+    loading: 'Loading checklist…',
+    errorLoading: 'Could not load this trip.',
+    emptyTitle: 'No items yet',
+    emptyBody: 'Add souvenirs or things to buy — check them off as you go.',
+    addCta: 'Add item',
+    labelPlaceholder: 'e.g. Matcha, gifts for family',
+    save: 'Save',
+    cancel: 'Cancel',
+    edit: 'Edit',
+    delete: 'Delete',
+    toggleChecked: 'Toggle checked',
+    errorGeneric: 'Could not save this item. Please try again.',
   },
   addReservation: {
     title: 'Add Reservation',

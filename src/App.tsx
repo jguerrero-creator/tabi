@@ -6,6 +6,7 @@ import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
 import { ReservationDetailScreen } from './features/reservations/ReservationDetailScreen'
+import { SouvenirsMenuScreen } from './features/souvenirs/SouvenirsMenuScreen'
 import { StayMenuScreen } from './features/stay/StayMenuScreen'
 import { TransportMenuScreen } from './features/transport/TransportMenuScreen'
 import { OverviewScreen } from './features/trips/OverviewScreen'
@@ -22,6 +23,7 @@ export function App() {
           <Route path="transport" element={<TransportMenuScreen />} />
           <Route path="activities" element={<ActivitiesMenuScreen />} />
           <Route path="budget" element={<BudgetMenuScreen />} />
+          <Route path="souvenirs" element={<SouvenirsMenuScreen />} />
         </Route>
         <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />
         <Route path="/privacy" element={<PrivacyPolicyScreen />} />

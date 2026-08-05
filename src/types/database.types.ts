@@ -257,6 +257,41 @@ export type Database = {
           },
         ]
       }
+      souvenir_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_checked: boolean
+          label: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_checked?: boolean
+          label: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_checked?: boolean
+          label?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "souvenir_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_day_locations: {
         Row: {
           address: string | null
