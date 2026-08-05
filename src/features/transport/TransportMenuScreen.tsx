@@ -83,6 +83,7 @@ export function TransportMenuScreen() {
                       title={reservation.name}
                       status={reservation.status}
                       secondaryLabel={arrivalLabel(reservation)}
+                      transportSubtype={reservation.transport_subtype}
                     />
                     {(childrenByMainId.get(reservation.id) ?? []).map((nested) => (
                       <MenuListRow
@@ -94,6 +95,7 @@ export function TransportMenuScreen() {
                         secondaryLabel={arrivalLabel(nested)}
                         nested
                         overlapBadge={strings.common.overlapBadge}
+                        transportSubtype={nested.transport_subtype}
                       />
                     ))}
                   </Fragment>

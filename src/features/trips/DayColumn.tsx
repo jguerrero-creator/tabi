@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { ReservationIcon } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
 import { statusDotClasses } from '../../components/menu/statusDotClasses'
 import { formatLocalTimeZoneLabel, formatTimeInZone, localTimeZone } from '../../lib/datetime'
@@ -360,7 +360,7 @@ function ReservationCard({ reservation }: { reservation: DayItem }) {
       className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-teal-600">
-        <ReservationTypeIcon type={reservation.type} className="h-4 w-4" />
+        <ReservationIcon reservation={reservation} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
@@ -386,7 +386,7 @@ function TonightStayCard({ reservation }: { reservation: Reservation }) {
       className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 hover:bg-slate-50"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-        <ReservationTypeIcon type="stay" className="h-4 w-4" />
+        <ReservationIcon reservation={reservation} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium text-slate-500">{strings.planning.tonightsStay}</p>

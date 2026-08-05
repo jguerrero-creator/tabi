@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import { ReservationTypeIcon } from '../ui/ReservationTypeIcon'
+import { ReservationIcon } from '../ui/ReservationTypeIcon'
 import { statusDotClasses } from './statusDotClasses'
-import type { ReservationStatus, ReservationType } from '../../types/reservation'
+import type { ReservationStatus, ReservationType, StaySubtype, TransportSubtype } from '../../types/reservation'
 
 export interface MenuRowFlag {
   label: string
@@ -17,6 +17,8 @@ interface MenuListRowProps {
   nested?: boolean
   overlapBadge?: string
   flags?: MenuRowFlag[]
+  staySubtype?: StaySubtype | null
+  transportSubtype?: TransportSubtype | null
 }
 
 const flagToneClasses: Record<MenuRowFlag['tone'], string> = {
@@ -33,6 +35,8 @@ export function MenuListRow({
   nested,
   overlapBadge,
   flags,
+  staySubtype,
+  transportSubtype,
 }: MenuListRowProps) {
   return (
     <li>
@@ -41,7 +45,10 @@ export function MenuListRow({
         className={`flex items-center gap-3 py-3 hover:bg-slate-50 ${nested ? 'pl-10 pr-4 bg-slate-50/60' : 'px-4'}`}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
-          <ReservationTypeIcon type={type} className="h-4 w-4" />
+          <ReservationIcon
+            reservation={{ type, stay_subtype: staySubtype, transport_subtype: transportSubtype }}
+            className="h-4 w-4"
+          />
         </span>
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-900">

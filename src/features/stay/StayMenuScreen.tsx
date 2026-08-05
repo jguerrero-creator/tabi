@@ -94,6 +94,7 @@ export function StayMenuScreen() {
                         status={reservation.status}
                         secondaryLabel={checkoutLabel(reservation)}
                         flags={stayFlags(reservation)}
+                        staySubtype={reservation.stay_subtype}
                       />
                       {(childrenByMainId.get(reservation.id) ?? []).map((nested) => (
                         <MenuListRow
@@ -106,6 +107,7 @@ export function StayMenuScreen() {
                           nested
                           overlapBadge={strings.common.overlapBadge}
                           flags={stayFlags(nested)}
+                          staySubtype={nested.stay_subtype}
                         />
                       ))}
                     </Fragment>
