@@ -164,6 +164,10 @@ export function AddReservationModal({
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
   const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState(initialName ?? '')
+  // TABI-203: once the user (or an AI extraction) has put something explicit into the name
+  // field, sub-type changes stop overwriting it — mirrors the "only while untouched" guard
+  // used for the start-date/location prefills below.
+  const [nameManuallyEdited, setNameManuallyEdited] = useState(Boolean(initialName))
   const [status, setStatus] = useState<ReservationStatus>('to_book')
   const [startAddress, setStartAddress] = useState(
     () => initialStartPlace?.formattedAddress ?? initialStartAddressText ?? '',
@@ -193,7 +197,8 @@ export function AddReservationModal({
   // duration, on the same calendar day (same simplification as nights-for-Stay, TABI-112).
   const [durationHours, setDurationHours] = useState('')
   const [durationMinutes, setDurationMinutes] = useState('')
-  const [priceAmount, setPriceAmount] = useState(() => (initialPriceAmount != null ? String(initialPriceAmount) : ''))
+  // TABI-203: default the price to 0 rather than leaving it blank — still freely editable.
+  const [priceAmount, setPriceAmount] = useState(() => (initialPriceAmount != null ? String(initialPriceAmount) : '0'))
   const [confirmationNumber, setConfirmationNumber] = useState(initialConfirmationNumber ?? '')
   const [note, setNote] = useState(initialNote ?? '')
   const [geocoding, setGeocoding] = useState(false)
@@ -238,6 +243,22 @@ export function AddReservationModal({
   }
   // TABI-122: point-to-point transport has no free-text name — it's derived from the route.
   const isAutoNamedTransport = isPointToPoint
+
+  // TABI-203: suggest a starting name derived from the chosen sub-type (e.g. "New Hotel")
+  // instead of leaving the field blank, re-suggesting whenever the type/sub-type changes —
+  // but only until the user actually types their own name in the field.
+  useEffect(() => {
+    if (nameManuallyEdited || isAutoNamedTransport) return
+    const subtypeLabel =
+      option.dbType === 'stay'
+        ? strings.addReservation.staySubtypes[staySubtype]
+        : isAtDisposal
+          ? strings.addReservation.transportSubtypes.at_disposal
+          : option.dbType === 'activity'
+            ? strings.reservationType.activity
+            : null
+    if (subtypeLabel) setName(strings.addReservation.suggestedName(subtypeLabel))
+  }, [nameManuallyEdited, isAutoNamedTransport, option.dbType, isAtDisposal, staySubtype])
   // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
   // whichever type is currently selected so switching type mid-form checks against the right set.
   const { reservations: sameTypeReservations, loading: sameTypeLoading } = useReservationsByType(
@@ -703,7 +724,10 @@ export function AddReservationModal({
           <Field label={strings.addReservation.nameLabel}>
             <input
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value)
+                setNameManuallyEdited(true)
+              }}
               placeholder={strings.addReservation.namePlaceholder}
               required
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
