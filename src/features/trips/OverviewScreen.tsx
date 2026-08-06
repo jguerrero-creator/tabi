@@ -15,6 +15,7 @@ import { AddReservationModal, type ResolvedPlace } from '../reservations/AddRese
 import { ImportConfirmationModal } from '../reservations/ImportConfirmationModal'
 import { NearbyPlacesMapModal } from '../reservations/NearbyPlacesMapModal'
 import { QuickAddModal } from '../reservations/QuickAddModal'
+import { SavePlaceModal } from '../reservations/SavePlaceModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { OverviewMap } from './OverviewMap'
 import type { FreeBlockAddPayload } from './DayColumn'
@@ -73,6 +74,10 @@ export function OverviewScreen() {
   // TABI-194: ultra-fast placeholder creation — a single free-text line through the same
   // extraction pipeline/review screen as ImportConfirmationModal, via QuickAddModal.
   const [showQuickAddModal, setShowQuickAddModal] = useState(false)
+  // TABI-20: "spot a place on-site, save it as To book" — a global entry point (not
+  // tied to a specific Planning day/free-block, unlike TABI-24's nearby-places flow)
+  // since the traveler isn't necessarily looking at their itinerary when they spot it.
+  const [showSavePlaceModal, setShowSavePlaceModal] = useState(false)
   // TABI-99: client-side entitlement check, display-only (greys out the trigger and
   // explains why) — the server-side gate on /api/extract-reservation and /api/import-url
   // is what actually enforces this. `free.aiAccess` is true today (TABI-177), so this never
@@ -174,6 +179,13 @@ export function OverviewScreen() {
         {!loading && !error && (
           <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
             <div className="flex justify-end gap-2 lg:col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowSavePlaceModal(true)}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                {strings.savePlace.triggerLabel}
+              </button>
               <button
                 type="button"
                 onClick={() => setShowQuickAddModal(true)}
@@ -377,6 +389,18 @@ export function OverviewScreen() {
         <QuickAddModal
           tripId={tripId ?? ''}
           onClose={() => setShowQuickAddModal(false)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+        />
+      )}
+
+      {showSavePlaceModal && (
+        <SavePlaceModal
+          tripId={tripId ?? ''}
+          onClose={() => setShowSavePlaceModal(false)}
           onCreate={async (input) => {
             const created = await createReservation(input)
             await refetchReservations()

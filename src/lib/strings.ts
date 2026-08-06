@@ -416,6 +416,14 @@ export const strings = {
     cancel: 'Cancel',
     ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
   },
+  savePlace: {
+    triggerLabel: 'Save a place',
+    locating: 'Finding your location…',
+    saving: 'Saving…',
+    locationDenied: "Couldn't access your location — search for the place instead.",
+    savedMessage: 'Saved to book',
+    saveErrorGeneric: 'Could not save this place. Please try again.',
+  },
   dayLocation: {
     addCta: '+ Add planned location',
     label: 'Planned location',
