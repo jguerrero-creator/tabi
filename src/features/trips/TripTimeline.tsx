@@ -14,7 +14,7 @@ import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
-import { DayColumn, type DayItem } from './DayColumn'
+import { DayColumn, type DayItem, type FreeBlockAddPayload } from './DayColumn'
 import { DayTabs, type DayTab } from './DayTabs'
 import type { TripLeg } from './useTripLegs'
 import type { DayLocationInput } from './useTripDayLocations'
@@ -49,7 +49,7 @@ interface TripTimelineProps {
   onSaveDayNote: (dateKey: string, note: string) => Promise<void>
   onClearDayNote: (dateKey: string) => Promise<void>
   /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
-  onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
+  onAddAtFreeBlock?: (input: FreeBlockAddPayload) => void
 }
 
 type DayEdges = { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }

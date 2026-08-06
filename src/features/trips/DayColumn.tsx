@@ -14,9 +14,17 @@ import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
+import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
 import type { DayLocationInput } from './useTripDayLocations'
+
+/** Where a free block's "+ Add" should center its nearby-places search (TABI-24). */
+export type FreeBlockAddPayload = {
+  startAt: string
+  timezone: string | null
+  contextLocation: { lat: number; lng: number } | null
+}
 
 /**
  * A reservation as it appears on one specific day's rail. A multi-night Stay
@@ -75,7 +83,7 @@ interface DayColumnProps {
   onSaveDayNote?: (note: string) => Promise<void>
   onClearDayNote?: () => Promise<void>
   /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
-  onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
+  onAddAtFreeBlock?: (input: FreeBlockAddPayload) => void
   className?: string
 }
 
@@ -120,6 +128,11 @@ export function DayColumn({
   const railEntries: RailEntry[] = showTonightStay
     ? [...baseEntries, { kind: 'stay', key: `stay-${activeStay.id}`, time: null, timezone: null, reservation: activeStay }]
     : baseEntries
+
+  const contextLocation = resolveContextualLocation(activeStay ?? null, dayLocation)
+  const handleAddAtFreeBlock = onAddAtFreeBlock
+    ? (input: { startAt: string; timezone: string | null }) => onAddAtFreeBlock({ ...input, contextLocation })
+    : undefined
 
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
@@ -166,7 +179,7 @@ export function DayColumn({
                 {entry.time ? formatTimeInZone(entry.time, entry.timezone ?? dayTimezone) : ''}
               </span>
               <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
-              {renderEntry(entry, onAddAtFreeBlock)}
+              {renderEntry(entry, handleAddAtFreeBlock)}
             </li>
           ))}
         </ul>

@@ -1,4 +1,5 @@
 import type { Reservation } from '../../types/reservation'
+import type { TripDayLocation } from '../../types/dayLocation'
 
 export interface AccommodationGap {
   /** ISO date (YYYY-MM-DD), inclusive */
@@ -58,6 +59,26 @@ export function findActiveStay(dateKey: string, reservations: Reservation[]): Re
       return dateKey >= checkIn && dateKey < checkOut
     }) ?? null
   )
+}
+
+/**
+ * TABI-24: the contextual location to center a free block's nearby-places search on —
+ * the accommodation active that day takes priority, falling back to the day's planned
+ * location (TABI-114) if there's no active Stay yet. Deliberately its own precedence,
+ * distinct from useTripLegs.resolveCoveredDayAnchor (day-location-first, for a different
+ * purpose) and ActivityPlaceSearchModal.computeBias (never consults activeStay at all).
+ */
+export function resolveContextualLocation(
+  activeStay: Reservation | null,
+  dayLocation: TripDayLocation | null | undefined,
+): { lat: number; lng: number } | null {
+  if (activeStay?.start_lat != null && activeStay.start_lng != null) {
+    return { lat: activeStay.start_lat, lng: activeStay.start_lng }
+  }
+  if (dayLocation) {
+    return { lat: dayLocation.lat, lng: dayLocation.lng }
+  }
+  return null
 }
 
 export function addDays(dateStr: string, days: number): string {

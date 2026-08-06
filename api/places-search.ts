@@ -7,8 +7,8 @@
 // distinct de la recherche riche Activités (V1)"). Text Search (New) already
 // returns rating/review-count/photos/primaryType at this field mask, so no
 // separate Place Details call is made here.
-import { z } from 'zod'
 import { checkRateLimit } from './_lib/rateLimit.js'
+import { GoogleSearchResponseSchema, mapGooglePlaces, PLACE_FIELD_MASK, type PlaceSearchResult } from './_lib/googlePlaces.js'
 
 interface PlacesSearchRequestBody {
   query?: string
@@ -17,43 +17,9 @@ interface PlacesSearchRequestBody {
   regionCode?: string
 }
 
-export interface PlaceSearchResult {
-  googlePlaceId: string
-  name: string
-  formattedAddress: string
-  lat: number
-  lng: number
-  rating: number | null
-  userRatingsTotal: number | null
-  photoRef: string | null
-  category: string | null
-}
+export type { PlaceSearchResult }
 
 type PlacesSearchResponse = { status: 'ok'; results: PlaceSearchResult[] }
-
-// Validated before mapping — Google's response is external data, never trusted blindly.
-const GooglePlaceSchema = z.object({
-  id: z.string(),
-  displayName: z.object({ text: z.string() }).optional(),
-  formattedAddress: z.string().optional(),
-  location: z.object({ latitude: z.number(), longitude: z.number() }).optional(),
-  rating: z.number().nullable().optional(),
-  userRatingCount: z.number().nullable().optional(),
-  photos: z.array(z.object({ name: z.string() })).optional(),
-  primaryType: z.string().nullable().optional(),
-})
-const GoogleSearchResponseSchema = z.object({ places: z.array(GooglePlaceSchema).optional() })
-
-const FIELD_MASK = [
-  'places.id',
-  'places.displayName',
-  'places.formattedAddress',
-  'places.location',
-  'places.rating',
-  'places.userRatingCount',
-  'places.photos',
-  'places.primaryType',
-].join(',')
 
 const MAX_RESULTS = 8
 const BIAS_RADIUS_METERS = 15000
@@ -110,7 +76,7 @@ export default async function handler(request: Request): Promise<Response> {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': FIELD_MASK,
+        'X-Goog-FieldMask': PLACE_FIELD_MASK,
       },
       body: JSON.stringify(requestBody),
     })
@@ -131,19 +97,7 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Failed to search places' }, 502)
   }
 
-  const results: PlaceSearchResult[] = (parsed.data.places ?? [])
-    .filter((place) => place.location)
-    .map((place) => ({
-      googlePlaceId: place.id,
-      name: place.displayName?.text ?? query,
-      formattedAddress: place.formattedAddress ?? '',
-      lat: place.location!.latitude,
-      lng: place.location!.longitude,
-      rating: place.rating ?? null,
-      userRatingsTotal: place.userRatingCount ?? null,
-      photoRef: place.photos?.[0]?.name ?? null,
-      category: place.primaryType ?? null,
-    }))
+  const results = mapGooglePlaces(parsed.data.places, query)
 
   return jsonResponse<PlacesSearchResponse>({ status: 'ok', results })
 }

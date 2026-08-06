@@ -11,11 +11,13 @@ import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { Reminder } from '../../types/reminder'
 import type { MapPoint } from '../../components/ui/MiniMap'
-import { AddReservationModal } from '../reservations/AddReservationModal'
+import { AddReservationModal, type ResolvedPlace } from '../reservations/AddReservationModal'
 import { ImportConfirmationModal } from '../reservations/ImportConfirmationModal'
+import { NearbyPlacesMapModal } from '../reservations/NearbyPlacesMapModal'
 import { QuickAddModal } from '../reservations/QuickAddModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { OverviewMap } from './OverviewMap'
+import type { FreeBlockAddPayload } from './DayColumn'
 import { RemindersSection } from './RemindersSection'
 import { TripLegsSection, type LegQuickAddPayload } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
@@ -43,7 +45,25 @@ export function OverviewScreen() {
   // (defaulted to Activity, the one type with no required address/price)
   // pre-seeded with that block's own start time/timezone instead of asking
   // the user to re-derive it.
-  const [quickAddBlock, setQuickAddBlock] = useState<{ startAt: string; timezone: string | null } | null>(null)
+  // TABI-24: when the block's day has a resolvable contextual location (active
+  // accommodation, or the day's planned location), a nearby-places map is shown
+  // first — a small step machine, same shape as ActivitiesMenuScreen's AddStep —
+  // before falling into the same TABI-54 blank form as the manual fallback.
+  const [quickAddBlock, setQuickAddBlock] = useState<FreeBlockAddPayload | null>(null)
+  const [quickAddStep, setQuickAddStep] = useState<'places' | 'form' | null>(null)
+  const [quickAddPlace, setQuickAddPlace] = useState<ResolvedPlace | null>(null)
+
+  function handleAddAtFreeBlock(input: FreeBlockAddPayload) {
+    setQuickAddBlock(input)
+    setQuickAddPlace(null)
+    setQuickAddStep(input.contextLocation ? 'places' : 'form')
+  }
+
+  function closeQuickAdd() {
+    setQuickAddBlock(null)
+    setQuickAddStep(null)
+    setQuickAddPlace(null)
+  }
   // TABI-155: "+ Add" on a computed "Getting Around" leg opens the same shared
   // Add sheet, prefilled with that leg's departure/arrival and mode.
   const [legQuickAdd, setLegQuickAdd] = useState<LegQuickAddPayload | null>(null)
@@ -281,7 +301,7 @@ export function OverviewScreen() {
                   dayNotesByKey={dayNotesByKey}
                   onSaveDayNote={saveDayNote}
                   onClearDayNote={clearDayNote}
-                  onAddAtFreeBlock={setQuickAddBlock}
+                  onAddAtFreeBlock={handleAddAtFreeBlock}
                 />
               </div>
             )}
@@ -289,14 +309,31 @@ export function OverviewScreen() {
         )}
       </main>
 
-      {quickAddBlock && (
+      {quickAddStep === 'places' && quickAddBlock?.contextLocation && (
+        <NearbyPlacesMapModal
+          center={quickAddBlock.contextLocation}
+          onSelect={(place) => {
+            setQuickAddPlace(place)
+            setQuickAddStep('form')
+          }}
+          onSkip={() => {
+            setQuickAddPlace(null)
+            setQuickAddStep('form')
+          }}
+          onCancel={closeQuickAdd}
+        />
+      )}
+
+      {quickAddStep === 'form' && quickAddBlock && (
         <AddReservationModal
           tripId={tripId ?? ''}
           defaultType="activity"
-          requireTypeChoice
+          requireTypeChoice={!quickAddPlace}
           initialStartAt={quickAddBlock.startAt}
           initialTimezone={quickAddBlock.timezone}
-          onClose={() => setQuickAddBlock(null)}
+          initialStartPlace={quickAddPlace}
+          initialName={quickAddPlace?.placeName ?? null}
+          onClose={closeQuickAdd}
           onCreate={async (input) => {
             const created = await createReservation(input)
             await refetchReservations()

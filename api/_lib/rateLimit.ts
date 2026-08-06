@@ -14,6 +14,7 @@ const DAILY_LIMITS = {
   'extract-reservation': 20,
   'import-url': 20,
   'places-search': 50,
+  'places-nearby': 50,
 } as const
 
 export type RateLimitedEndpoint = keyof typeof DAILY_LIMITS

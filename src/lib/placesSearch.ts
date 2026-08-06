@@ -48,3 +48,31 @@ export async function searchPlaces(query: string, bias: PlaceSearchBias): Promis
 export function placePhotoUrl(photoRef: string, width = 400): string {
   return `/api/places-photo?ref=${encodeURIComponent(photoRef)}&w=${width}`
 }
+
+// TABI-24: nearby-places map on the free-block "+ Add" — same auth/response shape as
+// searchPlaces above, but centered on a point instead of a typed query.
+export async function searchNearbyPlaces(lat: number, lng: number): Promise<PlaceSearchResult[]> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const accessToken = sessionData.session?.access_token
+
+  const response = await fetch('/api/places-nearby', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ lat, lng }),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null)
+    throw new PlaceSearchFailedError(errorBody?.error ?? 'Failed to search nearby places')
+  }
+
+  const responseBody = await response.json()
+  if (responseBody.status !== 'ok') {
+    throw new PlaceSearchFailedError(responseBody.error ?? 'Nearby place search failed')
+  }
+
+  return responseBody.results as PlaceSearchResult[]
+}

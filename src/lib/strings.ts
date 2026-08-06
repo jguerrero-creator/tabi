@@ -406,6 +406,16 @@ export const strings = {
     cancel: 'Cancel',
     ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
   },
+  nearbyPlaces: {
+    title: 'Nearby places',
+    loading: 'Finding nearby places…',
+    emptyResults: 'No nearby places found.',
+    errorGeneric: 'Could not load nearby places. Please try again.',
+    addCta: 'Add',
+    manualFallbackCta: 'Enter manually instead',
+    cancel: 'Cancel',
+    ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
+  },
   dayLocation: {
     addCta: '+ Add planned location',
     label: 'Planned location',
