@@ -1,10 +1,14 @@
-import { APIProvider, Map, Marker, Polyline } from '@vis.gl/react-google-maps'
+import { AdvancedMarker, APIProvider, Map, Polyline } from '@vis.gl/react-google-maps'
 import { mapStatusColor } from '../../lib/mapStatusColors'
 import { strings } from '../../lib/strings'
 import type { ReservationStatus } from '../../types/reservation'
 import { MapErrorBoundary } from './MapErrorBoundary'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+// AdvancedMarkerElement (TABI-153) requires a Map ID on every <Map>, unlike the
+// legacy Marker it replaces. Falls back to Google's DEMO_MAP_ID (dev watermark)
+// until a real Map ID is provisioned in Cloud Console — see .env.local.example.
+const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined) || 'DEMO_MAP_ID'
 
 export interface MapPoint {
   lat: number
@@ -36,8 +40,9 @@ export function MiniMap({ points, className = '', heightClassName = 'h-40' }: Mi
   return (
     <div className={`${heightClassName} w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
       <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-        <APIProvider apiKey={mapsApiKey}>
+        <APIProvider apiKey={mapsApiKey} libraries={['marker']}>
           <Map
+            mapId={mapId}
             defaultCenter={center}
             defaultZoom={points.length === 2 ? 10 : 14}
             gestureHandling="cooperative"
@@ -70,27 +75,15 @@ export function MapTrace({ points }: { points: MapPoint[] }) {
         />
       ))}
       {points.map((point, index) => (
-        <Marker
-          key={`${point.label}-${index}`}
-          position={point}
-          title={point.label}
-          icon={markerIcon(point.status)}
-        />
+        <AdvancedMarker key={`${point.label}-${index}`} position={point} title={point.label}>
+          <span
+            className="block rounded-full border-2 border-white shadow-sm"
+            style={{ width: 14, height: 14, backgroundColor: mapStatusColor(point.status) }}
+          />
+        </AdvancedMarker>
       ))}
     </>
   )
-}
-
-function markerIcon(status: ReservationStatus | null): google.maps.Symbol | undefined {
-  if (typeof google === 'undefined') return undefined
-  return {
-    path: google.maps.SymbolPath.CIRCLE,
-    fillColor: mapStatusColor(status),
-    fillOpacity: 1,
-    strokeColor: '#ffffff',
-    strokeWeight: 2,
-    scale: 7,
-  }
 }
 
 function midpoint(a: MapPoint, b: MapPoint) {
