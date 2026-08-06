@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ReservationIcon } from '../ui/ReservationTypeIcon'
 import { statusDotClasses } from './statusDotClasses'
+import { strings } from '../../lib/strings'
 import type { ReservationStatus, ReservationType, StaySubtype, TransportSubtype } from '../../types/reservation'
 
 export interface MenuRowFlag {
@@ -17,6 +18,8 @@ interface MenuListRowProps {
   nested?: boolean
   overlapBadge?: string
   flags?: MenuRowFlag[]
+  /** TABI-14: the Google rating snapshot taken at bookmark time (TABI-49/TABI-24), if any. */
+  rating?: { rating: number; userRatingsTotal: number | null } | null
   staySubtype?: StaySubtype | null
   transportSubtype?: TransportSubtype | null
 }
@@ -35,6 +38,7 @@ export function MenuListRow({
   nested,
   overlapBadge,
   flags,
+  rating,
   staySubtype,
   transportSubtype,
 }: MenuListRowProps) {
@@ -57,9 +61,14 @@ export function MenuListRow({
           </p>
           {secondaryLabel && <p className="text-xs text-slate-500">{secondaryLabel}</p>}
           {overlapBadge && <p className="text-[11px] text-slate-400">{overlapBadge}</p>}
-          {flags && flags.length > 0 && (
+          {((flags && flags.length > 0) || rating) && (
             <div className="mt-1 flex flex-wrap gap-1">
-              {flags.map((flag) => (
+              {rating && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                  {strings.activityPlaceSearch.ratingLabel(rating.rating, rating.userRatingsTotal ?? 0)}
+                </span>
+              )}
+              {flags?.map((flag) => (
                 <span
                   key={flag.label}
                   className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${flagToneClasses[flag.tone]}`}

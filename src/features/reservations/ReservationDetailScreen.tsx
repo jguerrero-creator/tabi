@@ -810,14 +810,15 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
           checkInDeadline={reservation.stay_check_in_deadline}
         />
       )}
-      {reservation.type === 'activity' && (
-        <ActivityPlaceFlags
-          rating={reservation.place_rating}
-          userRatingsTotal={reservation.place_user_ratings_total}
-          photoRef={reservation.place_photo_ref}
-          category={reservation.place_category}
-        />
-      )}
+      {/* TABI-14: place_* columns are written unconditionally regardless of reservation
+          type (see AddReservationModal's submit payload), so this isn't gated to
+          type === 'activity' — ActivityPlaceFlags' own null-guard handles "nothing to show". */}
+      <ActivityPlaceFlags
+        rating={reservation.place_rating}
+        userRatingsTotal={reservation.place_user_ratings_total}
+        photoRef={reservation.place_photo_ref}
+        category={reservation.place_category}
+      />
     </div>
   )
 }

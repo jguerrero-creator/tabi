@@ -94,6 +94,7 @@ export function StayMenuScreen() {
                         status={reservation.status}
                         secondaryLabel={checkoutLabel(reservation)}
                         flags={stayFlags(reservation)}
+                        rating={placeRating(reservation)}
                         staySubtype={reservation.stay_subtype}
                       />
                       {(childrenByMainId.get(reservation.id) ?? []).map((nested) => (
@@ -107,6 +108,7 @@ export function StayMenuScreen() {
                           nested
                           overlapBadge={strings.common.overlapBadge}
                           flags={stayFlags(nested)}
+                          rating={placeRating(nested)}
                           staySubtype={nested.stay_subtype}
                         />
                       ))}
@@ -163,6 +165,15 @@ function checkoutLabel(reservation: Reservation): string | null {
   // Derived from stored start_at/end_at, never from how the reservation was entered
   // (manual checkout date vs. the nights field, TABI-112) — one calculation either way.
   return strings.stayMenu.nightsCount(nightsBetween(checkIn, checkOut))
+}
+
+// TABI-14: the Google rating snapshot taken at bookmark time (TABI-49/TABI-24), if any —
+// place_* columns are written unconditionally regardless of reservation type, so a Stay
+// can carry this data too (e.g. picking a place from the nearby-map then switching type).
+function placeRating(reservation: Reservation): { rating: number; userRatingsTotal: number | null } | null {
+  return reservation.place_rating != null
+    ? { rating: reservation.place_rating, userRatingsTotal: reservation.place_user_ratings_total }
+    : null
 }
 
 function stayFlags(reservation: Reservation): MenuRowFlag[] {

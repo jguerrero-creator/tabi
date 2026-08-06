@@ -91,6 +91,11 @@ export function ActivitiesMenuScreen() {
                     title={reservation.name}
                     status={reservation.status}
                     secondaryLabel={endLabel(reservation)}
+                    rating={
+                      reservation.place_rating != null
+                        ? { rating: reservation.place_rating, userRatingsTotal: reservation.place_user_ratings_total }
+                        : null
+                    }
                   />
                 ))}
               </MenuSection>
