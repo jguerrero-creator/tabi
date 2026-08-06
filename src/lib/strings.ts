@@ -391,7 +391,7 @@ export const strings = {
     manualFallbackCta: 'Enter manually instead',
   },
   addressPicker: {
-    title: 'Select an Address',
+    title: 'Select an address',
     cancel: 'Cancel',
     selectionRequiredError: 'Please select an address from the list, or edit your search.',
   },
