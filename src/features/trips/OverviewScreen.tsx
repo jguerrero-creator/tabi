@@ -4,7 +4,9 @@ import { groupByDate, UNSCHEDULED_KEY } from '../../components/menu/groupByDate'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDayPillLabel, formatInZone, formatTripDateRange } from '../../lib/datetime'
+import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { showSavedToast } from '../../lib/toast'
 import { useProfile } from '../../lib/useProfile'
 import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
@@ -64,6 +66,42 @@ export function OverviewScreen() {
     setQuickAddBlock(null)
     setQuickAddStep(null)
     setQuickAddPlace(null)
+  }
+
+  // TABI-21: a place picked from the nearby-places map lands straight on the
+  // timeline — no intermediate form step, since the block already supplies the
+  // start time/timezone and the map result supplies everything else an Activity
+  // needs. Falls back to the full form (pre-filled with the picked place) rather
+  // than failing silently if the direct save errors, so the user's selection
+  // isn't lost.
+  async function handleSelectFreeBlockPlace(place: ResolvedPlace) {
+    if (!quickAddBlock) return
+    try {
+      await createReservation({
+        type: 'activity',
+        status: 'to_book',
+        name: place.placeName ?? place.formattedAddress,
+        start_at: quickAddBlock.startAt,
+        start_timezone: quickAddBlock.timezone,
+        start_address: place.formattedAddress,
+        start_lat: place.lat,
+        start_lng: place.lng,
+        start_place_name: place.placeName,
+        start_city: place.city,
+        place_google_id: place.placeDetails?.googlePlaceId ?? null,
+        place_rating: place.placeDetails?.rating ?? null,
+        place_user_ratings_total: place.placeDetails?.userRatingsTotal ?? null,
+        place_photo_ref: place.placeDetails?.photoRef ?? null,
+        place_category: place.placeDetails?.category ?? null,
+      })
+      await refetchReservations()
+      showSavedToast(strings.common.saved)
+      closeQuickAdd()
+    } catch (err) {
+      logClientError('OverviewScreen.handleSelectFreeBlockPlace', err)
+      setQuickAddPlace(place)
+      setQuickAddStep('form')
+    }
   }
   // TABI-155: "+ Add" on a computed "Getting Around" leg opens the same shared
   // Add sheet, prefilled with that leg's departure/arrival and mode.
@@ -324,10 +362,7 @@ export function OverviewScreen() {
       {quickAddStep === 'places' && quickAddBlock?.contextLocation && (
         <NearbyPlacesMapModal
           center={quickAddBlock.contextLocation}
-          onSelect={(place) => {
-            setQuickAddPlace(place)
-            setQuickAddStep('form')
-          }}
+          onSelect={handleSelectFreeBlockPlace}
           onSkip={() => {
             setQuickAddPlace(null)
             setQuickAddStep('form')
