@@ -13,6 +13,7 @@ import type { Database } from '../../src/types/database.types'
 const DAILY_LIMITS = {
   'extract-reservation': 20,
   'import-url': 20,
+  'extract-plan': 10,
   'places-search': 50,
   'places-nearby': 50,
 } as const

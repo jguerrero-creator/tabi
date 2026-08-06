@@ -15,6 +15,7 @@ import type { Reminder } from '../../types/reminder'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { AddReservationModal, type ResolvedPlace } from '../reservations/AddReservationModal'
 import { ImportConfirmationModal } from '../reservations/ImportConfirmationModal'
+import { ImportPlanModal } from '../reservations/ImportPlanModal'
 import { NearbyPlacesMapModal } from '../reservations/NearbyPlacesMapModal'
 import { QuickAddModal } from '../reservations/QuickAddModal'
 import { SavePlaceModal } from '../reservations/SavePlaceModal'
@@ -109,6 +110,10 @@ export function OverviewScreen() {
   // TABI-12: entry point for the extraction-review flow — paste-text, email upload (TABI-15),
   // PDF upload (TABI-23), and photo upload (TABI-58) all live inside ImportConfirmationModal.
   const [showImportModal, setShowImportModal] = useState(false)
+  // TABI-208: bulk import of a textual travel plan (a written itinerary, an exported AI
+  // planning conversation, or notes) — extracts a LIST of decided day-locations/reservations in
+  // one call, reviewed/edited one at a time via ImportPlanModal before any of it is saved.
+  const [showImportPlanModal, setShowImportPlanModal] = useState(false)
   // TABI-194: ultra-fast placeholder creation — a single free-text line through the same
   // extraction pipeline/review screen as ImportConfirmationModal, via QuickAddModal.
   const [showQuickAddModal, setShowQuickAddModal] = useState(false)
@@ -241,6 +246,15 @@ export function OverviewScreen() {
                 className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 {strings.importConfirmation.triggerLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImportPlanModal(true)}
+                disabled={aiAccessDenied}
+                title={aiAccessDenied ? strings.overview.aiAccessRequired : undefined}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+              >
+                {strings.importPlan.triggerLabel}
               </button>
             </div>
 
@@ -417,6 +431,19 @@ export function OverviewScreen() {
             await refetchReservations()
             return created
           }}
+        />
+      )}
+
+      {showImportPlanModal && (
+        <ImportPlanModal
+          tripId={tripId ?? ''}
+          onClose={() => setShowImportPlanModal(false)}
+          onCreate={async (input) => {
+            const created = await createReservation(input)
+            await refetchReservations()
+            return created
+          }}
+          onSaveDayLocation={saveDayLocation}
         />
       )}
 
