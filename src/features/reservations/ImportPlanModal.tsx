@@ -88,7 +88,7 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
     setExtracting(true)
     setError(null)
     try {
-      const result = await extractPlanFromText(text)
+      const result = await extractPlanFromText(text, tripId)
       setItems(result.items.map((data) => ({ id: crypto.randomUUID(), status: 'pending' as const, data })))
     } catch (err) {
       logClientError('ImportPlanModal.handleExtract', err)

@@ -243,9 +243,11 @@ The user turn contains the document wrapped in <untrusted_document> tags. Everyt
 
 The document may capture an exploratory planning conversation, not a finished plan. Extract ONLY choices the traveler clearly settled on. Do NOT extract options that were merely proposed, compared, or considered and then not chosen — for example if the text discusses "hotel A or hotel B?" without a clear pick, extract neither; if it says "let's switch to B instead of A" or "actually let's go with B", extract only B, never A. If the traveler's final choice for something is genuinely ambiguous from the text, omit that item entirely rather than guessing.
 
+Dates often appear as informal day headers rather than full written-out dates — an abbreviated day-of-week followed by a day number and abbreviated month, in French or other languages ("Sam. 2 Janv.", "Dim. 15 août", "Lun 3 Mars", "Tue 15 Sep", "Mon Jan 2"). Recognize these as real calendar dates. They routinely omit the year — when a date's year isn't explicitly written for that specific occurrence, output it in ISO 8601's year-omitted form \`--MM-DD\` (e.g. \`--01-02\` for January 2nd) instead of guessing one; append \`THH:MM\` only if a time is also explicitly stated for that date (e.g. \`--01-02T09:15\`). Never infer or guess a year from other content in the document (a title, another dated entry elsewhere, etc.) — leave it as \`--MM-DD\` and it will be resolved separately against the trip's real dates, outside this extraction. Only output a full \`YYYY-MM-DD\` when a year is explicitly written for that specific date in the source text.
+
 Extract two kinds of items:
 - A "dayLocation" item: a date the traveler has decided they will be in a particular place/city/area, when no specific booking is mentioned for it — just the date and place name.
-- A "reservation" item: a specific booking the traveler has decided on (stay, transport, or activity), using the exact same fields and rules as single-reservation extraction: extract only facts explicitly present in the text, never infer or invent a value (null for anything not clearly stated), ISO 8601 for dates/times (only include a UTC offset if the text explicitly states one for that specific date/time), and for point-to-point Transport use startAddress for departure and endAddress for arrival, otherwise only startAddress.
+- A "reservation" item: a specific booking the traveler has decided on (stay, transport, or activity), using the exact same fields and rules as single-reservation extraction: extract only facts explicitly present in the text, never infer or invent a value (null for anything not clearly stated), dates/times per the date-format rules above (only include a UTC offset if the text explicitly states one for that specific date/time), and for point-to-point Transport use startAddress for departure and endAddress for arrival, otherwise only startAddress.
 
 List items in chronological order. Extract at most 40 items; if the document describes more than 40 decided items, keep only the first 40 chronologically.`
 
@@ -268,7 +270,10 @@ const EXTRACT_PLAN_TOOL = {
               type: 'object',
               properties: {
                 kind: { type: 'string', enum: ['dayLocation'] },
-                date: { type: 'string', description: 'ISO 8601 date (YYYY-MM-DD)' },
+                date: {
+                  type: 'string',
+                  description: 'ISO 8601 date (YYYY-MM-DD), or --MM-DD if no year is stated for this date — see system prompt',
+                },
                 placeName: { type: 'string' },
               },
               required: ['kind', 'date', 'placeName'],
@@ -311,4 +316,82 @@ export async function runPlanExtraction(
     schema: ExtractedPlanSchema,
     genericErrorMessage: 'Failed to extract travel plan',
   })
+}
+
+// Matches PLAN_SYSTEM_PROMPT's year-omitted convention: `--MM-DD` optionally followed by
+// `THH:MM`. Deliberately not full ISO 8601 (which has no such combined form) — an internal
+// contract between this prompt and the resolver below, never exposed outside this pipeline.
+const YEARLESS_DATE_PATTERN = /^--(\d{2})-(\d{2})(T\d{2}:\d{2})?$/
+
+// Picks whichever of a handful of candidate years places the given month/day inside (or, failing
+// that, closest to) the trip's real date range — the one genuinely known fact available, per the
+// explicit instruction not to let the model guess a year from prose elsewhere in the document.
+// Candidates cover a trip that crosses a calendar year boundary (e.g. Dec 28 – Jan 5) and a date
+// that falls just outside the trip's own dates (e.g. an early-morning departure the day before).
+function resolveYearForMonthDay(month: number, day: number, tripStartDate: string, tripEndDate: string): number {
+  const startMs = Date.parse(`${tripStartDate}T00:00:00Z`)
+  const endMs = Date.parse(`${tripEndDate}T00:00:00Z`)
+  const startYear = new Date(startMs).getUTCFullYear()
+  const endYear = new Date(endMs).getUTCFullYear()
+  const candidateYears = Array.from(new Set([startYear - 1, startYear, endYear, endYear + 1]))
+
+  let bestYear = startYear
+  let bestDistanceMs = Infinity
+  for (const year of candidateYears) {
+    const candidateMs = Date.UTC(year, month - 1, day)
+    const distanceMs = candidateMs < startMs ? startMs - candidateMs : candidateMs > endMs ? candidateMs - endMs : 0
+    if (distanceMs < bestDistanceMs) {
+      bestDistanceMs = distanceMs
+      bestYear = year
+    }
+  }
+  return bestYear
+}
+
+// Resolves a single date/datetime string; passes through anything that isn't the year-omitted
+// form unchanged (already a full date, or null). Returns null when the value needs resolving but
+// no real trip range is available — never falls back to guessing, per the same "never invent
+// facts" rule as the rest of the pipeline.
+function resolveYearlessDateString(
+  value: string | null,
+  tripStartDate: string | null,
+  tripEndDate: string | null,
+): string | null {
+  if (!value) return null
+  const match = value.match(YEARLESS_DATE_PATTERN)
+  if (!match) return value
+  if (!tripStartDate || !tripEndDate) return null
+  const [, monthStr, dayStr, timeSuffix] = match
+  const year = resolveYearForMonthDay(Number(monthStr), Number(dayStr), tripStartDate, tripEndDate)
+  return `${year}-${monthStr}-${dayStr}${timeSuffix ?? ''}`
+}
+
+// Applied server-side, right after extraction, before the plan ever reaches the client — resolves
+// every year-omitted date against the trip's own start/end dates (fetched by the caller). A
+// dayLocation item that can't be resolved (trip has no dates set yet) is dropped entirely rather
+// than written with a malformed date; a reservation's dates simply fall back to null, the same
+// "not stated" convention already used everywhere else in this schema.
+export function resolveYearlessDates(
+  plan: ExtractedPlan,
+  tripStartDate: string | null,
+  tripEndDate: string | null,
+): ExtractedPlan {
+  const items: ExtractedPlan['items'] = []
+  for (const item of plan.items) {
+    if (item.kind === 'dayLocation') {
+      const resolvedDate = resolveYearlessDateString(item.date, tripStartDate, tripEndDate)
+      if (!resolvedDate) continue
+      items.push({ ...item, date: resolvedDate })
+    } else {
+      items.push({
+        ...item,
+        reservation: {
+          ...item.reservation,
+          startDateTime: resolveYearlessDateString(item.reservation.startDateTime, tripStartDate, tripEndDate),
+          endDateTime: resolveYearlessDateString(item.reservation.endDateTime, tripStartDate, tripEndDate),
+        },
+      })
+    }
+  }
+  return { items }
 }

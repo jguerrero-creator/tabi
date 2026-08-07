@@ -5,8 +5,10 @@ export class PlanExtractionFailedError extends Error {}
 
 // TABI-208: bulk import of a textual travel plan — its own endpoint (api/extract-plan.ts) since
 // the output is a list, not a single reservation, but the same auth/error-handling shape as
-// src/lib/extractReservation.ts's extract() helper.
-export async function extractPlanFromText(text: string): Promise<ExtractedPlan> {
+// src/lib/extractReservation.ts's extract() helper. tripId lets the server resolve any date the
+// model extracted without a year (an informal day header like "Sam. 2 Janv.") against the trip's
+// own real start/end dates — never guessed from the document's own text.
+export async function extractPlanFromText(text: string, tripId: string): Promise<ExtractedPlan> {
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
 
@@ -16,7 +18,7 @@ export async function extractPlanFromText(text: string): Promise<ExtractedPlan> 
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify({ kind: 'text', text }),
+    body: JSON.stringify({ kind: 'text', text, tripId }),
   })
 
   if (!response.ok) {
