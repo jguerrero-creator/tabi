@@ -186,6 +186,36 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     if (reservation.type !== 'activity' || !reservation.start_at || !reservation.end_at) return ''
     return String(durationHoursMinutes(reservation.start_at, reservation.end_at).minutes)
   })
+  // TABI-211: Transport had no date/time editing at all — same "editable dates in the detail
+  // screen" gap TABI-160 already closed for Stay, mirrored here: separate date/time state per
+  // leg, with the same initial-snapshot dirty-check as Stay's checkInTime/checkOutTime so editing
+  // something else (price, note…) without touching a defaulted time doesn't clear its "Default"
+  // badge. A vehicle rental (at_disposal) only ever collects dates, same as at creation (TABI-123).
+  const isTransportAtDisposal = reservation.type === 'transport' && reservation.transport_subtype === 'at_disposal'
+  const [transportStartDate, setTransportStartDate] = useState(() =>
+    reservation.type === 'transport' && reservation.start_at
+      ? localDateKey(reservation.start_at, reservation.start_timezone)
+      : '',
+  )
+  const [transportStartTime, setTransportStartTime] = useState(() =>
+    reservation.type === 'transport' && reservation.start_at
+      ? localTimeKey(reservation.start_at, reservation.start_timezone)
+      : '',
+  )
+  const [transportEndDate, setTransportEndDate] = useState(() =>
+    reservation.type === 'transport' && reservation.end_at
+      ? localDateKey(reservation.end_at, reservation.end_timezone)
+      : '',
+  )
+  const [transportEndTime, setTransportEndTime] = useState(() =>
+    reservation.type === 'transport' && reservation.end_at
+      ? localTimeKey(reservation.end_at, reservation.end_timezone)
+      : '',
+  )
+  const initialTransportStartDateRef = useRef(transportStartDate)
+  const initialTransportStartTimeRef = useRef(transportStartTime)
+  const initialTransportEndDateRef = useRef(transportEndDate)
+  const initialTransportEndTimeRef = useRef(transportEndTime)
   const [startAddress, setStartAddress] = useState(reservation.start_address ?? '')
   const [endAddress, setEndAddress] = useState(reservation.end_address ?? '')
   const [startPlace, setStartPlace] = useState<ResolvedPlace | null>(null)
@@ -368,6 +398,47 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       }
     }
 
+    // TABI-211: Transport's departure/arrival, previously not editable at all here — same
+    // initial-snapshot dirty-check shape as stayDatePatch above (both legs are always real, timed
+    // events at creation, unlike Activity). An at_disposal leg has no time field to edit, so its
+    // effective time always falls back to whatever was already stored.
+    let transportDatePatch: Partial<Reservation> = {}
+    if (reservation.type === 'transport' && reservation.start_at && reservation.end_at) {
+      const effectiveStartDate = transportStartDate || initialTransportStartDateRef.current
+      const effectiveEndDate = transportEndDate || initialTransportEndDateRef.current
+      const effectiveStartTime = isTransportAtDisposal
+        ? initialTransportStartTimeRef.current
+        : transportStartTime.trim() || initialTransportStartTimeRef.current
+      const effectiveEndTime = isTransportAtDisposal
+        ? initialTransportEndTimeRef.current
+        : transportEndTime.trim() || initialTransportEndTimeRef.current
+
+      const newStartAt = zonedTimeToUtc(effectiveStartDate, effectiveStartTime, reservation.start_timezone ?? localTimeZone())
+      const newEndAt = zonedTimeToUtc(effectiveEndDate, effectiveEndTime, reservation.end_timezone ?? localTimeZone())
+      if (newEndAt <= newStartAt) {
+        setFormError(strings.addReservation.errorEndBeforeStart)
+        return
+      }
+
+      const startDateChanged = effectiveStartDate !== initialTransportStartDateRef.current
+      const startTimeChanged =
+        !isTransportAtDisposal &&
+        transportStartTime.trim() !== '' &&
+        transportStartTime !== initialTransportStartTimeRef.current
+      const endDateChanged = effectiveEndDate !== initialTransportEndDateRef.current
+      const endTimeChanged =
+        !isTransportAtDisposal && transportEndTime.trim() !== '' && transportEndTime !== initialTransportEndTimeRef.current
+
+      transportDatePatch = {
+        ...(startDateChanged || startTimeChanged
+          ? { start_at: newStartAt, ...(startTimeChanged ? { start_time_is_default: false } : {}) }
+          : {}),
+        ...(endDateChanged || endTimeChanged
+          ? { end_at: newEndAt, ...(endTimeChanged ? { end_time_is_default: false } : {}) }
+          : {}),
+      }
+    }
+
     let patch: Partial<Reservation> = {
       ...(isAutoNamedTransport ? {} : { name: name.trim() }),
       note: note.trim() || null,
@@ -381,6 +452,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         : {}),
       ...stayDatePatch,
       ...activityDatePatch,
+      ...transportDatePatch,
     }
 
     try {
@@ -631,6 +703,50 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 onHoursChange={setDurationHours}
                 onMinutesChange={setDurationMinutes}
               />
+            )}
+            {reservation.type === 'transport' && (
+              <div className="flex gap-3">
+                <Field label={strings.reservationDetail.startDateLabel} className="flex-1">
+                  <input
+                    type="date"
+                    value={transportStartDate}
+                    onChange={(e) => setTransportStartDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+                {!isTransportAtDisposal && (
+                  <Field label={strings.reservationDetail.startTimeLabel} className="flex-1">
+                    <input
+                      type="time"
+                      value={transportStartTime}
+                      onChange={(e) => setTransportStartTime(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    />
+                  </Field>
+                )}
+              </div>
+            )}
+            {reservation.type === 'transport' && (
+              <div className="flex gap-3">
+                <Field label={strings.reservationDetail.endDateLabel} className="flex-1">
+                  <input
+                    type="date"
+                    value={transportEndDate}
+                    onChange={(e) => setTransportEndDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+                {!isTransportAtDisposal && (
+                  <Field label={strings.reservationDetail.endTimeLabel} className="flex-1">
+                    <input
+                      type="time"
+                      value={transportEndTime}
+                      onChange={(e) => setTransportEndTime(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    />
+                  </Field>
+                )}
+              </div>
             )}
             <div className="flex gap-3">
               <Field label={strings.reservationDetail.priceLabel} className="flex-1">

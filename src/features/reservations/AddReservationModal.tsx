@@ -68,6 +68,16 @@ export type ResolvedPlace = GeocodeResult & {
 const STAY_DEFAULT_CHECK_IN_TIME = '14:00'
 const STAY_DEFAULT_CHECK_OUT_TIME = '10:00'
 
+// A point-to-point Transport departure time is optional too — it used to hard-block submission
+// ("Start date and time are required"), but a missing departure time is exactly the kind of gap
+// that shouldn't dead-end the flow (e.g. TABI-208's bulk import rarely has a precise time). Falls
+// back to the trip's own day-window opening time instead (`trip.day_start_time` — the same field
+// TripLegsSection already anchors a leg quick-add to), flagged via start_time_is_default so it's
+// never silent: this feeds the travel-time engine directly (5b), so the traveler needs to see it
+// was guessed, via the same "Default" badge TABI-144 already renders on the detail screen for
+// defaulted Stay times. Only used if `trip` hasn't loaded yet.
+const DAY_START_TIME_FALLBACK = '08:00'
+
 const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
 const transportSubtypeOptions: TransportSubtype[] = ['point_to_point', 'at_disposal']
@@ -247,7 +257,11 @@ export function AddReservationModal({
     transportSubtype: isTransport ? transportSubtype : null,
     requiresEndAddress: isPointToPoint || isAtDisposal,
     requiresStart: mainType !== 'activity',
-    requiresStartTime: isPointToPoint,
+    // Departure time is never hard-required — a missing one now falls back to the trip's
+    // day-start time (see buildAndProceed) instead of blocking submission, mirroring how Stay's
+    // check-in time already works. Kept as its own field (rather than deleted) since it still
+    // governs the start time input's (inert, noValidate-bypassed) `required` attribute.
+    requiresStartTime: false,
     requiresEnd: mainType !== 'activity',
     requiresEndTime: isPointToPoint,
   }
@@ -400,7 +414,10 @@ export function AddReservationModal({
       setError(strings.addReservation.errorNameRequired)
       return
     }
-    if (option.requiresStart && (!startDate || (option.requiresStartTime && !startTime))) {
+    // Only the date is ever hard-required here now — a missing start time (Stay's check-in, or
+    // a point-to-point Transport departure) always has a default to fall back to, computed in
+    // buildAndProceed below.
+    if (option.requiresStart && !startDate) {
       setError(strings.addReservation.errorStartRequired)
       return
     }
@@ -477,9 +494,17 @@ export function AddReservationModal({
     // the stored timestamp never drifts to an adjacent calendar day across timezone conversion.
     // TABI-144: Stay check-in/check-out time is optional — fall back to a standard default
     // (14:00/10:00, per TABI-205) when left blank, flagged so the detail screen can surface it as unconfirmed.
-    const startTimeDefaulted = option.dbType === 'stay' && !startTime
+    // A point-to-point Transport departure time is optional too — falls back to the trip's own
+    // day-start time instead (same field TripLegsSection already anchors a leg quick-add to),
+    // flagged the same way so it's never silent about feeding the travel-time calc.
+    const startTimeDefaulted = (option.dbType === 'stay' || isPointToPoint) && !startTime
     const endTimeDefaulted = option.dbType === 'stay' && !endTime
-    const effectiveStartTime = isAtDisposal ? '12:00' : startTimeDefaulted ? STAY_DEFAULT_CHECK_IN_TIME : startTime
+    const tripDayStartTime = trip?.day_start_time.slice(0, 5) ?? DAY_START_TIME_FALLBACK
+    const effectiveStartTime = isAtDisposal
+      ? '12:00'
+      : startTimeDefaulted
+        ? (option.dbType === 'stay' ? STAY_DEFAULT_CHECK_IN_TIME : tripDayStartTime)
+        : startTime
     const effectiveEndTime = isAtDisposal ? '12:00' : endTimeDefaulted ? STAY_DEFAULT_CHECK_OUT_TIME : endTime
     const startAt = startDate && effectiveStartTime ? zonedTimeToUtc(startDate, effectiveStartTime, startTimezone) : null
     const endAt = endDate && effectiveEndTime ? zonedTimeToUtc(endDate, effectiveEndTime, endTimezone) : null
