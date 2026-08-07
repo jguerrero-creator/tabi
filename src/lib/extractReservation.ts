@@ -33,14 +33,25 @@ async function extract(body: Record<string, unknown>, endpoint = '/api/extract-r
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify(body),
-  })
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  }
+  const requestBody = JSON.stringify(body)
+
+  // TABI-8: a bounded extraction call can still occasionally hit Vercel's 25s Edge timeout (504)
+  // under an Anthropic API latency spike, even with the fix (Sonnet 5, thinking disabled) in
+  // place — one retry gives a transient spike a second chance before falling back to manual entry.
+  let response: Response
+  try {
+    response = await fetch(endpoint, { method: 'POST', headers, body: requestBody })
+    if (response.status === 504) {
+      response = await fetch(endpoint, { method: 'POST', headers, body: requestBody })
+    }
+  } catch (error) {
+    console.error('extractReservation: network error', error)
+    throw new ExtractionFailedError('Failed to extract reservation')
+  }
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null)

@@ -36,7 +36,14 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Server misconfigured' }, 500)
   }
 
-  const entitlement = await requireEntitlement(request, { feature: 'aiAccess' })
+  // Run entitlement + rate-limit checks concurrently rather than sequentially — each is its own
+  // Supabase round trip, and running them one after another eats into the 25s Edge budget before
+  // the (already latency-sensitive, see TABI-8) Claude call even starts.
+  const [entitlement, rateLimit] = await Promise.all([
+    requireEntitlement(request, { feature: 'aiAccess' }),
+    checkRateLimit(request, 'extract-reservation'),
+  ])
+
   if (!entitlement.allowed) {
     if (entitlement.reason === 'unauthenticated') {
       return jsonResponse({ error: 'Authentication required' }, 401)
@@ -47,7 +54,6 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Server misconfigured' }, 500)
   }
 
-  const rateLimit = await checkRateLimit(request, 'extract-reservation')
   if (!rateLimit.allowed) {
     if (rateLimit.reason === 'unauthenticated') {
       return jsonResponse({ error: 'Authentication required' }, 401)
