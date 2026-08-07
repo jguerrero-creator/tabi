@@ -257,8 +257,11 @@ const EXTRACT_PLAN_TOOL = {
     type: 'object',
     properties: {
       items: {
+        // Note: Anthropic's strict tool input_schema rejects `maxItems` on array properties
+        // ("For 'array' type, property 'maxItems' is not supported") — the 40-item cap is
+        // enforced by the prompt instruction and by ExtractedPlanSchema's z.array().max(40)
+        // re-validation on the response instead.
         type: 'array',
-        maxItems: 40,
         items: {
           anyOf: [
             {
