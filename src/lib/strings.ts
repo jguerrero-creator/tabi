@@ -411,6 +411,9 @@ export const strings = {
     emptyState: "We couldn't find anything decided in this text — try pasting more detail, or enter it manually instead.",
     dateFieldLabel: 'Date',
     untitledReservation: 'Untitled reservation',
+    confirmAllCta: 'Confirm all',
+    confirmingProgress: (current: number, total: number) => `Confirming ${current} of ${total}…`,
+    stopCta: 'Stop',
   },
   addressPicker: {
     title: 'Select an address',

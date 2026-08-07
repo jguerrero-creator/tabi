@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import { FormSheet } from '../../components/ui/FormSheet'
@@ -53,8 +53,16 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
   const [error, setError] = useState<string | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [items, setItems] = useState<ReviewItem[] | null>(null)
-  const [editingReservationId, setEditingReservationId] = useState<string | null>(null)
-  const [editingDayLocationId, setEditingDayLocationId] = useState<string | null>(null)
+  // A manual "Edit & Save" tap on one row, independent of the automated queue below.
+  const [manualEditingId, setManualEditingId] = useState<string | null>(null)
+  // TABI-210: "Confirm all" fast path — a snapshot of pending item ids to auto-walk through one at
+  // a time, each fired via AddReservationModal/PlanDayLocationEditor's own autoSubmit/autoStart
+  // (so every geocoding/overlap/out-of-period/mismatch/required-field check still runs and still
+  // pauses on its own dialog exactly as a manual save would — this only skips the "open the item
+  // and press Save" step for a clean, unambiguous one). `confirmAllTotal` is fixed at the count
+  // captured when the run started, so the progress label doesn't shift as items complete.
+  const [confirmAllRemaining, setConfirmAllRemaining] = useState<string[] | null>(null)
+  const [confirmAllTotal, setConfirmAllTotal] = useState(0)
 
   function handleTextChange(event: ChangeEvent<HTMLTextAreaElement>) {
     setText(event.target.value)
@@ -94,12 +102,47 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
     setItems((prev) => (prev ? prev.map((item) => (item.id === id ? { ...item, status } : item)) : prev))
   }
 
-  const editingReservationItem = items?.find((item) => item.id === editingReservationId)
+  const isConfirmAll = confirmAllRemaining !== null
+  const activeId = confirmAllRemaining ? confirmAllRemaining[0] : manualEditingId
+  const activeItem = items?.find((item) => item.id === activeId) ?? null
 
-  if (editingReservationItem && editingReservationItem.data.kind === 'reservation') {
-    const prefill = mapExtractedReservation(editingReservationItem.data.reservation, trip?.currency ?? null)
+  // Called whichever way the active item's editor finishes — saved, or the user backed out of it
+  // without saving. Either way it's done being "active": in a Confirm all run this advances to the
+  // next queued item (or ends the run); for a manual single-item edit it just returns to the list.
+  function finishActiveItem(outcome: 'saved' | 'skipped') {
+    if (!activeItem) return
+    if (outcome === 'saved') setItemStatus(activeItem.id, 'saved')
+    if (isConfirmAll) {
+      setConfirmAllRemaining((prev) => {
+        if (!prev) return prev
+        const next = prev.slice(1)
+        return next.length > 0 ? next : null
+      })
+    } else {
+      setManualEditingId(null)
+    }
+  }
+
+  function handleConfirmAll() {
+    const pendingIds = (items ?? []).filter((item) => item.status === 'pending').map((item) => item.id)
+    if (pendingIds.length === 0) return
+    setConfirmAllRemaining(pendingIds)
+    setConfirmAllTotal(pendingIds.length)
+  }
+
+  function handleStopConfirmAll() {
+    setConfirmAllRemaining(null)
+  }
+
+  if (activeItem && activeItem.data.kind === 'reservation') {
+    const prefill = mapExtractedReservation(activeItem.data.reservation, trip?.currency ?? null)
     return (
       <AddReservationModal
+        // Confirm all can move straight from one reservation-kind item to the next without ever
+        // unmounting (no intermediate list render in between) — a stable key per item forces a
+        // fresh mount each time, so autoSubmit's own "have I already fired" ref resets for every
+        // item instead of staying latched true from the previous one.
+        key={activeItem.id}
         tripId={tripId}
         defaultType={prefill.defaultType}
         requireTypeChoice={prefill.requireTypeChoice}
@@ -116,11 +159,15 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
         initialConfirmationNumber={prefill.initialConfirmationNumber}
         initialNote={prefill.initialNote}
         extractionNotice
-        onClose={() => setEditingReservationId(null)}
+        // Never auto-submit when the extraction couldn't tell what type this is (requireTypeChoice)
+        // — silently guessing a type would invent a fact the AI never actually had. Confirm all
+        // still reaches this item, it just pauses here for a real manual Save like any other
+        // ambiguity, instead of skipping straight through it.
+        autoSubmit={isConfirmAll && !prefill.requireTypeChoice}
+        onClose={() => finishActiveItem('skipped')}
         onCreate={async (input) => {
           const created = await onCreate(input)
-          setItemStatus(editingReservationItem.id, 'saved')
-          setEditingReservationId(null)
+          finishActiveItem('saved')
           return created
         }}
       />
@@ -128,39 +175,56 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
   }
 
   if (items) {
+    const pendingCount = items.filter((item) => item.status === 'pending').length
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
         <div className="flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-slate-900">{strings.importPlan.reviewTitle(items.length)}</h2>
-            <Button type="button" variant="secondary" onClick={onClose}>
-              {strings.importPlan.doneCta}
-            </Button>
+            {confirmAllRemaining ? (
+              <>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {strings.importPlan.confirmingProgress(confirmAllTotal - confirmAllRemaining.length + 1, confirmAllTotal)}
+                </h2>
+                <button type="button" onClick={handleStopConfirmAll} className="shrink-0 text-sm text-teal-700 underline">
+                  {strings.importPlan.stopCta}
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold text-slate-900">{strings.importPlan.reviewTitle(items.length)}</h2>
+                <div className="flex shrink-0 items-center gap-3">
+                  {pendingCount > 0 && (
+                    <button type="button" onClick={handleConfirmAll} className="text-sm font-medium text-teal-700 underline">
+                      {strings.importPlan.confirmAllCta}
+                    </button>
+                  )}
+                  <Button type="button" variant="secondary" onClick={onClose}>
+                    {strings.importPlan.doneCta}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-6 py-4">
             {items.length === 0 && <p className="text-sm text-slate-500">{strings.importPlan.emptyState}</p>}
             {items.map((item) =>
-              editingDayLocationId === item.id && item.data.kind === 'dayLocation' ? (
+              activeId === item.id && item.data.kind === 'dayLocation' ? (
                 <PlanDayLocationEditor
                   key={item.id}
                   initialDate={item.data.date}
                   initialPlaceName={item.data.placeName}
-                  onCancel={() => setEditingDayLocationId(null)}
+                  autoStart={isConfirmAll}
+                  onCancel={() => finishActiveItem('skipped')}
                   onSave={async (date, input) => {
                     await onSaveDayLocation(date, input)
-                    setItemStatus(item.id, 'saved')
-                    setEditingDayLocationId(null)
+                    finishActiveItem('saved')
                   }}
                 />
               ) : (
                 <PlanReviewItemRow
                   key={item.id}
                   item={item}
-                  onEdit={() =>
-                    item.data.kind === 'reservation'
-                      ? setEditingReservationId(item.id)
-                      : setEditingDayLocationId(item.id)
-                  }
+                  onEdit={() => setManualEditingId(item.id)}
                   onDiscard={() => setItemStatus(item.id, 'discarded')}
                   onUndo={() => setItemStatus(item.id, 'pending')}
                 />
@@ -313,11 +377,17 @@ function extractTimeText(iso: string | null): string | null {
 function PlanDayLocationEditor({
   initialDate,
   initialPlaceName,
+  autoStart = false,
   onSave,
   onCancel,
 }: {
   initialDate: string
   initialPlaceName: string
+  // TABI-210: Confirm all's fast path for a day-location item — fires the same handleSave a
+  // manual Save click would, once on mount, so a genuinely ambiguous address (resolveAddress's own
+  // AddressCandidatePicker/AddressNotFoundError handling below) still pauses for the user exactly
+  // as it would manually; a clean one just saves immediately.
+  autoStart?: boolean
   onSave: (date: string, input: DayLocationInput) => Promise<void>
   onCancel: () => void
 }) {
@@ -400,6 +470,14 @@ function PlanDayLocationEditor({
       setSaving(false)
     }
   }
+
+  const hasAutoStartedRef = useRef(false)
+  useEffect(() => {
+    if (!autoStart || hasAutoStartedRef.current) return
+    hasAutoStartedRef.current = true
+    void handleSave()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on mount only, guarded by the ref above
+  }, [autoStart])
 
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">

@@ -121,6 +121,15 @@ interface AddReservationModalProps {
   initialConfirmationNumber?: string | null
   initialNote?: string | null
   extractionNotice?: boolean
+  /**
+   * TABI-210: "Confirm all" fast path from ImportPlanModal's bulk-review screen — fires the same
+   * submit a manual Save click would (once, on mount) instead of waiting for the user to open the
+   * form and press Save themselves. Reuses handleSubmit as-is, so every safety check downstream
+   * (geocoding, overlap/out-of-period/location-mismatch confirms, required-field validation)
+   * still runs and still pauses on its own dialog/error exactly as it would for a manual submit —
+   * this only skips the "user notices the form and clicks Save" step for a clean, unambiguous item.
+   */
+  autoSubmit?: boolean
   onClose: () => void
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
@@ -148,6 +157,7 @@ export function AddReservationModal({
   initialConfirmationNumber = null,
   initialNote = null,
   extractionNotice = false,
+  autoSubmit = false,
   onClose,
   onCreate,
 }: AddReservationModalProps) {
@@ -626,6 +636,14 @@ export function AddReservationModal({
   function handleCancelLocationMismatch() {
     setLocationMismatchConfirm(null)
   }
+
+  const hasAutoSubmittedRef = useRef(false)
+  useEffect(() => {
+    if (!autoSubmit || hasAutoSubmittedRef.current) return
+    hasAutoSubmittedRef.current = true
+    void handleSubmit({ preventDefault: () => {} } as FormEvent)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on mount only, guarded by the ref above
+  }, [autoSubmit])
 
   return (
     <APIProvider apiKey={mapsApiKey ?? ''}>
