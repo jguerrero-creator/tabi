@@ -11,6 +11,7 @@ import { requireEntitlement } from './_lib/entitlements.js'
 import type { ContentBlockParam } from './_lib/extraction.js'
 import { runExtraction, type ExtractResult } from './_lib/extraction.js'
 import { checkRateLimit } from './_lib/rateLimit.js'
+import { timed } from './_lib/timing.js'
 
 type ExtractKind = 'text' | 'pdf' | 'image'
 
@@ -26,6 +27,8 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 export const config = { runtime: 'edge' }
 
 export default async function handler(request: Request): Promise<Response> {
+  const requestStart = Date.now()
+
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
@@ -38,11 +41,14 @@ export default async function handler(request: Request): Promise<Response> {
 
   // Run entitlement + rate-limit checks concurrently rather than sequentially — each is its own
   // Supabase round trip, and running them one after another eats into the 25s Edge budget before
-  // the (already latency-sensitive, see TABI-8) Claude call even starts.
+  // the (already latency-sensitive, see TABI-8) Claude call even starts. Each is timed
+  // individually (not just the Promise.all as a whole) so a real 504 repro shows which of the two
+  // — if either — actually ate the budget, instead of assuming it's the Claude call by default.
   const [entitlement, rateLimit] = await Promise.all([
-    requireEntitlement(request, { feature: 'aiAccess' }),
-    checkRateLimit(request, 'extract-reservation'),
+    timed('extract-reservation', 'entitlement check', requireEntitlement(request, { feature: 'aiAccess' })),
+    timed('extract-reservation', 'rate-limit check', checkRateLimit(request, 'extract-reservation')),
   ])
+  console.log(`extract-reservation: [timing] entitlement+rate-limit stage total ${Date.now() - requestStart}ms`)
 
   if (!entitlement.allowed) {
     if (entitlement.reason === 'unauthenticated') {
@@ -77,6 +83,7 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const result = await runExtraction(contentBlock.block, 'Extract this reservation.', apiKey, 'extract-reservation')
+  console.log(`extract-reservation: [timing] handler total ${Date.now() - requestStart}ms`)
   return jsonResponse<ExtractResult>(result)
 }
 

@@ -12,6 +12,7 @@
 // strict tool-use schema only constrains the request; it doesn't guarantee the response actually
 // matches it (TABI-94).
 import { z } from 'zod'
+import { timed } from './timing.js'
 
 export type ContentBlockParam =
   | { type: 'text'; text: string }
@@ -137,47 +138,58 @@ async function callClaudeTool<T>(params: {
     params
 
   let response: AnthropicMessageResponse
+  // TABI-8/timeout investigation: a real 504 kills this function mid-flight, so the "started"
+  // log below (emitted immediately, before the await) is what proves the fetch was still in
+  // flight at the moment of the kill — the "took Xms" log from `timed` only fires if the fetch
+  // actually settles, which a genuine hang never reaches.
+  const claudeStageStart = Date.now()
+  console.log(`${logPrefix}: [timing] starting Claude fetch`)
   try {
-    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        max_tokens: maxTokens,
-        // Sonnet 5 runs adaptive thinking by default when this is omitted
-        // (unlike Opus 4.8, where omitting it means no thinking) — disable
-        // explicitly, same reasoning as the Opus thinking removal above.
-        thinking: { type: 'disabled' },
-        system: systemPrompt,
-        tools: [tool],
-        tool_choice: { type: 'tool', name: tool.name },
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: '<untrusted_document>' },
-              contentBlock,
-              { type: 'text', text: '</untrusted_document>\n\n' + extraText },
-            ],
-          },
-        ],
+    const anthropicResponse = await timed(
+      logPrefix,
+      'Claude fetch',
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: maxTokens,
+          // Sonnet 5 runs adaptive thinking by default when this is omitted
+          // (unlike Opus 4.8, where omitting it means no thinking) — disable
+          // explicitly, same reasoning as the Opus thinking removal above.
+          thinking: { type: 'disabled' },
+          system: systemPrompt,
+          tools: [tool],
+          tool_choice: { type: 'tool', name: tool.name },
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: '<untrusted_document>' },
+                contentBlock,
+                { type: 'text', text: '</untrusted_document>\n\n' + extraText },
+              ],
+            },
+          ],
+        }),
       }),
-    })
+    )
 
     if (!anthropicResponse.ok) {
       console.error(`${logPrefix}: Claude API error`, anthropicResponse.status, await anthropicResponse.text())
       return { status: 'error', error: genericErrorMessage }
     }
 
-    response = await anthropicResponse.json()
+    response = await timed(logPrefix, 'Claude response JSON parse', anthropicResponse.json())
   } catch (error) {
-    console.error(`${logPrefix}: Claude API error`, error)
+    console.error(`${logPrefix}: Claude API error after ${Date.now() - claudeStageStart}ms`, error)
     return { status: 'error', error: genericErrorMessage }
   }
+  console.log(`${logPrefix}: [timing] full Claude call stage took ${Date.now() - claudeStageStart}ms`)
 
   if (response.stop_reason === 'refusal') {
     return { status: 'error', error: 'Extraction was declined' }
