@@ -125,6 +125,12 @@ export const strings = {
     confirmationNumberLabel: 'Confirmation number',
     confirmationNumberPlaceholder: 'e.g. ABC123',
     currencyLabel: 'Currency',
+    // TABI-211: the editable date/time fields carry the same leg wording as the read-only
+    // leg rows above them (Departure/Arrival, Pick-up/Drop-off) — a generic "Start date"
+    // sitting under an explicit "DEPARTURE" summary read as two unrelated things, and the
+    // fields were taken for a non-editable display of the summary.
+    legDateLabel: (leg: string) => `${leg} date`,
+    legTimeLabel: (leg: string) => `${leg} time`,
     startLabel: 'Start',
     endLabel: 'End',
     parkingLabel: 'Parking included',

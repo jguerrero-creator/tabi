@@ -32,6 +32,7 @@ import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
+import { useTrip } from '../trips/useTrip'
 import { transportRouteName } from './transportRouteName'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
@@ -113,6 +114,9 @@ interface ReservationDetailBodyProps {
 }
 
 function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: ReservationDetailBodyProps) {
+  // TABI-16: currency is inherited from the trip, never picked per reservation — this screen
+  // needs the trip to fill in a reservation saved without a price (price_currency still null).
+  const { trip } = useTrip(reservation.trip_id)
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -192,6 +196,9 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   // something else (price, note…) without touching a defaulted time doesn't clear its "Default"
   // badge. A vehicle rental (at_disposal) only ever collects dates, same as at creation (TABI-123).
   const isTransportAtDisposal = reservation.type === 'transport' && reservation.transport_subtype === 'at_disposal'
+  const transportLegLabels = isTransportAtDisposal
+    ? strings.reservationLegLabelsAtDisposal
+    : strings.reservationLegLabels.transport
   const [transportStartDate, setTransportStartDate] = useState(() =>
     reservation.type === 'transport' && reservation.start_at
       ? localDateKey(reservation.start_at, reservation.start_timezone)
@@ -444,6 +451,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       note: note.trim() || null,
       confirmation_number: confirmationNumber.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
+      // A price first entered here (created without one) would otherwise land with a null
+      // currency, which the Budget total (TABI-55) can't attribute to the trip's currency.
+      price_currency:
+        priceAmount.trim() === '' ? null : (reservation.price_currency ?? trip?.currency ?? null),
       ...(reservation.type === 'stay'
         ? {
             stay_parking_included: parkingIncluded,
@@ -706,7 +717,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             )}
             {reservation.type === 'transport' && (
               <div className="flex gap-3">
-                <Field label={strings.reservationDetail.startDateLabel} className="flex-1">
+                <Field
+                  label={strings.reservationDetail.legDateLabel(transportLegLabels.start)}
+                  className="flex-1"
+                >
                   <input
                     type="date"
                     value={transportStartDate}
@@ -715,7 +729,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   />
                 </Field>
                 {!isTransportAtDisposal && (
-                  <Field label={strings.reservationDetail.startTimeLabel} className="flex-1">
+                  <Field
+                    label={strings.reservationDetail.legTimeLabel(transportLegLabels.start)}
+                    className="flex-1"
+                  >
                     <input
                       type="time"
                       value={transportStartTime}
@@ -728,7 +745,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             )}
             {reservation.type === 'transport' && (
               <div className="flex gap-3">
-                <Field label={strings.reservationDetail.endDateLabel} className="flex-1">
+                <Field
+                  label={strings.reservationDetail.legDateLabel(transportLegLabels.end)}
+                  className="flex-1"
+                >
                   <input
                     type="date"
                     value={transportEndDate}
@@ -737,7 +757,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   />
                 </Field>
                 {!isTransportAtDisposal && (
-                  <Field label={strings.reservationDetail.endTimeLabel} className="flex-1">
+                  <Field
+                    label={strings.reservationDetail.legTimeLabel(transportLegLabels.end)}
+                    className="flex-1"
+                  >
                     <input
                       type="time"
                       value={transportEndTime}
@@ -760,7 +783,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               </Field>
               <Field label={strings.reservationDetail.currencyLabel} className="w-24">
                 <input
-                  value={reservation.price_currency ?? ''}
+                  value={reservation.price_currency ?? trip?.currency ?? ''}
                   disabled
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm uppercase text-slate-500"
                 />
