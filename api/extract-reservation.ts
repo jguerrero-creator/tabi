@@ -8,8 +8,8 @@
 // The actual Claude call/schema/tool is shared with the URL import channel
 // (TABI-193) in ./_lib/extraction.ts — one pipeline, not a fork per channel.
 import { requireEntitlement } from './_lib/entitlements.js'
-import type { ContentBlockParam } from './_lib/extraction.js'
-import { runExtraction, type ExtractResult } from './_lib/extraction.js'
+import type { ContentBlockParam, ExtractResult } from './_lib/extraction.js'
+import { runExtractionStreaming } from './_lib/extraction.js'
 import { checkRateLimit } from './_lib/rateLimit.js'
 import { timed } from './_lib/timing.js'
 
@@ -82,9 +82,43 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: contentBlock.error }, 400)
   }
 
-  const result = await runExtraction(contentBlock.block, 'Extract this reservation.', apiKey, 'extract-reservation')
-  console.log(`extract-reservation: [timing] handler total ${Date.now() - requestStart}ms`)
-  return jsonResponse<ExtractResult>(result)
+  // TABI-8: opens the Claude stream and resolves as soon as it's open (fast — see
+  // openClaudeToolStream in ./_lib/extraction.ts), not once extraction is fully done. A fast
+  // failure here (bad request, auth, network error before the stream ever opened) is returned
+  // as a normal synchronous JSON response below.
+  const opened = await runExtractionStreaming(contentBlock.block, 'Extract this reservation.', apiKey, 'extract-reservation')
+  console.log(`extract-reservation: [timing] time to Claude-stream-open ${Date.now() - requestStart}ms`)
+
+  if (opened.status === 'error') {
+    console.log(`extract-reservation: [timing] handler total (fast error path) ${Date.now() - requestStart}ms`)
+    return jsonResponse<ExtractResult>(opened)
+  }
+
+  // This is the fix: committing to our own Response NOW, with the stream still open, is what
+  // satisfies Vercel Edge's 25s time-to-first-byte cap regardless of how long Claude's full
+  // generation ends up taking — the accumulation below runs inside a body we've already
+  // returned, not before it. See Decision Log "Fix 504 timeout on AI extraction via streaming,
+  // not runtime switch".
+  console.log(`extract-reservation: [timing] returning initial Response, Claude stream still filling in the background`)
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder()
+      let result: ExtractResult
+      try {
+        result = await opened.consume()
+      } catch (error) {
+        // accumulateToolUseStream captures its own failures into a { status: 'error' } result
+        // rather than throwing — this catch exists only so a truly unexpected throw here still
+        // closes the stream with an error instead of leaving the client hanging forever.
+        console.error('extract-reservation: streamed extraction failed unexpectedly', error)
+        result = { status: 'error', error: 'Failed to extract reservation' }
+      }
+      console.log(`extract-reservation: [timing] handler total ${Date.now() - requestStart}ms`)
+      controller.enqueue(encoder.encode(JSON.stringify(result)))
+      controller.close()
+    },
+  })
+  return new Response(stream, { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
 function buildContentBlock(body: ExtractRequestBody): { block: ContentBlockParam } | { error: string } {

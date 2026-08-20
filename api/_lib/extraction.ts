@@ -19,19 +19,6 @@ export type ContentBlockParam =
   | { type: 'document'; source: { type: 'base64'; media_type: string; data: string } }
   | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
 
-interface AnthropicToolUseBlock {
-  type: 'tool_use'
-  id: string
-  name: string
-  input: unknown
-  [key: string]: unknown
-}
-
-interface AnthropicMessageResponse {
-  stop_reason: string
-  content: Array<{ type: string; [key: string]: unknown }>
-}
-
 export const ExtractedReservationSchema = z.object({
   type: z.enum(['stay', 'transport', 'activity']).nullable(),
   staySubtype: z.enum(['hotel', 'camping', 'airbnb', 'ryokan', 'other']).nullable(),
@@ -120,34 +107,39 @@ const EXTRACT_TOOL = {
   },
 }
 
-// Shared low-level Claude call used by both the single-reservation pipeline above and the
-// bulk plan pipeline below — same fetch/error-handling/refusal-check/tool_use lookup either way,
-// only the system prompt, tool schema, and output validation differ per caller.
-async function callClaudeTool<T>(params: {
+type ToolSchema = { name: string; description: string; strict: boolean; input_schema: Record<string, unknown> }
+type ToolResult<T> = { status: 'ok'; result: T } | { status: 'error'; error: string }
+
+// TABI-8 timeout fix (see Decision Log "Fix 504 timeout on AI extraction via streaming, not
+// runtime switch"): Vercel Edge's 25s cap is specifically time-to-first-byte, not total
+// duration — the earlier non-streaming call didn't get its first response byte from Anthropic
+// until generation had *finished* server-side, so our own fetch() didn't resolve until the full
+// 12-25s+ was already spent, with nothing left to return an initial Response in time.
+//
+// A stream:true request starts sending bytes as soon as generation begins (~1-2s), which is
+// what this fetch() now waits for. The *caller* (the edge handler) is responsible for returning
+// its own Response immediately once this resolves, before the stream has been fully read — see
+// api/extract-reservation.ts. Accumulating the rest of the stream (accumulateToolUseStream
+// below) can then take as long as it needs without hitting the TTFB cap.
+async function openClaudeToolStream(params: {
   contentBlock: ContentBlockParam
   extraText: string
   apiKey: string
   logPrefix: string
   maxTokens: number
   systemPrompt: string
-  tool: { name: string; description: string; strict: boolean; input_schema: Record<string, unknown> }
-  schema: z.ZodType<T>
+  tool: ToolSchema
   genericErrorMessage: string
-}): Promise<{ status: 'ok'; result: T } | { status: 'error'; error: string }> {
-  const { contentBlock, extraText, apiKey, logPrefix, maxTokens, systemPrompt, tool, schema, genericErrorMessage } =
-    params
+}): Promise<{ status: 'streaming'; body: ReadableStream<Uint8Array> } | { status: 'error'; error: string }> {
+  const { contentBlock, extraText, apiKey, logPrefix, maxTokens, systemPrompt, tool, genericErrorMessage } = params
 
-  let response: AnthropicMessageResponse
-  // TABI-8/timeout investigation: a real 504 kills this function mid-flight, so the "started"
-  // log below (emitted immediately, before the await) is what proves the fetch was still in
-  // flight at the moment of the kill — the "took Xms" log from `timed` only fires if the fetch
-  // actually settles, which a genuine hang never reaches.
-  const claudeStageStart = Date.now()
-  console.log(`${logPrefix}: [timing] starting Claude fetch`)
+  const openStart = Date.now()
+  console.log(`${logPrefix}: [timing] starting Claude fetch (stream)`)
+  let anthropicResponse: Response
   try {
-    const anthropicResponse = await timed(
+    anthropicResponse = await timed(
       logPrefix,
-      'Claude fetch',
+      'Claude stream open (TTFB)',
       fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -165,6 +157,7 @@ async function callClaudeTool<T>(params: {
           system: systemPrompt,
           tools: [tool],
           tool_choice: { type: 'tool', name: tool.name },
+          stream: true,
           messages: [
             {
               role: 'user',
@@ -178,38 +171,161 @@ async function callClaudeTool<T>(params: {
         }),
       }),
     )
-
-    if (!anthropicResponse.ok) {
-      console.error(`${logPrefix}: Claude API error`, anthropicResponse.status, await anthropicResponse.text())
-      return { status: 'error', error: genericErrorMessage }
-    }
-
-    response = await timed(logPrefix, 'Claude response JSON parse', anthropicResponse.json())
   } catch (error) {
-    console.error(`${logPrefix}: Claude API error after ${Date.now() - claudeStageStart}ms`, error)
+    console.error(`${logPrefix}: Claude API error opening stream after ${Date.now() - openStart}ms`, error)
     return { status: 'error', error: genericErrorMessage }
   }
-  console.log(`${logPrefix}: [timing] full Claude call stage took ${Date.now() - claudeStageStart}ms`)
 
-  if (response.stop_reason === 'refusal') {
-    return { status: 'error', error: 'Extraction was declined' }
+  if (!anthropicResponse.ok) {
+    // A rejection here (bad request, auth, overloaded) arrives as a normal fast JSON error, not
+    // an SSE stream — safe to read synchronously, no TTFB risk.
+    console.error(`${logPrefix}: Claude API error`, anthropicResponse.status, await anthropicResponse.text())
+    return { status: 'error', error: genericErrorMessage }
+  }
+  if (!anthropicResponse.body) {
+    console.error(`${logPrefix}: Claude API returned no response body for a streaming request`)
+    return { status: 'error', error: genericErrorMessage }
   }
 
-  const toolUse = response.content.find(
-    (block): block is AnthropicToolUseBlock => block.type === 'tool_use' && block.name === tool.name,
-  )
-  if (!toolUse) {
-    console.error(`${logPrefix}: no tool_use block in response`, response.stop_reason)
+  return { status: 'streaming', body: anthropicResponse.body }
+}
+
+// Reads Anthropic's SSE stream for a single forced tool_use call and accumulates its
+// incrementally-delivered `input` (input_json_delta chunks) into the same validated result
+// shape the rest of the pipeline already expects — the response contract downstream is
+// unchanged, only how the bytes arrive. Per principle #11 (never swallow an error silently): a
+// mid-stream `error` event, a 'refusal' stop reason, a stream that ends before message_stop
+// (premature termination), unparseable accumulated JSON, and schema validation failure are all
+// treated as explicit, logged failures — never as an empty/successful result.
+async function accumulateToolUseStream<T>(
+  body: ReadableStream<Uint8Array>,
+  tool: ToolSchema,
+  schema: z.ZodType<T>,
+  logPrefix: string,
+  genericErrorMessage: string,
+  claudeStageStart: number,
+): Promise<ToolResult<T>> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let toolInputJson = ''
+  let sawToolUseBlock = false
+  let sawMessageStop = false
+  let stopReason: string | null = null
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      // SSE frames are blank-line-separated; each frame carries an "event:" line and a
+      // "data:" line whose payload is the actual JSON we care about.
+      let frameEnd: number
+      while ((frameEnd = buffer.indexOf('\n\n')) !== -1) {
+        const frame = buffer.slice(0, frameEnd)
+        buffer = buffer.slice(frameEnd + 2)
+        const dataLine = frame.split('\n').find((line) => line.startsWith('data:'))
+        if (!dataLine) continue
+
+        let payload: Record<string, unknown>
+        try {
+          payload = JSON.parse(dataLine.slice('data:'.length).trim())
+        } catch (error) {
+          console.error(`${logPrefix}: unparseable SSE data line`, error)
+          continue
+        }
+
+        if (payload.type === 'error') {
+          console.error(`${logPrefix}: Claude stream error event`, payload.error)
+          return { status: 'error', error: genericErrorMessage }
+        }
+        if (payload.type === 'content_block_start') {
+          const block = payload.content_block as { type?: string; name?: string } | undefined
+          // tool_choice forced exactly this tool, so any tool_use block is the one we asked
+          // for — the name check just guards against a malformed/unexpected event shape.
+          if (block?.type === 'tool_use' && block.name === tool.name) sawToolUseBlock = true
+        }
+        if (payload.type === 'content_block_delta') {
+          const delta = payload.delta as { type?: string; partial_json?: string } | undefined
+          if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+            toolInputJson += delta.partial_json
+          }
+        }
+        if (payload.type === 'message_delta') {
+          const delta = payload.delta as { stop_reason?: string } | undefined
+          if (delta?.stop_reason) stopReason = delta.stop_reason
+        }
+        if (payload.type === 'message_stop') {
+          sawMessageStop = true
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`${logPrefix}: Claude stream read error after ${Date.now() - claudeStageStart}ms`, error)
+    return { status: 'error', error: genericErrorMessage }
+  }
+
+  console.log(`${logPrefix}: [timing] full Claude call stage (stream) took ${Date.now() - claudeStageStart}ms`)
+
+  if (!sawMessageStop) {
+    console.error(`${logPrefix}: Claude stream ended before message_stop — premature termination`)
+    return { status: 'error', error: genericErrorMessage }
+  }
+  if (stopReason === 'refusal') {
+    return { status: 'error', error: 'Extraction was declined' }
+  }
+  if (!sawToolUseBlock || !toolInputJson) {
+    console.error(`${logPrefix}: no tool_use content received from stream`, stopReason)
     return { status: 'error', error: 'Extraction failed' }
   }
 
-  const parsed = schema.safeParse(toolUse.input)
+  let parsedInput: unknown
+  try {
+    parsedInput = JSON.parse(toolInputJson)
+  } catch (error) {
+    console.error(`${logPrefix}: streamed tool input was not valid JSON`, error)
+    return { status: 'error', error: 'Extraction returned an unexpected format' }
+  }
+
+  const parsed = schema.safeParse(parsedInput)
   if (!parsed.success) {
     console.error(`${logPrefix}: tool output failed schema validation`, parsed.error)
     return { status: 'error', error: 'Extraction returned an unexpected format' }
   }
 
   return { status: 'ok', result: parsed.data }
+}
+
+// Blocking convenience wrapper — opens the stream and fully accumulates it before returning,
+// same Promise<ToolResult<T>> shape callClaudeTool always had. Used by callers (extract-plan,
+// import-url) that haven't been restructured to return an early Response themselves; they get
+// the SSE parsing transparently but not the TTFB benefit, since nothing here returns to the
+// caller until accumulation is done. Only api/extract-reservation.ts — the endpoint actually
+// hitting the 504 via Quick Add — uses openClaudeToolStream/accumulateToolUseStream directly to
+// get that benefit; see runExtractionStreaming below.
+async function callClaudeTool<T>(params: {
+  contentBlock: ContentBlockParam
+  extraText: string
+  apiKey: string
+  logPrefix: string
+  maxTokens: number
+  systemPrompt: string
+  tool: ToolSchema
+  schema: z.ZodType<T>
+  genericErrorMessage: string
+}): Promise<ToolResult<T>> {
+  const claudeStageStart = Date.now()
+  const opened = await openClaudeToolStream(params)
+  if (opened.status === 'error') return opened
+  return accumulateToolUseStream(
+    opened.body,
+    params.tool,
+    params.schema,
+    params.logPrefix,
+    params.genericErrorMessage,
+    claudeStageStart,
+  )
 }
 
 export async function runExtraction(
@@ -229,6 +345,47 @@ export async function runExtraction(
     schema: ExtractedReservationSchema,
     genericErrorMessage: 'Failed to extract reservation',
   })
+}
+
+export type ExtractionStreamHandle =
+  | { status: 'error'; error: string }
+  | { status: 'streaming'; consume: () => Promise<ExtractResult> }
+
+// TABI-8: the streaming counterpart to runExtraction, for the one caller that actually needs
+// the TTFB benefit (api/extract-reservation.ts, hit via Quick Add). Resolves as soon as Claude's
+// stream has opened (fast — see openClaudeToolStream) rather than once the full extraction is
+// done, so the edge handler can return its own Response immediately and only then call
+// consume() to accumulate the rest, inside a body it has already committed to returning.
+export async function runExtractionStreaming(
+  contentBlock: ContentBlockParam,
+  extraText: string,
+  apiKey: string,
+  logPrefix: string,
+): Promise<ExtractionStreamHandle> {
+  const claudeStageStart = Date.now()
+  const opened = await openClaudeToolStream({
+    contentBlock,
+    extraText,
+    apiKey,
+    logPrefix,
+    maxTokens: 2048,
+    systemPrompt: SYSTEM_PROMPT,
+    tool: EXTRACT_TOOL,
+    genericErrorMessage: 'Failed to extract reservation',
+  })
+  if (opened.status === 'error') return opened
+  return {
+    status: 'streaming',
+    consume: () =>
+      accumulateToolUseStream(
+        opened.body,
+        EXTRACT_TOOL,
+        ExtractedReservationSchema,
+        logPrefix,
+        'Failed to extract reservation',
+        claudeStageStart,
+      ),
+  }
 }
 
 // TABI-208: bulk import of a textual travel plan (a written itinerary, an exported AI-assistant
