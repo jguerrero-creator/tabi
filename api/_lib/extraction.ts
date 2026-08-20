@@ -376,15 +376,26 @@ export async function runExtractionStreaming(
   if (opened.status === 'error') return opened
   return {
     status: 'streaming',
-    consume: () =>
-      accumulateToolUseStream(
+    consume: async () => {
+      // TEMPORARY, preview-only: proves the TTFB fix holds when total accumulation genuinely
+      // exceeds Vercel's 25s cap — the exact failure shape from the original bug — rather than
+      // hoping a real Claude call happens to run long during manual testing. Gated behind an env
+      // var only ever set on this preview deployment; unset (or absent, the default) in
+      // production this is a no-op. Removed before merging to main.
+      const debugDelayMs = Number(process.env.DEBUG_ARTIFICIAL_EXTRACTION_DELAY_MS ?? 0)
+      if (debugDelayMs > 0) {
+        console.log(`${logPrefix}: [debug] injecting artificial ${debugDelayMs}ms delay before accumulating stream`)
+        await new Promise((resolve) => setTimeout(resolve, debugDelayMs))
+      }
+      return accumulateToolUseStream(
         opened.body,
         EXTRACT_TOOL,
         ExtractedReservationSchema,
         logPrefix,
         'Failed to extract reservation',
         claudeStageStart,
-      ),
+      )
+    },
   }
 }
 
