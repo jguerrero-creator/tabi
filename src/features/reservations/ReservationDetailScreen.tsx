@@ -901,26 +901,9 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
       : strings.reservationLegLabels[reservation.type]
 
   if (reservation.type === 'transport') {
-    return (
-      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-        <LegRow
-          label={legLabels.start}
-          placeName={reservation.start_place_name}
-          address={reservation.start_address}
-          at={reservation.start_at}
-          timezone={reservation.start_timezone}
-          isTimeDefault={reservation.start_time_is_default}
-        />
-        <LegRow
-          label={legLabels.end}
-          placeName={reservation.end_place_name}
-          address={reservation.end_address}
-          at={reservation.end_at}
-          timezone={reservation.end_timezone}
-          isTimeDefault={reservation.end_time_is_default}
-        />
-      </div>
-    )
+    // TABI-85: no read-only summary here — the date/time and address fields below are
+    // directly editable, so a static Departure/Arrival block would just duplicate them.
+    return null
   }
 
   return (
