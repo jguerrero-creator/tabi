@@ -162,6 +162,7 @@ export const strings = {
     endAddressLabelAtDisposal: 'Drop-off city',
     geocoding: 'Locating address…',
     geocodeErrorGeneric: 'Could not locate this address. Please try again.',
+    geocodeErrorNotFound: "We couldn't locate that address. Try a different search.",
   },
   overview: {
     title: 'Trip',

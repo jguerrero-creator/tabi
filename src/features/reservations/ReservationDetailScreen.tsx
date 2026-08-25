@@ -20,6 +20,7 @@ import {
   zonedTimeToUtc,
 } from '../../lib/datetime'
 import {
+  AddressNotFoundError,
   AddressSelectionCancelledError,
   fetchGeocodeByPlaceId,
   resolveAddress,
@@ -484,12 +485,14 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         )
       }
     } catch (err) {
-      if (!(err instanceof AddressSelectionCancelledError)) logClientError('ReservationDetailScreen.geocode', err)
-      setFormError(
-        err instanceof AddressSelectionCancelledError
-          ? strings.addressPicker.selectionRequiredError
-          : strings.reservationDetail.geocodeErrorGeneric,
-      )
+      if (err instanceof AddressSelectionCancelledError) {
+        setFormError(strings.addressPicker.selectionRequiredError)
+      } else if (err instanceof AddressNotFoundError) {
+        setFormError(strings.reservationDetail.geocodeErrorNotFound)
+      } else {
+        logClientError('ReservationDetailScreen.geocode', err)
+        setFormError(strings.reservationDetail.geocodeErrorGeneric)
+      }
       setGeocoding(false)
       return
     }
