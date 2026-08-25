@@ -627,6 +627,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                         type="date"
                         value={checkOutDate}
                         onChange={(e) => setCheckOutDate(e.target.value)}
+                        min={checkInDate || undefined}
                         className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                       />
                     </Field>
@@ -753,6 +754,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     type="date"
                     value={transportEndDate}
                     onChange={(e) => setTransportEndDate(e.target.value)}
+                    min={transportStartDate || undefined}
                     className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>

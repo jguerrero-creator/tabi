@@ -893,6 +893,7 @@ export function AddReservationModal({
                 date={endDate}
                 onDateChange={setEndDate}
                 required={option.requiresEnd}
+                min={startDate}
               />
             ) : (
               <DateTimeField
@@ -903,6 +904,7 @@ export function AddReservationModal({
                 onTimeChange={setEndTime}
                 dateRequired={option.requiresEnd}
                 timeRequired={option.requiresEndTime}
+                min={startDate}
               />
             )}
             {option.dbType === 'stay' && (
@@ -1143,11 +1145,13 @@ function DateField({
   date,
   onDateChange,
   required,
+  min,
 }: {
   legend: string
   date: string
   onDateChange: (value: string) => void
   required: boolean
+  min?: string
 }) {
   return (
     <fieldset className="flex-1">
@@ -1158,6 +1162,7 @@ function DateField({
         value={date}
         onChange={(event) => onDateChange(event.target.value)}
         required={required}
+        min={min || undefined}
         className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
       />
     </fieldset>
@@ -1172,6 +1177,7 @@ function DateTimeField({
   onTimeChange,
   dateRequired,
   timeRequired,
+  min,
 }: {
   legend: string
   date: string
@@ -1180,6 +1186,7 @@ function DateTimeField({
   onTimeChange: (value: string) => void
   dateRequired: boolean
   timeRequired: boolean
+  min?: string
 }) {
   return (
     <fieldset className="flex-1">
@@ -1191,6 +1198,7 @@ function DateTimeField({
           value={date}
           onChange={(event) => onDateChange(event.target.value)}
           required={dateRequired}
+          min={min || undefined}
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
         <input
