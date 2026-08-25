@@ -347,9 +347,9 @@ export const strings = {
     overlapConfirmCta: 'Yes, save anyway',
     overlapCancelCta: 'Go back',
     outOfPeriodConfirmTitle: 'Outside trip dates',
-    outOfPeriodConfirmMessage: "This falls outside the trip's current dates. Extend the trip to cover it, or keep it as is?",
+    outOfPeriodConfirmMessage: "This falls outside the trip's current dates. Extend the trip to cover it, or go back and correct the date.",
     outOfPeriodExtendCta: 'Extend trip dates',
-    outOfPeriodKeepCta: 'Keep as is',
+    outOfPeriodCancelCta: 'Go back',
     locationMismatchConfirmTitle: 'Different city than planned',
     locationMismatchConfirmMessage: (reservationCity: string, plannedCity: string, dayLabel: string) =>
       `This reservation is in ${reservationCity}, but you planned ${plannedCity} for ${dayLabel}. Is that intended?`,

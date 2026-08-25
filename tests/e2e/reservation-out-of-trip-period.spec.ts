@@ -3,10 +3,12 @@ import { authenticatedClientFor } from './support/auth'
 
 // TABI-113 — a reservation whose start or end falls outside the trip's current
 // dates is never blocked and never silent: saving asks for an explicit,
-// non-blocking confirmation with two resolutions — extend the trip to cover
-// it, or confirm the extra night before/after the trip is intentional.
+// non-blocking confirmation. Only one resolution actually persists the
+// reservation: extending the trip to cover it. The other option is "Go back"
+// (Bugs DB, 25/08) — a pure cancel that returns focus to the triggering date
+// field so the user can correct it; it never saves an out-of-range date as-is.
 
-test('adding a reservation outside the trip dates asks to extend or keep as is', async ({ page, registerTrip }) => {
+test('adding a reservation outside the trip dates asks to extend or go back', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 
@@ -39,6 +41,9 @@ test('adding a reservation outside the trip dates asks to extend or keep as is',
     // Extend path: check-in the night before the trip officially starts.
     await page.getByRole('button', { name: 'Add reservation' }).click()
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    // AddReservationModal's own `useTrip` fetch is what the out-of-period check reads — wait for
+    // it to settle before racing through the form, or the check can silently see a null trip.
+    await page.waitForLoadState('networkidle')
     const extendName = `E2E out-of-period extend ${runId}`
     await page.getByLabel('Name').fill(extendName)
     await page.getByLabel('Address').fill('1 Chome-1-2 Oshiage, Sumida City, Tokyo, Japan')
@@ -69,29 +74,44 @@ test('adding a reservation outside the trip dates asks to extend or keep as is',
     expect(extendedTrip.start_date).toBe('2026-09-09')
     expect(extendedTrip.end_date).toBe('2026-09-15')
 
-    // Keep-as-is path: a night after the (now extended) trip end, confirmed intentional.
+    // Go-back path: end date typo'd well outside the (now extended) trip range. "Go back" is a
+    // pure cancel — nothing is saved, the modal closes, and focus returns to the date field that
+    // triggered it so the mistake can be corrected in place, rather than being accepted as-is.
     await page.getByRole('button', { name: 'Add reservation' }).click()
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
-    const keepName = `E2E out-of-period keep ${runId}`
-    await page.getByLabel('Name').fill(keepName)
+    await page.waitForLoadState('networkidle')
+    const goBackName = `E2E out-of-period go-back ${runId}`
+    await page.getByLabel('Name').fill(goBackName)
     await page.getByLabel('Address').fill('1 Chome-1-2 Oshiage, Sumida City, Tokyo, Japan')
-    await page.getByLabel('Start date').fill('2026-09-15')
+    await page.getByLabel('Start date').fill('2026-09-12')
     await page.getByLabel('Start time').fill('20:00')
     await page.getByRole('button', { name: 'Enter checkout date manually' }).click()
-    await page.getByLabel('End date').fill('2026-09-16')
+    await page.getByLabel('End date').fill('2026-09-20')
     await page.getByLabel('End time').fill('11:00')
 
-    const [insertKeepResponse] = await Promise.all([
+    await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Outside trip dates' })).toBeVisible()
+    await page.getByRole('button', { name: 'Go back' }).click()
+
+    // Dialog is gone, nothing was created, we're still on the add form with the typo'd value
+    // intact, and focus landed back on the field that triggered the modal.
+    await expect(page.getByRole('heading', { name: 'Outside trip dates' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
+    await expect(page.getByText(goBackName)).toHaveCount(0)
+    await expect(page.getByLabel('End date')).toBeFocused()
+    await expect(page.getByLabel('End date')).toHaveValue('2026-09-20')
+
+    // Correct the date in place and complete the save, proving the field is editable/submittable.
+    const [insertGoBackResponse] = await Promise.all([
       page.waitForResponse((res) => res.url().includes('/rest/v1/reservations') && res.request().method() === 'POST'),
       (async () => {
+        await page.getByLabel('End date').fill('2026-09-14')
         await page.getByRole('button', { name: 'Add reservation', exact: true }).click()
-        await expect(page.getByRole('heading', { name: 'Outside trip dates' })).toBeVisible()
-        await page.getByRole('button', { name: 'Keep as is' }).click()
       })(),
     ])
-    expect(insertKeepResponse.ok()).toBe(true)
+    expect(insertGoBackResponse.ok()).toBe(true)
     await expect(page.getByRole('heading', { name: 'Add Reservation' })).toHaveCount(0)
-    await expect(page.getByText(keepName)).toBeVisible()
+    await expect(page.getByText(goBackName)).toBeVisible()
 
     const { data: unchangedTrip, error: unchangedTripError } = await client
       .from('trips')

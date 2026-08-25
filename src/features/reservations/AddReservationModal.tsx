@@ -40,7 +40,7 @@ import { lastKnownTripLocation } from './lastKnownTripLocation'
 import { findLocationMismatch, type LocationMismatch } from './locationMismatch'
 import { findOverlappingReservation } from './reservationOverlap'
 import { transportRouteName } from './transportRouteName'
-import { extendedTripRange, isOutsideTripPeriod } from './tripPeriod'
+import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservationsByType } from './useReservationsByType'
 
@@ -77,6 +77,11 @@ const STAY_DEFAULT_CHECK_OUT_TIME = '10:00'
 // was guessed, via the same "Default" badge TABI-144 already renders on the detail screen for
 // defaulted Stay times. Only used if `trip` hasn't loaded yet.
 const DAY_START_TIME_FALLBACK = '08:00'
+
+// Stable ids for the start/end date inputs, used to refocus whichever one triggered
+// the "Outside trip dates" confirmation once the user chooses "Go back".
+const START_DATE_FIELD_ID = 'reservation-date-start'
+const END_DATE_FIELD_ID = 'reservation-date-end'
 
 const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
@@ -231,6 +236,7 @@ export function AddReservationModal({
   const [overlapNote, setOverlapNote] = useState('')
   const [outOfPeriodConfirm, setOutOfPeriodConfirm] = useState<{
     input: Omit<NewReservation, 'trip_id'>
+    field: OutOfPeriodField
   } | null>(null)
   const [locationMismatchConfirm, setLocationMismatchConfirm] = useState<{
     input: Omit<NewReservation, 'trip_id'>
@@ -573,8 +579,9 @@ export function AddReservationModal({
   // TABI-113: checked once any overlap has been resolved (or there was none) — a reservation
   // outside the trip's current dates is never blocked either, just confirmed explicitly.
   async function proceedAfterOverlapCheck(input: Omit<NewReservation, 'trip_id'>) {
-    if (trip && isOutsideTripPeriod(input, trip)) {
-      setOutOfPeriodConfirm({ input })
+    const field = trip ? outOfPeriodField(input, trip) : null
+    if (field) {
+      setOutOfPeriodConfirm({ input, field })
       return
     }
     await proceedAfterOutOfPeriodCheck(input)
@@ -644,11 +651,19 @@ export function AddReservationModal({
     await proceedAfterOutOfPeriodCheck(input)
   }
 
-  async function handleKeepDatesAsIs() {
+  // Bug: "Outside trip dates" ne permet pas de revenir en arrière (Bugs DB, 25/08) — dismisses
+  // the dialog without saving anything and returns focus to the field that triggered it, so the
+  // only ways forward are correcting the date or explicitly extending the trip.
+  function handleGoBackFromOutOfPeriod() {
     if (!outOfPeriodConfirm) return
-    const { input } = outOfPeriodConfirm
+    const { field } = outOfPeriodConfirm
     setOutOfPeriodConfirm(null)
-    await proceedAfterOutOfPeriodCheck(input)
+    const hasEditableEndDateField = option.dbType !== 'activity' && (option.dbType !== 'stay' || manualEndDate)
+    const targetId = field === 'end' && hasEditableEndDateField ? END_DATE_FIELD_ID : START_DATE_FIELD_ID
+    // Wait a tick for the dialog to unmount before moving focus.
+    requestAnimationFrame(() => {
+      document.getElementById(targetId)?.focus()
+    })
   }
 
   async function handleConfirmLocationMismatch() {
@@ -819,6 +834,7 @@ export function AddReservationModal({
             date={startDate}
             onDateChange={setStartDate}
             required={option.requiresStart}
+            id={START_DATE_FIELD_ID}
           />
         ) : (
           <DateTimeField
@@ -829,6 +845,7 @@ export function AddReservationModal({
             onTimeChange={setStartTime}
             dateRequired={option.requiresStart}
             timeRequired={option.requiresStartTime}
+            id={START_DATE_FIELD_ID}
           />
         )}
 
@@ -894,6 +911,7 @@ export function AddReservationModal({
                 onDateChange={setEndDate}
                 required={option.requiresEnd}
                 min={startDate}
+                id={END_DATE_FIELD_ID}
               />
             ) : (
               <DateTimeField
@@ -905,6 +923,7 @@ export function AddReservationModal({
                 dateRequired={option.requiresEnd}
                 timeRequired={option.requiresEndTime}
                 min={startDate}
+                id={END_DATE_FIELD_ID}
               />
             )}
             {option.dbType === 'stay' && (
@@ -980,8 +999,8 @@ export function AddReservationModal({
           message={strings.addReservation.outOfPeriodConfirmMessage}
           confirmLabel={strings.addReservation.outOfPeriodExtendCta}
           onConfirm={handleExtendTrip}
-          secondaryLabel={strings.addReservation.outOfPeriodKeepCta}
-          onSecondary={handleKeepDatesAsIs}
+          cancelLabel={strings.addReservation.outOfPeriodCancelCta}
+          onCancel={handleGoBackFromOutOfPeriod}
           confirming={submitting}
         />
       )}
@@ -1146,17 +1165,20 @@ function DateField({
   onDateChange,
   required,
   min,
+  id,
 }: {
   legend: string
   date: string
   onDateChange: (value: string) => void
   required: boolean
   min?: string
+  id?: string
 }) {
   return (
     <fieldset className="flex-1">
       <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
       <input
+        id={id}
         type="date"
         aria-label={`${legend} date`}
         value={date}
@@ -1178,6 +1200,7 @@ function DateTimeField({
   dateRequired,
   timeRequired,
   min,
+  id,
 }: {
   legend: string
   date: string
@@ -1187,12 +1210,14 @@ function DateTimeField({
   dateRequired: boolean
   timeRequired: boolean
   min?: string
+  id?: string
 }) {
   return (
     <fieldset className="flex-1">
       <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
       <div className="flex gap-2">
         <input
+          id={id}
           type="date"
           aria-label={`${legend} date`}
           value={date}
