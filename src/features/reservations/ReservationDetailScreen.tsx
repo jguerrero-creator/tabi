@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { MiniMap } from '../../components/ui/MiniMap'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
@@ -35,12 +36,25 @@ import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
 import { transportRouteName } from './transportRouteName'
+import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
+const STAY_CHECKIN_DATE_FIELD_ID = 'reservation-checkin-date'
+const STAY_CHECKOUT_DATE_FIELD_ID = 'reservation-checkout-date'
+const TRANSPORT_START_DATE_FIELD_ID = 'reservation-transport-start-date'
+const TRANSPORT_END_DATE_FIELD_ID = 'reservation-transport-end-date'
+
 type ResolvedPlace = GeocodeResult & { placeName: string | null }
+
+type DatedCandidate = {
+  start_at: string | null
+  end_at: string | null
+  start_timezone: string | null
+  end_timezone: string | null
+}
 
 export function ReservationDetailScreen() {
   const { reservationId } = useParams<{ reservationId: string }>()
@@ -117,12 +131,21 @@ interface ReservationDetailBodyProps {
 function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: ReservationDetailBodyProps) {
   // TABI-16: currency is inherited from the trip, never picked per reservation — this screen
   // needs the trip to fill in a reservation saved without a price (price_currency still null).
-  const { trip } = useTrip(reservation.trip_id)
+  const { trip, updateDates: updateTripDates } = useTrip(reservation.trip_id)
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
+  // Bug: "ReservationDetailScreen.tsx n'a aucun contrôle 'Outside trip dates'" — parity with
+  // AddReservationModal's TABI-113 check, which the create flow already enforces. Editing a
+  // Stay/Transport date on an existing reservation to fall outside the trip's dates was
+  // silently accepted; this gates the save behind the same explicit confirm.
+  const [outOfPeriodConfirm, setOutOfPeriodConfirm] = useState<{
+    patch: Partial<Reservation>
+    field: OutOfPeriodField
+    candidate: DatedCandidate
+  } | null>(null)
 
   const [name, setName] = useState(reservation.name)
   const [note, setNote] = useState(reservation.note ?? '')
@@ -498,6 +521,29 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     }
     setGeocoding(false)
 
+    // Bug fix: parity with AddReservationModal's TABI-113 out-of-period check, which the
+    // create flow already enforces — only Stay/Transport have a full start/end pair whose
+    // edit (checkout date, transport leg dates — the same fields TABI-210 wired a `min` to)
+    // can land outside the trip's current dates; never blocking, just an explicit confirm.
+    if ((reservation.type === 'stay' || reservation.type === 'transport') && trip?.start_date && trip?.end_date) {
+      const datePatch = reservation.type === 'stay' ? stayDatePatch : transportDatePatch
+      const candidate: DatedCandidate = {
+        start_at: 'start_at' in datePatch ? (datePatch.start_at ?? null) : reservation.start_at,
+        end_at: 'end_at' in datePatch ? (datePatch.end_at ?? null) : reservation.end_at,
+        start_timezone: reservation.start_timezone,
+        end_timezone: reservation.end_timezone,
+      }
+      const field = outOfPeriodField(candidate, trip)
+      if (field) {
+        setOutOfPeriodConfirm({ patch, field, candidate })
+        return
+      }
+    }
+
+    await commitSave(patch)
+  }
+
+  async function commitSave(patch: Partial<Reservation>) {
     setSaving(true)
     try {
       await onUpdate(patch)
@@ -508,6 +554,44 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleExtendTrip() {
+    if (!outOfPeriodConfirm || !trip?.start_date || !trip?.end_date) return
+    const { patch, candidate } = outOfPeriodConfirm
+    const range = extendedTripRange(candidate, { start_date: trip.start_date, end_date: trip.end_date })
+    setSaving(true)
+    setFormError(null)
+    try {
+      await updateTripDates(range.start_date, range.end_date)
+    } catch (err) {
+      logClientError('ReservationDetailScreen.handleExtendTrip', err)
+      setFormError(strings.reservationDetail.errorGeneric)
+      setSaving(false)
+      return
+    }
+    setOutOfPeriodConfirm(null)
+    await commitSave(patch)
+  }
+
+  // Same "Go back" behavior as AddReservationModal (Bugs DB, 25/08 fix) — pure cancel,
+  // discards the edit and refocuses the field the user most likely needs to fix.
+  function handleGoBackFromOutOfPeriod() {
+    if (!outOfPeriodConfirm) return
+    const { field } = outOfPeriodConfirm
+    setOutOfPeriodConfirm(null)
+    const targetId =
+      reservation.type === 'stay'
+        ? field === 'end' && manualEndDate
+          ? STAY_CHECKOUT_DATE_FIELD_ID
+          : STAY_CHECKIN_DATE_FIELD_ID
+        : field === 'end'
+          ? TRANSPORT_END_DATE_FIELD_ID
+          : TRANSPORT_START_DATE_FIELD_ID
+    // Wait a tick for the dialog to unmount before moving focus.
+    requestAnimationFrame(() => {
+      document.getElementById(targetId)?.focus()
+    })
   }
 
   async function handleDelete() {
@@ -605,6 +689,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               <div className="flex gap-3">
                 <Field label={strings.reservationDetail.checkInDateLabel} className="flex-1">
                   <input
+                    id={STAY_CHECKIN_DATE_FIELD_ID}
                     type="date"
                     value={checkInDate}
                     onChange={(e) => setCheckInDate(e.target.value)}
@@ -627,6 +712,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   <div className="flex gap-3">
                     <Field label={strings.reservationDetail.checkOutDateLabel} className="flex-1">
                       <input
+                        id={STAY_CHECKOUT_DATE_FIELD_ID}
                         type="date"
                         value={checkOutDate}
                         onChange={(e) => setCheckOutDate(e.target.value)}
@@ -726,6 +812,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   className="flex-1"
                 >
                   <input
+                    id={TRANSPORT_START_DATE_FIELD_ID}
                     type="date"
                     value={transportStartDate}
                     onChange={(e) => setTransportStartDate(e.target.value)}
@@ -754,6 +841,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   className="flex-1"
                 >
                   <input
+                    id={TRANSPORT_END_DATE_FIELD_ID}
                     type="date"
                     value={transportEndDate}
                     onChange={(e) => setTransportEndDate(e.target.value)}
@@ -849,6 +937,17 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         </div>
         {candidates && (
           <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+        )}
+        {outOfPeriodConfirm && (
+          <ConfirmDialog
+            title={strings.addReservation.outOfPeriodConfirmTitle}
+            message={strings.addReservation.outOfPeriodConfirmMessage}
+            confirmLabel={strings.addReservation.outOfPeriodExtendCta}
+            onConfirm={handleExtendTrip}
+            cancelLabel={strings.addReservation.outOfPeriodCancelCta}
+            onCancel={handleGoBackFromOutOfPeriod}
+            confirming={saving}
+          />
         )}
       </ScreenShell>
     </APIProvider>
