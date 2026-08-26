@@ -37,8 +37,14 @@ export type FreeBlockAddPayload = {
 export type DayItem = Reservation & {
   /** True for the check-out occurrence of a multi-night Stay (false/absent for its check-in occurrence and for every other reservation). */
   isCheckoutOccurrence?: boolean
+  /** True for the arrival occurrence of a midnight/timezone-crossing Transport leg. */
+  isArrivalOccurrence?: boolean
   /** True on a multi-night Stay's check-in occurrence — its post-checkout free time belongs to the check-out occurrence's own day, not this one. */
   suppressTrailingFreeBlock?: boolean
+  /** True on a Transport arrival occurrence — no free time before it; the traveler was in transit before this day's window even opened. */
+  suppressLeadingDayEdge?: boolean
+  /** True on a Transport departure occurrence — no free time after it; the traveler remains in transit for the rest of this day's window. */
+  suppressTrailingDayEdge?: boolean
 }
 
 type RailEntry =
@@ -55,6 +61,7 @@ type RailEntry =
   | { kind: 'free'; key: string; time: string; timezone: string | null; durationSeconds: number }
   | { kind: 'tight'; key: string; time: string; timezone: string | null; durationSeconds: number }
   | { kind: 'stay'; key: string; time: null; timezone: null; reservation: Reservation }
+  | { kind: 'transit'; key: string; time: null; timezone: null; reservation: Reservation }
 
 interface DayColumnProps {
   dayKey: string
@@ -78,6 +85,16 @@ interface DayColumnProps {
    * Same "Unscheduled" pseudo-day omission as dayLocation/dayNote above.
    */
   activeStay?: Reservation | null
+  /**
+   * A point-to-point Transport leg still in progress (airborne/en route)
+   * through this entire day — a 2+ calendar-day span's intermediate day,
+   * which otherwise has no rail item of its own at all. Rendered as a
+   * dedicated "In transit" block instead of the empty-day placeholder, so
+   * the day never reads as silently unplanned (it's occupied, just not by
+   * anything with a time on this particular day). Same "Unscheduled"
+   * pseudo-day omission as dayLocation/dayNote above.
+   */
+  inProgressLeg?: Reservation | null
   /** Day-level note (TABI-56) — same "Unscheduled" pseudo-day omission as dayLocation above. */
   dayNote?: TripDayNote | null
   onSaveDayNote?: (note: string) => Promise<void>
@@ -98,6 +115,7 @@ export function DayColumn({
   onSaveDayLocation,
   onClearDayLocation,
   activeStay,
+  inProgressLeg,
   dayNote,
   onSaveDayNote,
   onClearDayNote,
@@ -118,7 +136,9 @@ export function DayColumn({
             durationSeconds: edges.fullDay.durationSeconds,
           },
         ]
-      : buildRailEntries(items, freeTimeByFromId, edges)
+      : items.length === 0 && inProgressLeg
+        ? [{ kind: 'transit' as const, key: `transit-${inProgressLeg.id}`, time: null, timezone: null, reservation: inProgressLeg }]
+        : buildRailEntries(items, freeTimeByFromId, edges)
 
   // Omitted when the stay's own check-in reservation already appears among
   // `items` for this day — that reservation card already answers "where do I
@@ -325,6 +345,8 @@ function renderEntry(
       return <ReservationCard reservation={entry.reservation} />
     case 'stay':
       return <TonightStayCard reservation={entry.reservation} />
+    case 'transit':
+      return <InTransitCard reservation={entry.reservation} />
     case 'tight':
       return (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
@@ -413,6 +435,32 @@ function TonightStayCard({ reservation }: { reservation: Reservation }) {
   )
 }
 
+/**
+ * A day's only content when a Transport leg is in progress the whole day
+ * (a 2+ calendar-day span's intermediate day) — same dashed, untimed
+ * treatment as `TonightStayCard` since neither is a scheduled event on this
+ * particular day, just a state the traveler is already in.
+ */
+function InTransitCard({ reservation }: { reservation: Reservation }) {
+  return (
+    <Link
+      to={`/reservations/${reservation.id}`}
+      className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 hover:bg-slate-50"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+        <ReservationIcon reservation={reservation} className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium text-slate-500">{strings.planning.inTransit}</p>
+        <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
+          <span className="truncate">{reservation.name}</span>
+        </p>
+      </div>
+    </Link>
+  )
+}
+
 /** A day is flagged as a long-travel day (TABI-6) if any leg starting within it meets the too-long threshold. */
 function dayHasTooLongTravel(items: Reservation[], freeTimeByFromId: Map<string, FreeTimeBlock>): boolean {
   return items.some((item) => freeTimeByFromId.get(item.id)?.tooLongTravel ?? false)
@@ -421,6 +469,7 @@ function dayHasTooLongTravel(items: Reservation[], freeTimeByFromId: Map<string,
 function rowLabel(reservation: DayItem): string | null {
   if (!reservation.start_at) return null
   const labels = strings.reservationLegLabels[reservation.type]
-  const label = reservation.isCheckoutOccurrence ? labels.end : labels.start
+  const isEndOccurrence = reservation.isCheckoutOccurrence || reservation.isArrivalOccurrence
+  const label = isEndOccurrence ? labels.end : labels.start
   return `${label} · ${formatTimeInZone(reservation.start_at, reservation.start_timezone)}`
 }

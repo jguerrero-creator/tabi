@@ -191,6 +191,7 @@ export const strings = {
     dayPillVehicleRentalStatus: (status: ReservationStatus) => `Vehicle rental: ${strings.status[status]}`,
     dayPillItemCount: (count: number) => `${count} planned item${count === 1 ? '' : 's'}`,
     tonightsStay: "Tonight's stay",
+    inTransit: 'In transit',
   },
   menus: {
     overview: 'Overview',

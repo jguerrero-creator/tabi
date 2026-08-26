@@ -123,7 +123,20 @@ export function computeDayEdgeFreeBlocks(
   days: {
     dateKey: string
     timezone: string
-    items: (Reservation & { start_at: string; suppressTrailingFreeBlock?: boolean })[]
+    items: (Reservation & {
+      start_at: string
+      suppressTrailingFreeBlock?: boolean
+      suppressLeadingDayEdge?: boolean
+      suppressTrailingDayEdge?: boolean
+    })[]
+    /**
+     * True when a point-to-point Transport leg is in progress through this
+     * entire day (its departure and arrival both fall on other days) — set by
+     * `findInProgressTransportLeg`. Only meaningful when `items` is empty:
+     * without it, this day would otherwise render as one big full-day free
+     * block, even though the traveler is airborne the whole time.
+     */
+    fullyOccupied?: boolean
   }[],
   dayStartTime: string,
   dayEndTime: string,
@@ -134,6 +147,7 @@ export function computeDayEdgeFreeBlocks(
     const dayStart = zonedTimeToUtc(day.dateKey, dayStartTime, day.timezone)
 
     if (day.items.length === 0) {
+      if (day.fullyOccupied) continue
       const dayEnd = zonedTimeToUtc(day.dateKey, dayEndTime, day.timezone)
       pushDayEdgeBlock(blocks, day.dateKey, 'full-day', dayStart, dayEnd)
       continue
@@ -143,7 +157,13 @@ export function computeDayEdgeFreeBlocks(
     const first = sorted[0]
     const last = sorted[sorted.length - 1]
 
-    pushDayEdgeBlock(blocks, day.dateKey, 'leading', dayStart, first.start_at)
+    // A Transport arrival occurrence (`buildDayOccurrences`) sets this: the
+    // traveler was already occupied (in transit) before this day's window
+    // even opened, so there's no free time to show before it — unlike a Stay
+    // check-out, which leaves the traveler free right up until checkout.
+    if (!first.suppressLeadingDayEdge) {
+      pushDayEdgeBlock(blocks, day.dateKey, 'leading', dayStart, first.start_at)
+    }
 
     // The trailing edge starts after the day's last item has already ended —
     // by then the traveler may be in a different timezone than the one this
@@ -153,23 +173,32 @@ export function computeDayEdgeFreeBlocks(
     // wherever/whenever the day *started* (TABI-165). The block still files
     // under `day.dateKey` for tab assignment; only the cutoff instant moves.
     //
-    // A multi-night Stay's check-in occurrence is the one exception: its
-    // `end_at` (checkout) routinely lands days later, and that checkout gets
-    // its own occurrence — and its own trailing edge — on its own day (see
-    // `buildDayOccurrences` in TripTimeline.tsx, which sets
-    // `suppressTrailingFreeBlock` on exactly this occurrence). Using `end_at`
-    // here too would double-count that same stretch of free time on the
-    // check-in day as well, so its trailing edge is anchored to its own
-    // `start_at` instead, same as a same-day item. A same-day check-in/
-    // check-out Stay never gets this flag, so it keeps using its real
-    // `end_at` below, same as before.
-    const trailingInstant = last.suppressTrailingFreeBlock ? last.start_at : (last.end_at ?? last.start_at)
-    const trailingTimezone = last.suppressTrailingFreeBlock
-      ? (last.start_timezone ?? day.timezone)
-      : (last.end_timezone ?? last.start_timezone ?? day.timezone)
-    const trailingDateKey = localDateKey(trailingInstant, trailingTimezone)
-    const trailingDayEnd = zonedTimeToUtc(trailingDateKey, dayEndTime, trailingTimezone)
-    pushDayEdgeBlock(blocks, day.dateKey, 'trailing', trailingInstant, trailingDayEnd)
+    // A multi-night Stay's check-in occurrence and a Transport departure
+    // occurrence are exceptions, for different reasons:
+    // - A Stay check-in's `end_at` (checkout) routinely lands days later,
+    //   and that checkout gets its own occurrence — and its own trailing
+    //   edge — on its own day. Using `end_at` here too would double-count
+    //   that same stretch of free time on the check-in day as well, so its
+    //   trailing edge is anchored to its own `start_at` instead, same as a
+    //   same-day item — the guest is free again immediately after checking
+    //   in, unlike a traveler mid-journey.
+    // - A Transport departure's `suppressTrailingDayEdge` skips the trailing
+    //   edge entirely: the traveler remains occupied (in transit) for the
+    //   rest of this day's window, so there is no free time to show after
+    //   departure at all — its arrival occurrence's own day picks up the
+    //   real post-arrival free time instead.
+    // A same-day check-in/check-out Stay, or a same-day Transport leg, never
+    // gets either flag, so it keeps using its real `end_at` below, same as
+    // before.
+    if (!last.suppressTrailingDayEdge) {
+      const trailingInstant = last.suppressTrailingFreeBlock ? last.start_at : (last.end_at ?? last.start_at)
+      const trailingTimezone = last.suppressTrailingFreeBlock
+        ? (last.start_timezone ?? day.timezone)
+        : (last.end_timezone ?? last.start_timezone ?? day.timezone)
+      const trailingDateKey = localDateKey(trailingInstant, trailingTimezone)
+      const trailingDayEnd = zonedTimeToUtc(trailingDateKey, dayEndTime, trailingTimezone)
+      pushDayEdgeBlock(blocks, day.dateKey, 'trailing', trailingInstant, trailingDayEnd)
+    }
   }
 
   return blocks

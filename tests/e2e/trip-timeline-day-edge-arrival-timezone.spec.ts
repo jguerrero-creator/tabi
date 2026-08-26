@@ -17,15 +17,23 @@ test.use({ viewport: { width: 390, height: 844 } })
 // item's arrival (`end_timezone` ?? `start_timezone`) instead of reusing the
 // day's start-anchored `dateKey`/`timezone`.
 //
-// This seeds a single overnight Paris → Tokyo flight (the day's only item, so
-// items[0] === last) departing Paris afternoon and landing Tokyo the next
-// calendar morning (09:10 JST). With the fix, the trailing free block should
-// run from that arrival to 22:00 JST on the *arrival's own* calendar date
-// (Sep 11 in Tokyo) — 12h 50m — rather than disappearing entirely (the old
-// bug: 22:00 Paris time on the *departure's* Sep 10 falls before the arrival
-// instant, producing a negative duration that got silently dropped).
+// Bugs DB, Sévérité: Bloquant — "Un trajet Transport qui traverse minuit...
+// n'apparaît que sur le jour de départ". TABI-165 fixed the *time* of the
+// post-arrival free block, but it still filed that block under the
+// departure day's tab, and the flight itself never appeared on the arrival
+// day's tab at all (which rendered as one big, wrong, full-day free block
+// from day-start — the traveler was still airborne). `buildDayOccurrences`
+// now splits a midnight/timezone-crossing point-to-point Transport leg into
+// a departure occurrence and an arrival occurrence, exactly like it already
+// did for a multi-night Stay's check-in/check-out — each getting its own
+// day, its own correctly-split leading/trailing free time, and (via
+// `suppressTrailingDayEdge`/`suppressLeadingDayEdge`) no free time at all
+// on the departure day after takeoff or on the arrival day before landing.
+//
+// This seeds a single overnight Paris → Tokyo flight departing Paris
+// afternoon and landing Tokyo the next calendar morning (09:10 JST).
 
-test('trailing free block after an international arrival uses the arrival timezone, not the departure timezone (TABI-165)', async ({
+test('a midnight/timezone-crossing Transport leg appears on both its departure and arrival day, with free time correctly split (Bugs DB, Bloquant)', async ({
   page,
   registerTrip,
 }) => {
@@ -81,22 +89,32 @@ test('trailing free block after an international arrival uses the arrival timezo
     await page.getByRole('button', { name: 'Planning' }).click()
     await expect(page.getByRole('button', { name: 'Sep 10' })).toBeVisible()
 
-    // Both a mobile single-day view and a desktop carousel render
-    // simultaneously in the DOM (CSS-toggled visibility), hence `.first()`
-    // throughout.
-    await expect(page.getByRole('link', { name: flightName, exact: false }).first()).toBeVisible()
-
-    // Leading edge (08:00 -> 13:35 Paris time) — unaffected by this bug,
-    // sanity-checks the day loaded correctly.
-    await expect(page.getByText('5h 35m free').first()).toBeVisible()
-
-    // Trailing edge: 09:10 JST arrival -> 22:00 JST (Tokyo's own Sep 11,
-    // not Paris's Sep 10) = 12h 50m. Before the fix this block didn't render
-    // at all (negative duration, silently dropped).
-    await expect(page.getByText('12h 50m free').first()).toBeVisible()
-
+    const mobileView = page.getByTestId('mobile-day-view')
     const mobileRailItems = page.locator('main ul').first().locator('li')
-    await expect(mobileRailItems).toHaveCount(3)
+
+    // Departure day (Sep 10): flight shows as a Departure row. Leading free
+    // time before it (08:00 -> 13:35 Paris time = 5h 35m) is unaffected by
+    // this bug, sanity-checks the day loaded correctly. No free time after
+    // departure at all — the traveler remains occupied (in transit) for the
+    // rest of the day's window; the real post-arrival free time belongs to
+    // the arrival day instead, not here.
+    await expect(mobileView.getByText(flightName)).toBeVisible()
+    await expect(mobileView.getByText('Departure · 13:35')).toBeVisible()
+    await expect(mobileView.getByText('5h 35m free').first()).toBeVisible()
+    await expect(mobileView.getByText('12h 50m free')).not.toBeVisible()
+    await expect(mobileRailItems).toHaveCount(2)
+
+    // Arrival day (Sep 11): before this fix, the flight never appeared here
+    // at all — this tab rendered as one big, wrong, full-day free block from
+    // day-start, even though the traveler was still airborne until 09:10
+    // JST. It must now show an Arrival row, with no free time before it, and
+    // the real trailing free time (09:10 JST arrival -> 22:00 JST, Tokyo's
+    // own Sep 11 — not Paris's Sep 10) = 12h 50m after it.
+    await page.getByRole('button', { name: 'Sep 11' }).click()
+    await expect(mobileView.getByText(flightName)).toBeVisible()
+    await expect(mobileView.getByText('Arrival · 09:10')).toBeVisible()
+    await expect(mobileView.getByText('12h 50m free')).toBeVisible()
+    await expect(mobileRailItems).toHaveCount(2)
   } finally {
     const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)
     if (deleteReservationsError) throw deleteReservationsError

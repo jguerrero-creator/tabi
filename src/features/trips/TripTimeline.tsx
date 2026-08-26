@@ -10,6 +10,7 @@ import {
 import { strings } from '../../lib/strings'
 import { findActiveStay } from '../stay/computeAccommodationGaps'
 import { findActiveVehicleRental } from '../transport/findActiveVehicleRental'
+import { findInProgressTransportLeg } from '../transport/findInProgressTransportLeg'
 import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
@@ -111,7 +112,7 @@ export function TripTimeline({
   const effectiveSelectedKey =
     selectedDayKey && days.some((day) => day.key === selectedDayKey) ? selectedDayKey : days[0].key
 
-  const dayEdgesByKey = trip ? buildDayEdgesByKey(trip, days, groupsByKey) : new Map<string, DayEdges>()
+  const dayEdgesByKey = trip ? buildDayEdgesByKey(trip, days, groupsByKey, reservations) : new Map<string, DayEdges>()
 
   return (
     <>
@@ -124,6 +125,12 @@ export function TripTimeline({
           edges={dayEdgesByKey.get(effectiveSelectedKey) ?? {}}
           activeStay={
             effectiveSelectedKey === UNSCHEDULED_KEY ? null : findActiveStay(effectiveSelectedKey, reservations)
+          }
+          inProgressLeg={
+            effectiveSelectedKey === UNSCHEDULED_KEY ||
+            (groupsByKey.get(effectiveSelectedKey)?.items.length ?? 0) > 0
+              ? null
+              : findInProgressTransportLeg(effectiveSelectedKey, reservations)
           }
           dayLocation={dayLocationsByKey.get(effectiveSelectedKey)}
           onAddAtFreeBlock={onAddAtFreeBlock}
@@ -157,6 +164,11 @@ export function TripTimeline({
             freeTimeByFromId={freeTimeByFromId}
             edges={dayEdgesByKey.get(day.key) ?? {}}
             activeStay={day.key === UNSCHEDULED_KEY ? null : findActiveStay(day.key, reservations)}
+            inProgressLeg={
+              day.key === UNSCHEDULED_KEY || (groupsByKey.get(day.key)?.items.length ?? 0) > 0
+                ? null
+                : findInProgressTransportLeg(day.key, reservations)
+            }
             dayLocation={dayLocationsByKey.get(day.key)}
             onAddAtFreeBlock={onAddAtFreeBlock}
             onSaveDayLocation={
@@ -200,12 +212,13 @@ function buildDayTabs(
     const items = groupsByKey.get(key)?.items ?? []
     const activeStay = findActiveStay(key, reservations)
     const activeRental = findActiveVehicleRental(key, reservations)
+    const inProgressLeg = items.length === 0 ? findInProgressTransportLeg(key, reservations) : null
     return {
       key,
       label: formatDayPillLabel(key),
       stayStatus: activeStay?.status ?? null,
       vehicleRentalStatus: activeRental?.status ?? null,
-      itemCount: countDayItems(items, activeStay),
+      itemCount: countDayItems(items, activeStay, inProgressLeg),
     }
   })
 
@@ -227,12 +240,17 @@ function buildDayTabs(
  * A multi-night Stay is only bucketed under its check-in day by groupByDate
  * (grouped by start_at), so a day it merely covers wouldn't otherwise count
  * it — `activeStay` fills that gap. Guarded against double-counting on the
- * check-in day itself, where the stay is already present in `items`.
+ * check-in day itself, where the stay is already present in `items`. A
+ * Transport leg in progress through an intermediate day of a 2+ day span
+ * (`inProgressLeg`) has no occurrence of its own on that day either — same
+ * gap, same fix — but per `findInProgressTransportLeg`, it's only ever
+ * non-null when `items` is already empty, so no double-counting guard is
+ * needed for it.
  */
-function countDayItems(items: DayItem[], activeStay: Reservation | null): number {
-  if (!activeStay) return items.length
-  const alreadyCounted = items.some((item) => item.id === activeStay.id)
-  return alreadyCounted ? items.length : items.length + 1
+function countDayItems(items: DayItem[], activeStay: Reservation | null, inProgressLeg: Reservation | null): number {
+  const stayCount = activeStay && !items.some((item) => item.id === activeStay.id) ? 1 : 0
+  const inProgressCount = inProgressLeg ? 1 : 0
+  return items.length + stayCount + inProgressCount
 }
 
 /** Trip `start_date`/`end_date` are plain calendar dates; anchor to UTC midnight per day, same reasoning as `formatTripDateRange`. */
@@ -263,15 +281,18 @@ function buildDayEdgesByKey(
   trip: Trip,
   days: { key: string; label: string }[],
   groupsByKey: Map<string, DateGroup<DayItem>>,
+  reservations: Reservation[],
 ): Map<string, DayEdges> {
   const input = days
     .filter((day) => day.key !== UNSCHEDULED_KEY)
     .map((day) => {
       const items = groupsByKey.get(day.key)?.items ?? []
+      const inProgressLeg = items.length === 0 ? findInProgressTransportLeg(day.key, reservations) : null
       return {
         dateKey: day.key,
         timezone: items[0]?.start_timezone ?? localTimeZone(),
         items: items.filter((item): item is DayItem & { start_at: string } => item.start_at !== null),
+        fullyOccupied: inProgressLeg !== null,
       }
     })
 
