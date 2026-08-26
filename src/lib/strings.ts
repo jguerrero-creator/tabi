@@ -341,6 +341,7 @@ export const strings = {
     errorNightsRequired: 'Number of nights is required.',
     errorEndBeforeStart: 'End must be on or after start.',
     errorGeneric: 'Something went wrong. Please try again.',
+    errorTripLoadFailed: "Could not load this trip's details. Please close and try again.",
     geocodeErrorGeneric: 'Could not locate this address. Please try again.',
     overlapConfirmTitle: 'Overlapping dates',
     overlapConfirmMessage: (name: string) => `This overlaps with "${name}". Is this intended?`,

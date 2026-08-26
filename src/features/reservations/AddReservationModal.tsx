@@ -295,7 +295,7 @@ export function AddReservationModal({
     tripId,
     option.dbType,
   )
-  const { trip, loading: tripLoading, updateDates: updateTripDates } = useTrip(tripId)
+  const { trip, loading: tripLoading, error: tripError, updateDates: updateTripDates } = useTrip(tripId)
   const { locationsByDate: dayLocationsByDate } = useTripDayLocations(tripId)
   // TABI-204: last-known-location prefill draws from every reservation in the trip
   // (not just the current type), since the goal is "where did the traveler's plan
@@ -415,6 +415,16 @@ export function AddReservationModal({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+
+    // Bug (Bugs DB, 26/08): the trip fetch could still be pending/failed/not-found at
+    // submit time, silently skipping outOfPeriodField's check below (it degrades to
+    // `null` whenever `trip` is falsy) and any other trip-dependent guard. Fail safe
+    // instead of letting a falsy `trip` slip through to that logic.
+    if (tripLoading) return
+    if (tripError || !trip) {
+      setError(strings.addReservation.errorTripLoadFailed)
+      return
+    }
 
     if (!isAutoNamedTransport && !name.trim()) {
       setError(strings.addReservation.errorNameRequired)
@@ -680,10 +690,14 @@ export function AddReservationModal({
   const hasAutoSubmittedRef = useRef(false)
   useEffect(() => {
     if (!autoSubmit || hasAutoSubmittedRef.current) return
+    // Wait for the trip fetch to resolve (success or failure) before consuming the one-shot
+    // ref below — otherwise a still-pending fetch at mount time would make handleSubmit's
+    // new tripLoading guard no-op this silently, with no later retry.
+    if (tripLoading) return
     hasAutoSubmittedRef.current = true
     void handleSubmit({ preventDefault: () => {} } as FormEvent)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on mount only, guarded by the ref above
-  }, [autoSubmit])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once (per trip-load resolution) only, guarded by the ref above
+  }, [autoSubmit, tripLoading])
 
   return (
     <APIProvider apiKey={mapsApiKey ?? ''}>
@@ -694,12 +708,16 @@ export function AddReservationModal({
         cancelLabel={strings.addReservation.cancel}
         submitLabel={strings.addReservation.submit}
         submitting={submitting}
-        submitDisabled={geocoding}
+        submitDisabled={geocoding || tripLoading || Boolean(tripError)}
       >
         {extractionNotice && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             {strings.addReservation.extractionNoticeBanner}
           </div>
+        )}
+
+        {tripError && (
+          <p className="text-sm text-red-600">{strings.addReservation.errorTripLoadFailed}</p>
         )}
 
         {typeExpanded ? (
