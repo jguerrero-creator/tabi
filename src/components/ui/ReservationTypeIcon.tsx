@@ -1,5 +1,29 @@
 import type { ReservationType, StaySubtype, TransportSubtype } from '../../types/reservation'
 
+/**
+ * Type-identity colors (TABI-217) — distinct from the 3-state booking-status
+ * palette (statusDotClasses: emerald/amber/slate). Rose (not raw `red`) avoids
+ * reading as an error state, since `red` is used app-wide for error text/banners;
+ * `yellow` (not `amber`) avoids matching the "to book" status color.
+ */
+export const reservationTypeBadgeClasses: Record<ReservationType, string> = {
+  // yellow-700, not -600: Tailwind's yellow-600 (#CA8A04) sits almost on the
+  // same hue as the "to book" status dot (amber-500, #F59E0B) — measured near-
+  // identical on a rendered to-book Transport row. The darker -700 keeps the
+  // same yellow family but is dark/muted enough to read as clearly distinct
+  // from that bright orange dot.
+  transport: 'bg-yellow-50 text-yellow-700',
+  stay: 'bg-rose-50 text-rose-600',
+  activity: 'bg-blue-50 text-blue-600',
+}
+
+/** Same per-type palette as `reservationTypeBadgeClasses`, as a bare icon/text color for un-badged icons. */
+export const reservationTypeTextClasses: Record<ReservationType, string> = {
+  transport: 'text-yellow-700',
+  stay: 'text-rose-600',
+  activity: 'text-blue-600',
+}
+
 const paths: Record<ReservationType, React.ReactNode> = {
   stay: (
     <>

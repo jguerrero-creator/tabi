@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ReservationIcon } from '../ui/ReservationTypeIcon'
+import { ReservationIcon, reservationTypeBadgeClasses } from '../ui/ReservationTypeIcon'
 import { statusDotClasses } from './statusDotClasses'
 import { strings } from '../../lib/strings'
 import type { ReservationStatus, ReservationType, StaySubtype, TransportSubtype } from '../../types/reservation'
@@ -48,7 +48,9 @@ export function MenuListRow({
         to={to}
         className={`flex items-center gap-3 py-3 hover:bg-slate-50 ${nested ? 'pl-10 pr-4 bg-slate-50/60' : 'px-4'}`}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[type]}`}
+        >
           <ReservationIcon
             reservation={{ type, stay_subtype: staySubtype, transport_subtype: transportSubtype }}
             className="h-4 w-4"

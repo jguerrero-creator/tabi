@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ReservationIcon } from '../../components/ui/ReservationTypeIcon'
+import { ReservationIcon, reservationTypeTextClasses } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
 import { statusDotClasses } from '../../components/menu/statusDotClasses'
 import { formatLocalTimeZoneLabel, formatTimeInZone, localTimeZone } from '../../lib/datetime'
@@ -394,7 +394,9 @@ function ReservationCard({ reservation }: { reservation: DayItem }) {
       to={`/reservations/${reservation.id}`}
       className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-teal-600">
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${reservationTypeTextClasses[reservation.type]}`}
+      >
         <ReservationIcon reservation={reservation} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">

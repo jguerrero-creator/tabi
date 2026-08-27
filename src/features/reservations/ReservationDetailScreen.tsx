@@ -8,7 +8,7 @@ import type { MapPoint } from '../../components/ui/MiniMap'
 import { MiniMap } from '../../components/ui/MiniMap'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
-import { ReservationIcon } from '../../components/ui/ReservationTypeIcon'
+import { ReservationIcon, reservationTypeBadgeClasses } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusPicker } from '../../components/ui/StatusPicker'
 import {
@@ -609,7 +609,9 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[reservation.type]}`}
+              >
                 <ReservationIcon reservation={reservation} className="h-5 w-5" />
               </span>
               <div>

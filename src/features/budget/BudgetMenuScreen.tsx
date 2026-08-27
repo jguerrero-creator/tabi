@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuSection } from '../../components/menu/MenuSection'
 import { Button } from '../../components/ui/Button'
-import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { ReservationTypeIcon, reservationTypeBadgeClasses } from '../../components/ui/ReservationTypeIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatCurrency } from '../../lib/currency'
 import { logClientError } from '../../lib/logError'
@@ -120,7 +120,9 @@ export function BudgetMenuScreen() {
                   .filter((category) => category.count > 0)
                   .map((category) => (
                     <li key={category.type} className="flex items-center gap-3 px-4 py-3">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600">
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[category.type]}`}
+                      >
                         <ReservationTypeIcon type={category.type} className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">

@@ -3,7 +3,7 @@ import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePick
 import { Button } from '../../components/ui/Button'
 import { FormSheet } from '../../components/ui/FormSheet'
 import { PlaceAutocompleteField, type PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
-import { ReservationTypeIcon } from '../../components/ui/ReservationTypeIcon'
+import { ReservationTypeIcon, reservationTypeTextClasses } from '../../components/ui/ReservationTypeIcon'
 import { formatDateRangeLabel, formatDayPillLabel } from '../../lib/datetime'
 import { extractPlanFromText } from '../../lib/extractPlan'
 import {
@@ -298,7 +298,7 @@ function PlanReviewItemRow({
         item.status === 'discarded' ? 'opacity-50' : ''
       }`}
     >
-      <div className="shrink-0 text-slate-500">{icon}</div>
+      <div className="shrink-0">{icon}</div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-slate-900">{title}</p>
         {dateLabel && <p className="truncate text-xs text-slate-500">{dateLabel}</p>}
@@ -330,7 +330,11 @@ function PlanReviewItemRow({
 function describePlanItem(data: PlanItem): { icon: ReactNode; title: string; dateLabel: string | null } {
   if (data.kind === 'dayLocation') {
     return {
-      icon: <span aria-hidden="true">📍</span>,
+      icon: (
+        <span className="text-slate-500" aria-hidden="true">
+          📍
+        </span>
+      ),
       title: data.placeName,
       dateLabel: formatDayPillLabel(data.date),
     }
@@ -352,8 +356,9 @@ function describePlanItem(data: PlanItem): { icon: ReactNode; title: string; dat
     dateLabel += endTime && endTime !== startTime ? ` · ${startTime}–${endTime}` : ` · ${startTime}`
   }
 
+  const resolvedType = reservation.type ?? 'activity'
   return {
-    icon: <ReservationTypeIcon type={reservation.type ?? 'activity'} />,
+    icon: <ReservationTypeIcon type={resolvedType} className={`h-5 w-5 ${reservationTypeTextClasses[resolvedType]}`} />,
     title: reservation.name ?? strings.importPlan.untitledReservation,
     dateLabel,
   }
