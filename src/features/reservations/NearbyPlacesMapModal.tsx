@@ -1,16 +1,14 @@
-import { AdvancedMarker, APIProvider, Map } from '@vis.gl/react-google-maps'
+import { AdvancedMarker, Map } from '@vis.gl/react-google-maps'
 import { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { MapErrorBoundary } from '../../components/ui/MapErrorBoundary'
 import { Spinner } from '../../components/ui/Spinner'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
+import { mapId, mapsApiKey } from '../../lib/googleMaps'
 import { logClientError } from '../../lib/logError'
 import { placePhotoUrl, searchNearbyPlaces, type PlaceSearchResult } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import type { ResolvedPlace } from './AddReservationModal'
-
-const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
-const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined) || 'DEMO_MAP_ID'
 
 interface NearbyPlacesMapModalProps {
   center: { lat: number; lng: number }
@@ -101,27 +99,25 @@ export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: Nea
 
           {mapsApiKey && (
             <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-              <APIProvider apiKey={mapsApiKey} libraries={['marker']}>
-                <Map mapId={mapId} defaultCenter={center} defaultZoom={15} gestureHandling="greedy" disableDefaultUI>
-                  <AdvancedMarker position={center}>
-                    <span className="block h-3 w-3 rounded-full border-2 border-white bg-slate-500 shadow-sm" />
+              <Map mapId={mapId} defaultCenter={center} defaultZoom={15} gestureHandling="greedy" disableDefaultUI>
+                <AdvancedMarker position={center}>
+                  <span className="block h-3 w-3 rounded-full border-2 border-white bg-slate-500 shadow-sm" />
+                </AdvancedMarker>
+                {results.map((result) => (
+                  <AdvancedMarker
+                    key={result.googlePlaceId}
+                    position={{ lat: result.lat, lng: result.lng }}
+                    title={result.name}
+                    onClick={() => setSelected(result)}
+                  >
+                    <span
+                      className={`block h-5 w-5 rounded-full border-2 border-white shadow-sm ${
+                        selected?.googlePlaceId === result.googlePlaceId ? 'bg-teal-700' : 'bg-teal-500'
+                      }`}
+                    />
                   </AdvancedMarker>
-                  {results.map((result) => (
-                    <AdvancedMarker
-                      key={result.googlePlaceId}
-                      position={{ lat: result.lat, lng: result.lng }}
-                      title={result.name}
-                      onClick={() => setSelected(result)}
-                    >
-                      <span
-                        className={`block h-5 w-5 rounded-full border-2 border-white shadow-sm ${
-                          selected?.googlePlaceId === result.googlePlaceId ? 'bg-teal-700' : 'bg-teal-500'
-                        }`}
-                      />
-                    </AdvancedMarker>
-                  ))}
-                </Map>
-              </APIProvider>
+                ))}
+              </Map>
             </MapErrorBoundary>
           )}
         </div>

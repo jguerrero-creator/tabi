@@ -1,4 +1,3 @@
-import { APIProvider } from '@vis.gl/react-google-maps'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
@@ -39,8 +38,6 @@ import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
-
-const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
 const STAY_CHECKIN_DATE_FIELD_ID = 'reservation-checkin-date'
 const STAY_CHECKOUT_DATE_FIELD_ID = 'reservation-checkout-date'
@@ -607,8 +604,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   }
 
   return (
-    <APIProvider apiKey={mapsApiKey ?? ''}>
-      <ScreenShell onBack={onBack}>
+    <ScreenShell onBack={onBack}>
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -950,7 +946,6 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           />
         )}
       </ScreenShell>
-    </APIProvider>
   )
 }
 

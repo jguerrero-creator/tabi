@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { APIProvider, Map } from '@vis.gl/react-google-maps'
+import { Map } from '@vis.gl/react-google-maps'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { MapTrace, MiniMap } from '../../components/ui/MiniMap'
 import { MapErrorBoundary } from '../../components/ui/MapErrorBoundary'
+import { mapId, mapsApiKey } from '../../lib/googleMaps'
 import { strings } from '../../lib/strings'
-
-const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
-// AdvancedMarkerElement (TABI-153) requires a Map ID on every <Map>, unlike the
-// legacy Marker it replaces. Falls back to Google's DEMO_MAP_ID (dev watermark)
-// until a real Map ID is provisioned in Cloud Console — see .env.local.example.
-const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined) || 'DEMO_MAP_ID'
 
 interface OverviewMapProps {
   points: MapPoint[]
@@ -36,11 +31,9 @@ export function OverviewMap({ points }: OverviewMapProps) {
       {fullscreen && mapsApiKey && (
         <div className="fixed inset-0 z-50 bg-black">
           <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-            <APIProvider apiKey={mapsApiKey} libraries={['marker']}>
-              <Map mapId={mapId} defaultCenter={centerOf(points)} defaultZoom={11} gestureHandling="greedy">
-                <MapTrace points={points} />
-              </Map>
-            </APIProvider>
+            <Map mapId={mapId} defaultCenter={centerOf(points)} defaultZoom={11} gestureHandling="greedy">
+              <MapTrace points={points} />
+            </Map>
           </MapErrorBoundary>
           <button
             type="button"

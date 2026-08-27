@@ -1,4 +1,3 @@
-import { APIProvider } from '@vis.gl/react-google-maps'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -43,8 +42,6 @@ import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservationsByType } from './useReservationsByType'
-
-const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
 export type ResolvedPlace = GeocodeResult & {
   placeName: string | null
@@ -700,7 +697,7 @@ export function AddReservationModal({
   }, [autoSubmit, tripLoading])
 
   return (
-    <APIProvider apiKey={mapsApiKey ?? ''}>
+    <>
       <FormSheet
         title={strings.addReservation.title}
         onSubmit={handleSubmit}
@@ -1050,7 +1047,7 @@ export function AddReservationModal({
           confirming={submitting}
         />
       )}
-    </APIProvider>
+    </>
   )
 }
 
