@@ -1,4 +1,5 @@
 import type { Reservation } from '../types/reservation'
+import { buildDayOccurrences } from './dayOccurrences'
 import { localDateKey, zonedTimeToUtc } from './datetime'
 import { legKey } from './tripLegs'
 import type { TravelMode } from './travelTime'
@@ -49,6 +50,18 @@ export const DEFAULT_MAX_TRAVEL_SECONDS = 4 * 60 * 60
  * time, not generic guide time" calculation. All arithmetic is done on UTC
  * instants (`start_at`/`end_at` epoch millis), never on displayed local
  * wall-clock strings, so it stays correct across timezone changes and DST.
+ *
+ * Pairs `buildDayOccurrences`' output, not the raw reservation list: a
+ * multi-night Stay's check-in `start_at` (and a midnight-crossing Transport's
+ * departure) is otherwise the only instant that ever enters this sort, so a
+ * reservation that starts *after* check-in but *before* the real checkout
+ * (e.g. an activity on a stay's second day) would wrongly pair check-in
+ * straight through to whatever comes after checkout, skipping the checkout
+ * instant — and its real gap — entirely (Bugs: "Ordre chronologique cassé
+ * dans la timeline d'un jour"). The check-in/checkout (and departure/arrival)
+ * split shares one reservation id per pair, so the two occurrences always
+ * sort adjacent to each other with a zero-length gap between them, which the
+ * `gapMs <= 0` guard below already skips — no extra self-pair handling needed.
  */
 export function computeFreeTimeBlocks(
   reservations: Reservation[],
@@ -57,7 +70,7 @@ export function computeFreeTimeBlocks(
 ): FreeTimeBlock[] {
   const legByPair = new Map(legs.map((leg) => [legKey(leg.fromReservationId, leg.toReservationId), leg]))
 
-  const scheduled = reservations.filter(
+  const scheduled = buildDayOccurrences(reservations).filter(
     (reservation): reservation is Reservation & { start_at: string } => reservation.start_at !== null,
   )
   const sorted = [...scheduled].sort((a, b) => a.start_at.localeCompare(b.start_at))

@@ -1,3 +1,4 @@
+import { buildDayOccurrences, type DayOccurrence } from './dayOccurrences'
 import { localDateKey } from './datetime'
 import type { Reservation } from '../types/reservation'
 import type { LatLng } from './travelTime'
@@ -72,6 +73,13 @@ export function resolveLegEndpointPlace(reservation: Reservation, latLng: LatLng
  * so the drop-off coordinate doesn't represent where they are that day).
  * `resolveCoveredDayAnchor` supplies a substitute location for that day
  * instead (the day's planned location, or its active accommodation).
+ *
+ * Pairs `buildDayOccurrences`' output rather than the raw reservation list,
+ * same reasoning as `computeFreeTimeBlocks` — otherwise a Stay's checkout (or
+ * a Transport's arrival) is invisible to this pairing and a reservation
+ * sandwiched between check-in and checkout gets a leg computed straight
+ * through to whatever comes after checkout, instead of to/from the checkout
+ * itself.
  */
 export function buildTripLegs(
   reservations: Reservation[],
@@ -79,8 +87,8 @@ export function buildTripLegs(
 ): TripLegInput[] {
   // Reservations without a start_at ("decide later", no date yet) have no place
   // in a chronological sequence, so they're excluded from consecutive pairing.
-  const scheduled = reservations.filter(
-    (reservation): reservation is Reservation & { start_at: string } => reservation.start_at !== null,
+  const scheduled = buildDayOccurrences(reservations).filter(
+    (reservation): reservation is DayOccurrence & { start_at: string } => reservation.start_at !== null,
   )
   const sorted = [...scheduled].sort((a, b) => a.start_at.localeCompare(b.start_at))
   const legs: TripLegInput[] = []
@@ -88,6 +96,14 @@ export function buildTripLegs(
   for (let i = 0; i < sorted.length - 1; i++) {
     const from = sorted[i]
     const to = sorted[i + 1]
+
+    // A Stay check-in / Transport departure occurrence's real trailing gap
+    // belongs to its check-out/arrival occurrence's own slot instead (same
+    // flag `computeFreeTimeBlocks` and the rail use to suppress this) — skip
+    // it here too, or this pairing would compute a leg "from" an occurrence
+    // whose own occupancy hasn't actually ended yet at this point in the
+    // sequence (e.g. into a reservation that starts before the real checkout).
+    if (from.suppressTrailingFreeBlock) continue
 
     const isCoveredByRental =
       from.type === 'transport' &&
