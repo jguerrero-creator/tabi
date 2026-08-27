@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
@@ -17,6 +17,8 @@ interface SouvenirItemRowProps {
  * edit in place, no separate detail screen for something this small.
  */
 export function SouvenirItemRow({ item, onUpdate, onDelete }: SouvenirItemRowProps) {
+  const labelFieldId = useId()
+  const checkedFieldId = useId()
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(item.label)
   const [submitting, setSubmitting] = useState(false)
@@ -70,6 +72,8 @@ export function SouvenirItemRow({ item, onUpdate, onDelete }: SouvenirItemRowPro
       <li className="px-4 py-3">
         <form onSubmit={handleSave} className="space-y-2">
           <input
+            id={labelFieldId}
+            name={labelFieldId}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             placeholder={strings.souvenirsMenu.labelPlaceholder}
@@ -94,6 +98,8 @@ export function SouvenirItemRow({ item, onUpdate, onDelete }: SouvenirItemRowPro
   return (
     <li className="flex items-center gap-3 px-4 py-3">
       <input
+        id={checkedFieldId}
+        name={checkedFieldId}
         type="checkbox"
         checked={item.is_checked}
         onChange={handleToggleChecked}

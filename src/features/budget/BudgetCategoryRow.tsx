@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { formatCurrency } from '../../lib/currency'
 import { logClientError } from '../../lib/logError'
@@ -19,6 +19,8 @@ interface BudgetCategoryRowProps {
  * label to edit in place, no separate detail screen for something this small.
  */
 export function BudgetCategoryRow({ category, currency, onUpdate, onDelete }: BudgetCategoryRowProps) {
+  const labelFieldId = useId()
+  const amountFieldId = useId()
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(category.label)
   const [amount, setAmount] = useState(String(category.amount))
@@ -61,6 +63,8 @@ export function BudgetCategoryRow({ category, currency, onUpdate, onDelete }: Bu
       <li className="px-4 py-3">
         <form onSubmit={handleSave} className="space-y-2">
           <input
+            id={labelFieldId}
+            name={labelFieldId}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             placeholder={strings.budgetMenu.labelPlaceholder}
@@ -68,6 +72,8 @@ export function BudgetCategoryRow({ category, currency, onUpdate, onDelete }: Bu
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
           />
           <input
+            id={amountFieldId}
+            name={amountFieldId}
             type="number"
             step="0.01"
             min="0"

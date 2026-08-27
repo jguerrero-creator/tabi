@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useId, useMemo, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuSection } from '../../components/menu/MenuSection'
@@ -16,6 +16,8 @@ import { computeBudgetSummary } from './computeBudgetSummary'
 import { useTripBudgetCategories } from './useTripBudgetCategories'
 
 export function BudgetMenuScreen() {
+  const newLabelFieldId = useId()
+  const newAmountFieldId = useId()
   const { tripId } = useParams<{ tripId: string }>()
   const { trip, loading: tripLoading, error: tripError } = useTrip(tripId ?? '')
   const {
@@ -141,6 +143,8 @@ export function BudgetMenuScreen() {
                   <li className="px-4 py-3">
                     <form onSubmit={handleAddCategory} className="space-y-2">
                       <input
+                        id={newLabelFieldId}
+                        name={newLabelFieldId}
                         value={newLabel}
                         onChange={(event) => setNewLabel(event.target.value)}
                         placeholder={strings.budgetMenu.labelPlaceholder}
@@ -149,6 +153,8 @@ export function BudgetMenuScreen() {
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                       />
                       <input
+                        id={newAmountFieldId}
+                        name={newAmountFieldId}
                         type="number"
                         step="0.01"
                         min="0"

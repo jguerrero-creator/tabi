@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import { FormSheet } from '../../components/ui/FormSheet'
@@ -249,6 +249,8 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">{strings.importPlan.textLabel}</span>
         <textarea
+          id="import-plan-text"
+          name="import-plan-text"
           value={text}
           onChange={handleTextChange}
           placeholder={strings.importPlan.textPlaceholder}
@@ -261,6 +263,8 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">{strings.importPlan.fileLabel}</span>
         <input
+          id="import-plan-file"
+          name="import-plan-file"
           type="file"
           accept=".txt,.eml,text/plain,message/rfc822"
           onChange={handleFileSelect}
@@ -391,6 +395,7 @@ function PlanDayLocationEditor({
   onSave: (date: string, input: DayLocationInput) => Promise<void>
   onCancel: () => void
 }) {
+  const dateFieldId = useId()
   const [date, setDate] = useState(initialDate)
   const [text, setText] = useState(initialPlaceName)
   const [pendingPlace, setPendingPlace] = useState<(GeocodeResult & { placeName: string | null }) | null>(null)
@@ -484,6 +489,8 @@ function PlanDayLocationEditor({
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-700">{strings.importPlan.dateFieldLabel}</span>
         <input
+          id={dateFieldId}
+          name={dateFieldId}
           type="date"
           value={date}
           onChange={(event) => setDate(event.target.value)}

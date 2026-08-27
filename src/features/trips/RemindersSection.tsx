@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
@@ -17,6 +17,8 @@ interface RemindersSectionProps {
  * (TABI-53), so this widget only needs to be the entry point for adding one.
  */
 export function RemindersSection({ onCreate }: RemindersSectionProps) {
+  const titleFieldId = useId()
+  const dateFieldId = useId()
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
@@ -58,6 +60,8 @@ export function RemindersSection({ onCreate }: RemindersSectionProps) {
       {adding && (
         <form onSubmit={handleSubmit} className="mt-2 space-y-2 rounded-xl border border-slate-200 bg-white p-3">
           <input
+            id={titleFieldId}
+            name={titleFieldId}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder={strings.reminders.titlePlaceholder}
@@ -65,6 +69,8 @@ export function RemindersSection({ onCreate }: RemindersSectionProps) {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
           />
           <input
+            id={dateFieldId}
+            name={dateFieldId}
             type="date"
             value={date}
             onChange={(event) => setDate(event.target.value)}

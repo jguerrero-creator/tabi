@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Button } from './Button'
 
 interface ConfirmDialogProps {
@@ -32,6 +33,7 @@ export function ConfirmDialog({
   onSecondary,
   confirming = false,
 }: ConfirmDialogProps) {
+  const noteFieldId = useId()
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center">
       <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 sm:rounded-2xl">
@@ -42,6 +44,8 @@ export function ConfirmDialog({
           <label className="mt-4 block">
             <span className="mb-1 block text-sm font-medium text-slate-700">{noteLabel}</span>
             <textarea
+              id={noteFieldId}
+              name={noteFieldId}
               value={note}
               onChange={(event) => onNoteChange?.(event.target.value)}
               placeholder={notePlaceholder}

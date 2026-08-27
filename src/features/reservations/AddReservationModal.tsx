@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Field } from '../../components/ui/Field'
 import { FormSheet } from '../../components/ui/FormSheet'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { PlaceAutocompleteField } from '../../components/ui/PlaceAutocompleteField'
@@ -173,6 +174,8 @@ export function AddReservationModal({
   onClose,
   onCreate,
 }: AddReservationModalProps) {
+  const computedEndDateId = useId()
+  const computedEndTimeId = useId()
   const [mainType, setMainType] = useState<ReservationType>(defaultType)
   // TABI-126: the add sheet inherits its type from the menu it was opened from (Stay/Transport/
   // Activities) instead of re-asking — the selector stays collapsed until "Change type" is used.
@@ -884,6 +887,8 @@ export function AddReservationModal({
                 </legend>
                 <div className="flex gap-2">
                   <input
+                    id={computedEndDateId}
+                    name={computedEndDateId}
                     type="date"
                     aria-label={`${strings.addReservation.endLabel} date`}
                     value={endDate}
@@ -891,6 +896,8 @@ export function AddReservationModal({
                     className="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-500"
                   />
                   <input
+                    id={computedEndTimeId}
+                    name={computedEndTimeId}
                     type="time"
                     aria-label={`${strings.addReservation.endLabel} time`}
                     value={endTime}
@@ -1157,23 +1164,6 @@ function ParkingPicker({
   )
 }
 
-function Field({
-  label,
-  className = '',
-  children,
-}: {
-  label: string
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  )
-}
-
 function DateField({
   legend,
   date,
@@ -1189,11 +1179,14 @@ function DateField({
   min?: string
   id?: string
 }) {
+  const generatedId = useId()
+  const fieldId = id ?? generatedId
   return (
     <fieldset className="flex-1">
       <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
       <input
-        id={id}
+        id={fieldId}
+        name={fieldId}
         type="date"
         aria-label={`${legend} date`}
         value={date}
@@ -1227,12 +1220,16 @@ function DateTimeField({
   min?: string
   id?: string
 }) {
+  const generatedDateId = useId()
+  const timeId = useId()
+  const dateId = id ?? generatedDateId
   return (
     <fieldset className="flex-1">
       <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
       <div className="flex gap-2">
         <input
-          id={id}
+          id={dateId}
+          name={dateId}
           type="date"
           aria-label={`${legend} date`}
           value={date}
@@ -1242,6 +1239,8 @@ function DateTimeField({
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
         <input
+          id={timeId}
+          name={timeId}
           type="time"
           aria-label={`${legend} time`}
           value={time}
@@ -1269,11 +1268,15 @@ function DurationField({
   onHoursChange: (value: string) => void
   onMinutesChange: (value: string) => void
 }) {
+  const hoursId = useId()
+  const minutesId = useId()
   return (
     <fieldset className="flex-1">
       <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
       <div className="flex gap-2">
         <input
+          id={hoursId}
+          name={hoursId}
           type="number"
           min={0}
           max={23}
@@ -1285,6 +1288,8 @@ function DurationField({
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
         <input
+          id={minutesId}
+          name={minutesId}
           type="number"
           min={0}
           max={59}

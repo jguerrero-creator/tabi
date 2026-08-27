@@ -235,6 +235,8 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
           {strings.importConfirmation.textLabel}
         </span>
         <textarea
+          id="import-confirmation-text"
+          name="import-confirmation-text"
           value={text}
           onChange={handleTextChange}
           placeholder={strings.importConfirmation.textPlaceholder}
@@ -249,6 +251,8 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
           {strings.importConfirmation.fileLabel}
         </span>
         <input
+          id="import-confirmation-file"
+          name="import-confirmation-file"
           type="file"
           accept=".eml,.txt,message/rfc822,text/plain"
           onChange={handleFileSelect}
@@ -262,6 +266,8 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
           {strings.importConfirmation.pdfLabel}
         </span>
         <input
+          id="import-confirmation-pdf"
+          name="import-confirmation-pdf"
           type="file"
           accept=".pdf,application/pdf"
           onChange={handlePdfSelect}
@@ -283,6 +289,8 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
           {strings.importConfirmation.photoLabel}
         </span>
         <input
+          id="import-confirmation-photo"
+          name="import-confirmation-photo"
           type="file"
           accept="image/jpeg,image/png,image/gif,image/webp"
           capture="environment"
@@ -303,6 +311,8 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-slate-700">{strings.importConfirmation.urlLabel}</span>
         <input
+          id="import-confirmation-url"
+          name="import-confirmation-url"
           type="url"
           value={url}
           onChange={handleUrlChange}

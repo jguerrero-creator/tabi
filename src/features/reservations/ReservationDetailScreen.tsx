@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Field } from '../../components/ui/Field'
 import type { MapPoint } from '../../components/ui/MiniMap'
 import { MiniMap } from '../../components/ui/MiniMap'
 import type { PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
@@ -1143,23 +1144,6 @@ function LegRow({
   )
 }
 
-function Field({
-  label,
-  className = '',
-  children,
-}: {
-  label: string
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  )
-}
-
 // TABI-182: mirrors AddReservationModal's DurationField (TABI-181) — duplicated per this
 // codebase's existing convention of file-local small form pieces (see Field, DateTimeField).
 function DurationField({
@@ -1175,11 +1159,15 @@ function DurationField({
   onHoursChange: (value: string) => void
   onMinutesChange: (value: string) => void
 }) {
+  const hoursId = useId()
+  const minutesId = useId()
   return (
     <fieldset className="flex-1">
       <legend className="mb-1 block text-sm font-medium text-slate-700">{legend}</legend>
       <div className="flex gap-2">
         <input
+          id={hoursId}
+          name={hoursId}
           type="number"
           min={0}
           max={23}
@@ -1191,6 +1179,8 @@ function DurationField({
           className="w-1/2 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
         <input
+          id={minutesId}
+          name={minutesId}
           type="number"
           min={0}
           max={59}

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuSection } from '../../components/menu/MenuSection'
@@ -12,6 +12,7 @@ import { SouvenirItemRow } from './SouvenirItemRow'
 import { useTripSouvenirItems } from './useTripSouvenirItems'
 
 export function SouvenirsMenuScreen() {
+  const newLabelFieldId = useId()
   const { tripId } = useParams<{ tripId: string }>()
   const { trip, loading: tripLoading, error: tripError } = useTrip(tripId ?? '')
   const {
@@ -85,6 +86,8 @@ export function SouvenirsMenuScreen() {
               <li className="px-4 py-3">
                 <form onSubmit={handleAddItem} className="space-y-2">
                   <input
+                    id={newLabelFieldId}
+                    name={newLabelFieldId}
                     value={newLabel}
                     onChange={(event) => setNewLabel(event.target.value)}
                     placeholder={strings.souvenirsMenu.labelPlaceholder}
