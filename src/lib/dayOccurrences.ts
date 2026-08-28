@@ -6,11 +6,15 @@ import { localDateKey } from './datetime'
  * contributes two occurrences sharing the same underlying reservation id —
  * one on its check-in day, one on its check-out day — so its checkout is
  * visible on its own day instead of only ever showing up folded into the
- * check-in day's trailing free time. A midnight/timezone-crossing
- * point-to-point Transport leg is split the same way — a departure occurrence
- * and an arrival occurrence — so it's visible (and correctly occupies free
- * time) on both days instead of only its departure day (Bugs: "Un trajet
- * Transport qui traverse minuit... n'apparaît que sur le jour de départ").
+ * check-in day's trailing free time. Every point-to-point Transport leg is
+ * split the same way — a departure occurrence and an arrival occurrence —
+ * unconditionally, regardless of whether the two land on the same local
+ * calendar date, so it's always visible (and correctly occupies free time)
+ * on both its departure and arrival day (Bugs: "Un trajet Transport qui
+ * traverse minuit... n'apparaît que sur le jour de départ"; and "Comparaison
+ * de dates locales dans des fuseaux différents peut coïncider par erreur" —
+ * comparing local date *strings* computed in two different timezones can
+ * spuriously "match" even across a leg lasting most of a day).
  * Structurally identical to (and interchangeable with) `DayItem` in
  * `src/features/trips/DayColumn.tsx`, which is defined separately there to
  * avoid this module importing anything React-related — this file needs to
@@ -19,7 +23,7 @@ import { localDateKey } from './datetime'
 export type DayOccurrence = Reservation & {
   /** True for the check-out occurrence of a multi-night Stay. */
   isCheckoutOccurrence?: boolean
-  /** True for the arrival occurrence of a midnight-crossing Transport leg. */
+  /** True for the arrival occurrence of a point-to-point Transport leg. */
   isArrivalOccurrence?: boolean
   /**
    * Suppresses the pairwise free-time block keyed off this occurrence's id
@@ -51,18 +55,26 @@ export type DayOccurrence = Reservation & {
  * the checkout shows up as a real, timed rail item on its own day instead of
  * only ever being folded into the check-in day's trailing free time.
  *
- * Does the same for a point-to-point Transport leg whose departure and
- * arrival land on different local calendar dates (different timezones, or
- * simply an overnight leg) — a departure occurrence and an arrival
- * occurrence, so the leg is visible on both days and the traveler is treated
- * as occupied for its full real duration rather than "free" for whichever
- * part of the journey fell outside the departure day's own rendering.
+ * Does the same for every point-to-point Transport leg, unconditionally — a
+ * departure occurrence and an arrival occurrence, so the leg is visible on
+ * both its departure and arrival day and the traveler is treated as occupied
+ * for its full real duration. This used to only split when the departure and
+ * arrival local calendar dates (each computed in its own timezone) differed
+ * as strings — but two calendar-date strings computed in different
+ * timezones can coincidentally read the same even when the real elapsed
+ * time is close to a full day (e.g. a long-haul leg where the destination's
+ * local date happens to still match the origin's), silently treating most of
+ * a real journey as free time. Splitting unconditionally removes that
+ * false-equality risk instead of trying to patch the comparison — a same-day,
+ * same-timezone domestic hop just ends up with its departure and arrival
+ * occurrences adjacent on the same day, which is what it already showed via
+ * a single row's own departure/arrival instants either way.
  *
- * Every other reservation (and a same-day Stay/Transport, if one ever
- * existed) passes through as a single occurrence, unchanged. A leg spanning
- * 2+ calendar days (an intermediate day with neither the departure nor the
- * arrival) isn't covered by this split alone — that's handled separately by
- * `findInProgressTransportLeg`, consulted by `computeDayEdgeFreeBlocks`.
+ * Every other reservation type passes through as a single occurrence,
+ * unchanged. A leg spanning 2+ calendar days (an intermediate day with
+ * neither the departure nor the arrival) isn't covered by this split alone —
+ * that's handled separately by `findInProgressTransportLeg`, consulted by
+ * `computeDayEdgeFreeBlocks`.
  */
 export function buildDayOccurrences(reservations: Reservation[]): DayOccurrence[] {
   const occurrences: DayOccurrence[] = []
@@ -89,23 +101,28 @@ export function buildDayOccurrences(reservations: Reservation[]): DayOccurrence[
       reservation.start_at &&
       reservation.end_at
     ) {
-      const departureDay = localDateKey(reservation.start_at, reservation.start_timezone)
-      const arrivalDay = localDateKey(reservation.end_at, reservation.end_timezone)
-      if (departureDay !== arrivalDay) {
-        occurrences.push({
-          ...reservation,
-          suppressTrailingFreeBlock: true,
-          suppressTrailingDayEdge: true,
-        })
-        occurrences.push({
-          ...reservation,
-          start_at: reservation.end_at,
-          start_timezone: reservation.end_timezone,
-          isArrivalOccurrence: true,
-          suppressLeadingDayEdge: true,
-        })
-        continue
-      }
+      // Bug (Bugs DB, Bloquant — "Comparaison de dates locales dans des fuseaux
+      // différents peut coïncider par erreur"): this used to only split when
+      // localDateKey(start, start_timezone) !== localDateKey(end, end_timezone) —
+      // but comparing local calendar-date *strings* computed in two different
+      // timezones is invalid and can coincidentally match even when the real
+      // elapsed time is close to a full day (e.g. a ~14h Tokyo->Brussels leg
+      // where both zones' local dates happen to read the same string). Always
+      // splitting, unconditionally, removes the false-equality problem at the
+      // root instead of trying to patch the comparison.
+      occurrences.push({
+        ...reservation,
+        suppressTrailingFreeBlock: true,
+        suppressTrailingDayEdge: true,
+      })
+      occurrences.push({
+        ...reservation,
+        start_at: reservation.end_at,
+        start_timezone: reservation.end_timezone,
+        isArrivalOccurrence: true,
+        suppressLeadingDayEdge: true,
+      })
+      continue
     }
 
     occurrences.push(reservation)

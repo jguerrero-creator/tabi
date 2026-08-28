@@ -108,9 +108,17 @@ test('Planning shows one day at a time via day-tabs, with a cross-day free/trave
     await expect(checkInTrailingFreeRow).toContainText('7h')
 
     // Switching day-tabs shows Sep 12's own occurrence of the Stay (its
-    // Check-out row) plus the Transport.
+    // Check-out row) plus the Transport — which now always renders as its own
+    // Departure and Arrival rows (Bugs DB, "Comparaison de dates locales dans
+    // des fuseaux différents peut coïncider par erreur"), even for this
+    // same-day, same-timezone hop.
     await page.getByRole('button', { name: 'Sep 12' }).click()
-    await expect(mobileView.locator('li').filter({ hasText: transportName })).toBeVisible()
+    const transportDepartureRow = mobileView.locator('li').filter({ hasText: 'Departure · 14:00' })
+    const transportArrivalRow = mobileView.locator('li').filter({ hasText: 'Arrival · 15:00' })
+    await expect(transportDepartureRow).toBeVisible()
+    await expect(transportArrivalRow).toBeVisible()
+    // Nothing (no free block) renders between departure and arrival.
+    await expect(transportDepartureRow.locator('xpath=following-sibling::li[1]')).toContainText('Arrival · 15:00')
 
     // A free block is attached right after the Check-out row, on the
     // checkout's own day (Sep 12) — not dropped because the Transport it

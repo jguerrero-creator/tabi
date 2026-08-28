@@ -241,9 +241,21 @@ function buildRailEntries(
     // departure right after it would be measured in.
     const originTimezone = reservation.end_timezone ?? reservation.start_timezone
 
+    // Bug: a departure and an arrival occurrence (or a check-in and check-out
+    // occurrence) share the same underlying reservation id — normally harmless
+    // since a split pair always landed on two different days, but the
+    // unconditional Transport split (Bugs DB, "Comparaison de dates locales
+    // dans des fuseaux différents peut coïncider par erreur") can now legitimately
+    // land both occurrences of the same leg in this same day's `items`, which
+    // produced two React list entries with an identical key.
+    const occurrenceSuffix = reservation.isArrivalOccurrence
+      ? '-arrival'
+      : reservation.isCheckoutOccurrence
+        ? '-checkout'
+        : ''
     entries.push({
       kind: 'reservation',
-      key: reservation.id,
+      key: `${reservation.id}${occurrenceSuffix}`,
       time: reservation.start_at,
       timezone: reservation.start_timezone,
       reservation,

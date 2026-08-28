@@ -107,11 +107,19 @@ test('a day with an Activity, a Stay check-out, and a Transport departure render
     const mobileView = page.getByTestId('mobile-day-view')
     const activityRow = mobileView.locator('li').filter({ hasText: activityName })
     const checkOutRow = mobileView.locator('li').filter({ hasText: stayName }).filter({ hasText: 'Check-out' })
-    const transportRow = mobileView.locator('li').filter({ hasText: transportName })
+    // Every point-to-point Transport leg now always splits into a Departure and an
+    // Arrival row (Bugs DB, "Comparaison de dates locales dans des fuseaux différents
+    // peut coïncider par erreur") — even a same-day, same-timezone hop like this one.
+    const transportDepartureRow = mobileView.locator('li').filter({ hasText: 'Departure · 18:09' })
+    const transportArrivalRow = mobileView.locator('li').filter({ hasText: 'Arrival · 20:00' })
 
     await expect(activityRow).toBeVisible()
     await expect(checkOutRow).toBeVisible()
-    await expect(transportRow).toBeVisible()
+    await expect(transportDepartureRow).toBeVisible()
+    await expect(transportArrivalRow).toBeVisible()
+    // Nothing (no free block) renders between departure and arrival — the traveler
+    // is in transit, not free, for that hour.
+    await expect(transportDepartureRow.locator('xpath=following-sibling::li[1]')).toContainText('Arrival · 20:00')
 
     // True chronological order: Activity (08:00) -> free -> Check-out (10:00)
     // -> free -> Transport (18:09). The Activity's own free block must land
