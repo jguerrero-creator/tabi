@@ -11,6 +11,7 @@ interface CreateTripInput {
   destinations: string[]
   trip_type?: Enums<'trip_type'> | null
   currency: string
+  traveler_count: number
   day_start_time: string
   day_end_time: string
   note?: string | null
@@ -56,6 +57,7 @@ export function useTrips() {
       destinations: input.destinations,
       trip_type: input.trip_type ?? null,
       currency: input.currency,
+      traveler_count: input.traveler_count,
       day_start_time: input.day_start_time,
       day_end_time: input.day_end_time,
       note: input.note ?? null,
@@ -83,6 +85,7 @@ export function useTrips() {
         destinations: input.destinations,
         trip_type: input.trip_type ?? null,
         currency: input.currency,
+        traveler_count: input.traveler_count,
         day_start_time: input.day_start_time,
         day_end_time: input.day_end_time,
         note: input.note ?? null,

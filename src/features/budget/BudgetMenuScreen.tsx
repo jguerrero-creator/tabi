@@ -1,5 +1,5 @@
 import { useId, useMemo, useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuSection } from '../../components/menu/MenuSection'
 import { Button } from '../../components/ui/Button'
@@ -43,8 +43,8 @@ export function BudgetMenuScreen() {
   const loading = tripLoading || reservationsLoading || categoriesLoading
   const error = tripError || reservationsError || categoriesError
   const summary = useMemo(
-    () => computeBudgetSummary(reservations, budgetCategories),
-    [reservations, budgetCategories],
+    () => computeBudgetSummary(reservations, budgetCategories, trip?.traveler_count ?? 1),
+    [reservations, budgetCategories, trip?.traveler_count],
   )
   const currency = trip?.currency ?? ''
   const isEmpty = summary.count === 0 && budgetCategories.length === 0
@@ -119,21 +119,33 @@ export function BudgetMenuScreen() {
                 {summary.categories
                   .filter((category) => category.count > 0)
                   .map((category) => (
-                    <li key={category.type} className="flex items-center gap-3 px-4 py-3">
-                      <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[category.type]}`}
+                    <li key={category.type}>
+                      <Link
+                        to={`/trips/${tripId}/budget/${category.type}`}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
                       >
-                        <ReservationTypeIcon type={category.type} className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-900">
-                          {strings.reservationType[category.type]}
-                        </p>
-                        <p className="text-xs text-slate-500">{strings.budgetMenu.itemCount(category.count)}</p>
-                      </div>
-                      <p className="shrink-0 text-sm font-semibold text-slate-900">
-                        {formatCurrency(category.total, currency)}
-                      </p>
+                        <span
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[category.type]}`}
+                        >
+                          <ReservationTypeIcon type={category.type} className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-900">
+                            {strings.reservationType[category.type]}
+                          </p>
+                          <p className="text-xs text-slate-500">{strings.budgetMenu.itemCount(category.count)}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {formatCurrency(category.total, currency)}
+                            {category.perPersonTotal != null && (
+                              <span className="ml-1 font-normal text-slate-500">
+                                · {strings.budgetMenu.perPersonAmount(formatCurrency(category.perPersonTotal, currency))}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </Link>
                     </li>
                   ))}
               </MenuSection>

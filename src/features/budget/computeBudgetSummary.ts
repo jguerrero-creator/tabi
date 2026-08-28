@@ -6,6 +6,8 @@ export interface BudgetCategoryTotal {
   total: number
   count: number
   pricedCount: number
+  /** Stay total ÷ traveler count — a shared room, unlike Transport/Activity which are booked per-person. Null unless there's more than 1 traveler. */
+  perPersonTotal: number | null
 }
 
 export interface BudgetSummary {
@@ -21,15 +23,18 @@ const categoryOrder: ReservationType[] = ['stay', 'transport', 'activity']
 export function computeBudgetSummary(
   reservations: Reservation[],
   budgetCategories: BudgetCategory[] = [],
+  travelerCount = 1,
 ): BudgetSummary {
   const categories = categoryOrder.map((type): BudgetCategoryTotal => {
     const items = reservations.filter((reservation) => reservation.type === type)
     const priced = items.filter((reservation) => reservation.price_amount != null)
+    const total = priced.reduce((sum, reservation) => sum + reservation.price_amount!, 0)
     return {
       type,
-      total: priced.reduce((sum, reservation) => sum + reservation.price_amount!, 0),
+      total,
       count: items.length,
       pricedCount: priced.length,
+      perPersonTotal: type === 'stay' && travelerCount > 1 ? total / travelerCount : null,
     }
   })
 

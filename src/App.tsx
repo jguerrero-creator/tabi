@@ -4,6 +4,7 @@ import { TripLayout } from './components/menu/TripLayout'
 import { ReportWidget } from './components/ui/ReportWidget'
 import { SavedToast } from './components/ui/SavedToast'
 import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen'
+import { BudgetCategoryDetailScreen } from './features/budget/BudgetCategoryDetailScreen'
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
 import { ReservationDetailScreen } from './features/reservations/ReservationDetailScreen'
@@ -30,6 +31,7 @@ export function App() {
           <Route path="transport" element={<TransportMenuScreen />} />
           <Route path="activities" element={<ActivitiesMenuScreen />} />
           <Route path="budget" element={<BudgetMenuScreen />} />
+          <Route path="budget/:type" element={<BudgetCategoryDetailScreen />} />
           <Route path="souvenirs" element={<SouvenirsMenuScreen />} />
         </Route>
         <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />

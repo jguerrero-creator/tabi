@@ -22,6 +22,8 @@ interface MenuListRowProps {
   rating?: { rating: number; userRatingsTotal: number | null } | null
   staySubtype?: StaySubtype | null
   transportSubtype?: TransportSubtype | null
+  /** Optional trailing content on the row's right edge, e.g. a cost (budget category detail list). */
+  trailing?: React.ReactNode
 }
 
 const flagToneClasses: Record<MenuRowFlag['tone'], string> = {
@@ -41,6 +43,7 @@ export function MenuListRow({
   rating,
   staySubtype,
   transportSubtype,
+  trailing,
 }: MenuListRowProps) {
   return (
     <li>
@@ -81,6 +84,7 @@ export function MenuListRow({
             </div>
           )}
         </div>
+        {trailing && <div className="shrink-0">{trailing}</div>}
       </Link>
     </li>
   )

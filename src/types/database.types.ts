@@ -390,6 +390,7 @@ export type Database = {
           note: string | null
           organizer_id: string
           start_date: string | null
+          traveler_count: number
           trip_type: Database["public"]["Enums"]["trip_type"] | null
           updated_at: string
         }
@@ -405,6 +406,7 @@ export type Database = {
           note?: string | null
           organizer_id: string
           start_date?: string | null
+          traveler_count?: number
           trip_type?: Database["public"]["Enums"]["trip_type"] | null
           updated_at?: string
         }
@@ -420,6 +422,7 @@ export type Database = {
           note?: string | null
           organizer_id?: string
           start_date?: string | null
+          traveler_count?: number
           trip_type?: Database["public"]["Enums"]["trip_type"] | null
           updated_at?: string
         }

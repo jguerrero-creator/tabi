@@ -27,6 +27,7 @@ export interface TripFormValues {
   destinations: string[]
   trip_type: TripType | null
   currency: string
+  traveler_count: number
   day_start_time: string
   day_end_time: string
   note: string | null
@@ -46,6 +47,7 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
   const [destinations, setDestinations] = useState<string[]>(trip?.destinations ?? [])
   const [tripType, setTripType] = useState<TripType | ''>(trip?.trip_type ?? '')
   const [currency, setCurrency] = useState(() => trip?.currency ?? getDefaultCurrency())
+  const [travelerCount, setTravelerCount] = useState(String(trip?.traveler_count ?? 1))
   const [dayStartTime, setDayStartTime] = useState(trip?.day_start_time.slice(0, 5) ?? DEFAULT_DAY_START_TIME)
   const [dayEndTime, setDayEndTime] = useState(trip?.day_end_time.slice(0, 5) ?? DEFAULT_DAY_END_TIME)
   const [note, setNote] = useState(trip?.note ?? '')
@@ -65,6 +67,12 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
       return
     }
 
+    const parsedTravelerCount = Number(travelerCount)
+    if (!Number.isInteger(parsedTravelerCount) || parsedTravelerCount < 1) {
+      setError(strings.createTrip.errorTravelerCount)
+      return
+    }
+
     setSubmitting(true)
     setError(null)
     try {
@@ -75,6 +83,7 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
         destinations,
         trip_type: tripType || null,
         currency,
+        traveler_count: parsedTravelerCount,
         day_start_time: dayStartTime,
         day_end_time: dayEndTime,
         note: note.trim() || null,
@@ -154,6 +163,22 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
             </option>
           ))}
         </select>
+      </div>
+      <div>
+        <label htmlFor="trip-traveler-count" className="mb-1 block text-sm font-medium text-slate-700">
+          {strings.createTrip.travelerCountLabel}
+        </label>
+        <input
+          id="trip-traveler-count"
+          type="number"
+          min="1"
+          step="1"
+          required
+          value={travelerCount}
+          onChange={(event) => setTravelerCount(event.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-slate-500">{strings.createTrip.travelerCountHint}</p>
       </div>
       <div className="flex gap-3">
         <div className="flex-1">
