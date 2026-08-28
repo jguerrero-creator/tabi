@@ -8,7 +8,6 @@ import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import { useProfile } from '../../lib/useProfile'
-import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { Reminder } from '../../types/reminder'
@@ -29,6 +28,7 @@ import { useTrip } from './useTrip'
 import { useTripDayLocations } from './useTripDayLocations'
 import { useTripDayNotes } from './useTripDayNotes'
 import { useTripLegs } from './useTripLegs'
+import { useTripLegTravelModes } from './useTripLegTravelModes'
 import { useTripReminders } from './useTripReminders'
 import { useTripReservations } from './useTripReservations'
 
@@ -163,7 +163,9 @@ export function OverviewScreen() {
     [setSearchParams],
   )
 
-  const [modeByLeg, setModeByLeg] = useState<Record<string, TravelMode>>({})
+  // TABI-200: persists the chosen mode (and its computed/failed result) per leg so it
+  // survives a reload instead of resetting to "no mode chosen" on every Overview visit.
+  const { stateByKey: legModeState, setLegMode, setLegResult, dismissLegError } = useTripLegTravelModes(tripId ?? '')
   const { locationsByDate: dayLocationsByKey, saveDayLocation, clearDayLocation } = useTripDayLocations(tripId ?? '')
   const { notesByDate: dayNotesByKey, saveDayNote, clearDayNote } = useTripDayNotes(tripId ?? '')
   // Lifted above both TripLegsSection and TripTimeline so switching tabs
@@ -172,7 +174,7 @@ export function OverviewScreen() {
     legs,
     loading: legsLoading,
     error: legsError,
-  } = useTripLegs(reservations, dayLocationsByKey, modeByLeg)
+  } = useTripLegs(reservations, dayLocationsByKey, legModeState, setLegResult)
   const { reminders, createReminder, deleteReminder } = useTripReminders(tripId ?? '')
 
   const loading = tripLoading || reservationsLoading
@@ -292,7 +294,8 @@ export function OverviewScreen() {
                     loading={legsLoading}
                     error={legsError}
                     trip={trip}
-                    onModeChange={(key, mode) => setModeByLeg((prev) => ({ ...prev, [key]: mode }))}
+                    onModeChange={setLegMode}
+                    onDismissError={dismissLegError}
                     onQuickAddTransport={setLegQuickAdd}
                   />
 

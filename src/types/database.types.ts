@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -377,6 +377,70 @@ export type Database = {
           },
         ]
       }
+      trip_leg_travel_modes: {
+        Row: {
+          computed_at: string | null
+          created_at: string
+          dismissed_at: string | null
+          distance_meters: number | null
+          duration_seconds: number | null
+          from_reservation_id: string
+          id: string
+          mode: Database["public"]["Enums"]["travel_mode"]
+          to_reservation_id: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          computed_at?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          from_reservation_id: string
+          id?: string
+          mode: Database["public"]["Enums"]["travel_mode"]
+          to_reservation_id: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          computed_at?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          from_reservation_id?: string
+          id?: string
+          mode?: Database["public"]["Enums"]["travel_mode"]
+          to_reservation_id?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_leg_travel_modes_from_reservation_id_fkey"
+            columns: ["from_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_leg_travel_modes_to_reservation_id_fkey"
+            columns: ["to_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_leg_travel_modes_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
           created_at: string
@@ -443,6 +507,7 @@ export type Database = {
       reservation_type: "stay" | "transport" | "activity"
       stay_subtype: "hotel" | "camping" | "airbnb" | "ryokan" | "other"
       transport_subtype: "point_to_point" | "at_disposal"
+      travel_mode: "DRIVE" | "WALK" | "BICYCLE" | "TRANSIT" | "TRAIN"
       trip_type: "city_trip" | "road_trip" | "multi_destination" | "other"
     }
     CompositeTypes: {
@@ -575,6 +640,7 @@ export const Constants = {
       reservation_type: ["stay", "transport", "activity"],
       stay_subtype: ["hotel", "camping", "airbnb", "ryokan", "other"],
       transport_subtype: ["point_to_point", "at_disposal"],
+      travel_mode: ["DRIVE", "WALK", "BICYCLE", "TRANSIT", "TRAIN"],
       trip_type: ["city_trip", "road_trip", "multi_destination", "other"],
     },
   },

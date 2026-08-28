@@ -222,6 +222,7 @@ export const strings = {
     tightConnection: (shortfall: string) => `Cutting it close — ${shortfall} short on travel time`,
     longTravel: (duration: string) => `${duration} travel — long leg`,
     noTransitRoute: 'Public transit unavailable for this route — check Google Maps or try another mode.',
+    dismissError: 'Dismiss',
     selectMode: 'Select a travel mode to see travel time',
     addAsReservation: '+ Add reservation',
   },

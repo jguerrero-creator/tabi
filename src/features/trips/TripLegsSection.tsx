@@ -31,7 +31,8 @@ interface TripLegsSectionProps {
   loading: boolean
   error: string | null
   trip: Trip | null
-  onModeChange: (key: string, mode: TravelMode) => void
+  onModeChange: (fromReservationId: string, toReservationId: string, mode: TravelMode) => void
+  onDismissError: (fromReservationId: string, toReservationId: string) => void
   onQuickAddTransport: (payload: LegQuickAddPayload) => void
 }
 
@@ -42,6 +43,7 @@ export function TripLegsSection({
   error,
   trip,
   onModeChange,
+  onDismissError,
   onQuickAddTransport,
 }: TripLegsSectionProps) {
   const freeTimeByLeg = useMemo(() => {
@@ -88,8 +90,18 @@ export function TripLegsSection({
                 <div className="mb-2">
                   {leg.mode === null ? (
                     <p className="text-xs text-slate-500">{strings.tripLegs.selectMode}</p>
-                  ) : leg.durationSeconds === null && isTransitMode(leg.mode) ? (
-                    <p className="text-xs font-medium text-amber-700">{strings.tripLegs.noTransitRoute}</p>
+                  ) : leg.durationSeconds === null && isTransitMode(leg.mode) && leg.justComputed && !leg.dismissed ? (
+                    <p className="flex items-start justify-between gap-2 text-xs font-medium text-amber-700">
+                      <span>{strings.tripLegs.noTransitRoute}</span>
+                      <button
+                        type="button"
+                        onClick={() => onDismissError(leg.fromReservationId, leg.toReservationId)}
+                        aria-label={strings.tripLegs.dismissError}
+                        className="shrink-0 text-amber-700 hover:text-amber-900"
+                      >
+                        ✕
+                      </button>
+                    </p>
                   ) : (
                     <p className="text-xs text-slate-500">{formatLeg(leg.durationSeconds, leg.distanceMeters)}</p>
                   )}
@@ -109,7 +121,10 @@ export function TripLegsSection({
                     </p>
                   )}
                 </div>
-                <TravelModePicker value={leg.mode} onChange={(mode) => onModeChange(key, mode)} />
+                <TravelModePicker
+                  value={leg.mode}
+                  onChange={(mode) => onModeChange(leg.fromReservationId, leg.toReservationId, mode)}
+                />
                 {quickAddPayload && (
                   <button
                     type="button"
