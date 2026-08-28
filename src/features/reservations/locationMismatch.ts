@@ -62,11 +62,15 @@ export function reservationCityByDay(input: ReservationCandidate): Map<string, s
  * First day where a reservation's city differs from that day's planned location
  * (TABI-116) — never blocking, just surfaced so the traveler can confirm it's
  * intentional ("this reservation is in Osaka, but Kyoto was planned for that day").
+ * Never shown for Transport (Decision Log): a flight/journey changing city is the
+ * point of the reservation, not a mismatch to confirm — every inter-city or
+ * international leg would otherwise false-positive. Only Stay and Activity keep it.
  */
 export function findLocationMismatch(
   input: ReservationCandidate,
   dayLocationsByDate: Map<string, TripDayLocation>,
 ): LocationMismatch | null {
+  if (input.type === 'transport') return null
   for (const [dayKey, reservationCity] of reservationCityByDay(input)) {
     const planned = dayLocationsByDate.get(dayKey)
     if (!planned?.city) continue
