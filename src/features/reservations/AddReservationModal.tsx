@@ -657,6 +657,14 @@ export function AddReservationModal({
       setSubmitting(false)
       return
     }
+    // Bug (Bugs DB, "L'UI devient totalement non cliquable..."): `submitting` must drop back
+    // to false as soon as this PATCH resolves, before handing off to whatever comes next —
+    // proceedAfterOutOfPeriodCheck may open another ConfirmDialog (location mismatch) instead
+    // of calling submitReservation, and every ConfirmDialog/FormSheet button is disabled while
+    // `submitting` is true. Leaving it true here left that next dialog's own buttons (and the
+    // form's Cancel/Submit) permanently disabled — no confirm, no cancel, no way out but a
+    // refresh. submitReservation still sets it back to true itself if a real save follows.
+    setSubmitting(false)
     setOutOfPeriodConfirm(null)
     await proceedAfterOutOfPeriodCheck(input)
   }
