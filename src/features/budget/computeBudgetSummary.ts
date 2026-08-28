@@ -14,6 +14,8 @@ export interface BudgetSummary {
   categories: BudgetCategoryTotal[]
   manualTotal: number
   total: number
+  /** Grand total with Stay divided by traveler count (Transport/Activity/manual stay full price). Null unless there's more than 1 traveler. */
+  totalPerPerson: number | null
   count: number
   pricedCount: number
 }
@@ -40,11 +42,16 @@ export function computeBudgetSummary(
 
   const manualTotal = budgetCategories.reduce((sum, category) => sum + category.amount, 0)
   const reservationsTotal = categories.reduce((sum, category) => sum + category.total, 0)
+  const reservationsTotalPerPerson = categories.reduce(
+    (sum, category) => sum + (category.perPersonTotal ?? category.total),
+    0,
+  )
 
   return {
     categories,
     manualTotal,
     total: reservationsTotal + manualTotal,
+    totalPerPerson: travelerCount > 1 ? reservationsTotalPerPerson + manualTotal : null,
     count: reservations.length,
     pricedCount: categories.reduce((sum, category) => sum + category.pricedCount, 0),
   }

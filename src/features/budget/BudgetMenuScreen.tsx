@@ -106,6 +106,11 @@ export function BudgetMenuScreen() {
                   {strings.budgetMenu.totalLabel}
                 </p>
                 <p className="mt-1 text-3xl font-semibold">{formatCurrency(summary.total, currency)}</p>
+                {summary.totalPerPerson != null && (
+                  <p className="mt-0.5 text-sm text-teal-100">
+                    {strings.budgetMenu.perPersonAmount(formatCurrency(summary.totalPerPerson, currency))}
+                  </p>
+                )}
                 {summary.pricedCount < summary.count && (
                   <p className="mt-1 text-xs text-teal-100">
                     {strings.budgetMenu.partialHint(summary.pricedCount, summary.count)}
