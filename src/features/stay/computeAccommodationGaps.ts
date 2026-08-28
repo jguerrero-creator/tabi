@@ -1,5 +1,6 @@
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
+import { transportTouchesNight } from '../transport/findInProgressTransportLeg'
 
 export interface AccommodationGap {
   /** ISO date (YYYY-MM-DD), inclusive */
@@ -11,6 +12,9 @@ export interface AccommodationGap {
 /**
  * Nights of the trip with no stay reservation covering them at all (any status).
  * A gap is a silent absence, not a "to book" reminder — those already show via status.
+ * A night touched by a point-to-point Transport leg (e.g. an overnight flight) is also
+ * treated as covered, even partially — `reservations` should include Transport, not just
+ * Stay, for this suppression to take effect.
  */
 export function computeAccommodationGaps(
   trip: { start_date: string | null; end_date: string | null },
@@ -35,7 +39,7 @@ export function computeAccommodationGaps(
   const gaps: AccommodationGap[] = []
   let gapStart: string | null = null
   for (let night = trip.start_date; night <= lastNight; night = addDays(night, 1)) {
-    if (!covered.has(night)) {
+    if (!covered.has(night) && !transportTouchesNight(night, reservations)) {
       gapStart ??= night
     } else if (gapStart !== null) {
       gaps.push({ start: gapStart, end: night })

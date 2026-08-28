@@ -28,6 +28,9 @@ export function StayMenuScreen() {
     error: reservationsError,
     refetch: refetchReservations,
   } = useReservationsByType(tripId ?? '', 'stay')
+  // TABI-81 fix: an overnight Transport leg (e.g. a flight departing 26th, arriving 27th)
+  // covers the night even without a Stay booked, so gap detection needs Transport too.
+  const { reservations: transportReservations } = useReservationsByType(tripId ?? '', 'transport')
   const { createReservation } = useCreateReservation(tripId ?? '')
   const [showAddModal, setShowAddModal] = useState(false)
 
@@ -36,8 +39,8 @@ export function StayMenuScreen() {
 
   const gaps = useMemo(() => {
     if (!trip) return []
-    return computeAccommodationGaps(trip, reservations)
-  }, [trip, reservations])
+    return computeAccommodationGaps(trip, [...reservations, ...transportReservations])
+  }, [trip, reservations, transportReservations])
 
   const { nestedIds, childrenByMainId } = useMemo(() => nestOverlappingReservations(reservations), [reservations])
   const timeline = useMemo(

@@ -310,10 +310,12 @@ export function AddReservationModal({
   useEffect(() => {
     if (hasPrefilledStartDateRef.current) return
     if (option.dbType !== 'stay') return
-    if (tripLoading || sameTypeLoading) return
+    if (tripLoading || sameTypeLoading || allTripReservationsLoading) return
     if (startDate !== '') return
 
-    const gaps = computeAccommodationGaps(trip ?? { start_date: null, end_date: null }, sameTypeReservations)
+    // Pass every reservation (not just Stay) so an overnight Transport leg suppresses
+    // a gap here the same way it does in the Stay menu's coverage-gap section.
+    const gaps = computeAccommodationGaps(trip ?? { start_date: null, end_date: null }, allTripReservations)
     const firstUncoveredStart =
       gaps.length > 0 ? gaps[0].start : sameTypeReservations.length === 0 ? (trip?.start_date ?? null) : null
 
@@ -321,7 +323,16 @@ export function AddReservationModal({
       setStartDate(firstUncoveredStart)
       hasPrefilledStartDateRef.current = true
     }
-  }, [option.dbType, trip, tripLoading, sameTypeReservations, sameTypeLoading, startDate])
+  }, [
+    option.dbType,
+    trip,
+    tripLoading,
+    sameTypeReservations,
+    sameTypeLoading,
+    allTripReservations,
+    allTripReservationsLoading,
+    startDate,
+  ])
 
   // TABI-204: prefill the start address with the trip's last known location — its most
   // recently-dated planned day-location or geocoded reservation address — so back-to-back
