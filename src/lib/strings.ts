@@ -288,11 +288,12 @@ export const strings = {
   budgetConverter: {
     title: 'Currency converter',
     amountPlaceholder: 'Amount',
-    currencyPlaceholder: 'Currency (e.g. JPY)',
     ratePlaceholder: 'Rate',
-    rateHint: (currency: string) => `1 ${currency} =`,
+    rateHint: (operation: 'multiply' | 'divide') => (operation === 'multiply' ? '× rate' : '÷ rate'),
+    toggleAriaLabel: (operation: 'multiply' | 'divide') =>
+      operation === 'multiply' ? 'Switch to divide by rate' : 'Switch to multiply by rate',
     resultPrefix: '=',
-    incomplete: 'Enter an amount, currency, and rate.',
+    incomplete: 'Enter an amount and a rate.',
   },
   souvenirsMenu: {
     loading: 'Loading checklist…',
