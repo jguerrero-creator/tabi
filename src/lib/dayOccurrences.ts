@@ -6,15 +6,21 @@ import { localDateKey } from './datetime'
  * contributes two occurrences sharing the same underlying reservation id —
  * one on its check-in day, one on its check-out day — so its checkout is
  * visible on its own day instead of only ever showing up folded into the
- * check-in day's trailing free time. Every point-to-point Transport leg is
- * split the same way — a departure occurrence and an arrival occurrence —
- * unconditionally, regardless of whether the two land on the same local
- * calendar date, so it's always visible (and correctly occupies free time)
- * on both its departure and arrival day (Bugs: "Un trajet Transport qui
- * traverse minuit... n'apparaît que sur le jour de départ"; and "Comparaison
- * de dates locales dans des fuseaux différents peut coïncider par erreur" —
- * comparing local date *strings* computed in two different timezones can
- * spuriously "match" even across a leg lasting most of a day).
+ * check-in day's trailing free time. A point-to-point Transport leg that
+ * actually spans more than one local calendar day is split the same way — a
+ * departure occurrence and an arrival occurrence — so it's always visible
+ * (and correctly occupies free time) on both its departure and arrival day
+ * (Bugs: "Un trajet Transport qui traverse minuit... n'apparaît que sur le
+ * jour de départ"; and "Comparaison de dates locales dans des fuseaux
+ * différents peut coïncider par erreur" — comparing local date *strings*
+ * computed in two different timezones can spuriously "match" even across a
+ * leg lasting most of a day). The split briefly became fully unconditional to
+ * fix that second bug, which introduced a regression of its own (Bugs DB,
+ * Majeur — "Le split Départ/Arrivée inconditionnel fait compter en double les
+ * Transport sur une même journée": every same-day, same-timezone leg — a
+ * train, a taxi, any ordinary domestic hop — was duplicated into two rail
+ * cards and inflated the day-tab item count by one). See `buildDayOccurrences`
+ * below for the condition it now uses instead, and why that one is safe.
  * Structurally identical to (and interchangeable with) `DayItem` in
  * `src/features/trips/DayColumn.tsx`, which is defined separately there to
  * avoid this module importing anything React-related — this file needs to
@@ -55,20 +61,21 @@ export type DayOccurrence = Reservation & {
  * the checkout shows up as a real, timed rail item on its own day instead of
  * only ever being folded into the check-in day's trailing free time.
  *
- * Does the same for every point-to-point Transport leg, unconditionally — a
- * departure occurrence and an arrival occurrence, so the leg is visible on
- * both its departure and arrival day and the traveler is treated as occupied
- * for its full real duration. This used to only split when the departure and
- * arrival local calendar dates (each computed in its own timezone) differed
- * as strings — but two calendar-date strings computed in different
- * timezones can coincidentally read the same even when the real elapsed
- * time is close to a full day (e.g. a long-haul leg where the destination's
- * local date happens to still match the origin's), silently treating most of
- * a real journey as free time. Splitting unconditionally removes that
- * false-equality risk instead of trying to patch the comparison — a same-day,
- * same-timezone domestic hop just ends up with its departure and arrival
- * occurrences adjacent on the same day, which is what it already showed via
- * a single row's own departure/arrival instants either way.
+ * Does the same for a point-to-point Transport leg that actually spans more
+ * than one local calendar day — a departure occurrence and an arrival
+ * occurrence, so the leg is visible on both its departure and arrival day and
+ * the traveler is treated as occupied for its full real duration. "Spans more
+ * than one day" is decided by comparing the departure and arrival dates *in a
+ * single shared timezone* — the leg's own, since both ends must agree for the
+ * comparison to be meaningful at all. Comparing local calendar-date strings
+ * computed in two DIFFERENT timezones is invalid — it can coincidentally read
+ * the same even when the real elapsed time is close to a full day (e.g. a
+ * long-haul leg where the destination's local date happens to still match the
+ * origin's), silently treating most of a real journey as free time (Bugs DB,
+ * Bloquant) — so whenever the two ends don't share one timezone, the split
+ * always applies, conservatively, rather than risk that comparison. Only a
+ * leg confirmed (via one shared zone) to start and end on the same local date
+ * stays a single occurrence, exactly as it rendered before either bug fix.
  *
  * Every other reservation type passes through as a single occurrence,
  * unchanged. A leg spanning 2+ calendar days (an intermediate day with
@@ -101,28 +108,34 @@ export function buildDayOccurrences(reservations: Reservation[]): DayOccurrence[
       reservation.start_at &&
       reservation.end_at
     ) {
-      // Bug (Bugs DB, Bloquant — "Comparaison de dates locales dans des fuseaux
-      // différents peut coïncider par erreur"): this used to only split when
-      // localDateKey(start, start_timezone) !== localDateKey(end, end_timezone) —
-      // but comparing local calendar-date *strings* computed in two different
-      // timezones is invalid and can coincidentally match even when the real
-      // elapsed time is close to a full day (e.g. a ~14h Tokyo->Brussels leg
-      // where both zones' local dates happen to read the same string). Always
-      // splitting, unconditionally, removes the false-equality problem at the
-      // root instead of trying to patch the comparison.
-      occurrences.push({
-        ...reservation,
-        suppressTrailingFreeBlock: true,
-        suppressTrailingDayEdge: true,
-      })
-      occurrences.push({
-        ...reservation,
-        start_at: reservation.end_at,
-        start_timezone: reservation.end_timezone,
-        isArrivalOccurrence: true,
-        suppressLeadingDayEdge: true,
-      })
-      continue
+      // Only a leg whose two ends share one IANA timezone can have its dates
+      // compared at all — reading both instants through that single zone is
+      // always valid, unlike comparing two dates each computed in its own,
+      // different zone (Bugs DB, Bloquant — "Comparaison de dates locales dans
+      // des fuseaux différents peut coïncider par erreur"). Different
+      // timezones always split, conservatively, without ever making that
+      // comparison.
+      const sameZone = reservation.start_timezone === reservation.end_timezone
+      const spansMultipleDays =
+        !sameZone ||
+        localDateKey(reservation.start_at, reservation.start_timezone) !==
+          localDateKey(reservation.end_at, reservation.end_timezone)
+
+      if (spansMultipleDays) {
+        occurrences.push({
+          ...reservation,
+          suppressTrailingFreeBlock: true,
+          suppressTrailingDayEdge: true,
+        })
+        occurrences.push({
+          ...reservation,
+          start_at: reservation.end_at,
+          start_timezone: reservation.end_timezone,
+          isArrivalOccurrence: true,
+          suppressLeadingDayEdge: true,
+        })
+        continue
+      }
     }
 
     occurrences.push(reservation)

@@ -246,11 +246,21 @@ function buildDayTabs(
  * gap, same fix — but per `findInProgressTransportLeg`, it's only ever
  * non-null when `items` is already empty, so no double-counting guard is
  * needed for it.
+ *
+ * `items` itself is deduped by reservation id before counting: a Transport
+ * leg whose departure and arrival occurrences (`buildDayOccurrences`) both
+ * land in the same day's group — either a genuine same-timezone same-day hop,
+ * or two different-timezone legs whose independently-computed local dates
+ * happen to read the same string — is still exactly one booking, and the
+ * item-count badge should read "1" for it either way (Bugs DB, Majeur — "Le
+ * split Départ/Arrivée inconditionnel fait compter en double les Transport
+ * sur une même journée").
  */
 function countDayItems(items: DayItem[], activeStay: Reservation | null, inProgressLeg: Reservation | null): number {
+  const distinctItemCount = new Set(items.map((item) => item.id)).size
   const stayCount = activeStay && !items.some((item) => item.id === activeStay.id) ? 1 : 0
   const inProgressCount = inProgressLeg ? 1 : 0
-  return items.length + stayCount + inProgressCount
+  return distinctItemCount + stayCount + inProgressCount
 }
 
 /** Trip `start_date`/`end_date` are plain calendar dates; anchor to UTC midnight per day, same reasoning as `formatTripDateRange`. */
