@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Field } from '../../components/ui/Field'
-import { formatCurrency } from '../../lib/currency'
 import { strings } from '../../lib/strings'
 
 interface BudgetConverterProps {
   tripId: string
-  tripCurrency: string
 }
 
 type ConverterOperation = 'multiply' | 'divide'
@@ -43,7 +41,7 @@ function loadState(tripId: string): ConverterState {
  * State persists per-trip for the browser session (sessionStorage) so the
  * user isn't re-entering a manual rate on every visit during the trip.
  */
-export function BudgetConverter({ tripId, tripCurrency }: BudgetConverterProps) {
+export function BudgetConverter({ tripId }: BudgetConverterProps) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<ConverterState>(EMPTY_STATE)
 
@@ -137,7 +135,8 @@ export function BudgetConverter({ tripId, tripCurrency }: BudgetConverterProps) 
           <p className="pt-1 text-sm">
             {result != null ? (
               <span className="font-semibold text-slate-900">
-                {strings.budgetConverter.resultPrefix} {formatCurrency(result, tripCurrency)}
+                {strings.budgetConverter.resultPrefix}{' '}
+                {new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(result)}
               </span>
             ) : (
               <span className="text-slate-400">{strings.budgetConverter.incomplete}</span>

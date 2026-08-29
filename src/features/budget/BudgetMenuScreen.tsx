@@ -186,7 +186,7 @@ export function BudgetMenuScreen() {
               </MenuSection>
             )}
 
-            <BudgetConverter tripCurrency={currency} tripId={tripId ?? ''} />
+            <BudgetConverter tripId={tripId ?? ''} />
 
             {(budgetCategories.length > 0 || adding) && (
               <MenuSection label={strings.budgetMenu.manualCategoriesLabel}>
