@@ -285,6 +285,15 @@ export const strings = {
     emptyBody: 'Nothing in this category yet.',
     unscheduledLabel: 'Unscheduled',
   },
+  budgetConverter: {
+    title: 'Currency converter',
+    amountPlaceholder: 'Amount',
+    currencyPlaceholder: 'Currency (e.g. JPY)',
+    ratePlaceholder: 'Rate',
+    rateHint: (currency: string) => `1 ${currency} =`,
+    resultPrefix: '=',
+    incomplete: 'Enter an amount, currency, and rate.',
+  },
   souvenirsMenu: {
     loading: 'Loading checklist…',
     errorLoading: 'Could not load this trip.',
