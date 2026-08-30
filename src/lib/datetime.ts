@@ -132,6 +132,24 @@ export function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: strin
 }
 
 /**
+ * Whether a real UTC-instant range `[startAt, endAt]` (inclusive) touches the
+ * calendar day `dateKey` (a plain "YYYY-MM-DD" string, UTC-midnight-anchored
+ * — same convention as `addDays`/`formatDayPillLabel`/`formatDateRangeLabel`
+ * elsewhere for date-only values with no inherent timezone of their own).
+ * Always compares real UTC instants — never two local calendar-date strings
+ * computed in different IANA timezones against each other, which is invalid
+ * and can silently invert an otherwise-correct date range (Bugs DB, Majeur —
+ * "findActiveVehicleRental inverse sa propre plage de dates à travers des
+ * fuseaux horaires éloignés"; Mineur — "lastKnownTripLocation peut se
+ * tromper d'ordre chronologique entre fuseaux horaires").
+ */
+export function dateKeyOverlapsRange(dateKey: string, startAt: string, endAt: string): boolean {
+  const dayStart = Date.parse(`${dateKey}T00:00:00.000Z`)
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000
+  return Date.parse(startAt) < dayEnd && Date.parse(endAt) >= dayStart
+}
+
+/**
  * Adds an hours/minutes duration to a "HH:MM" wall-clock time, wrapping within the same
  * day (TABI-181: an Activity never spans multiple calendar days, so this never rolls the
  * date over — a wraparound past midnight instead surfaces as an end-before-start validation
