@@ -8,10 +8,12 @@ import { Spinner } from '../../components/ui/Spinner'
 import { useTrip } from '../trips/useTrip'
 import { AddReservationModal, type ResolvedPlace } from '../reservations/AddReservationModal'
 import { ActivityPlaceSearchModal } from '../reservations/ActivityPlaceSearchModal'
+import { checkClosedAtPlannedTime, WEEKDAY_NAMES } from '../reservations/closedOnDay'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
 import { formatDateHeader, localDateKey } from '../../lib/datetime'
+import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import type { Reservation } from '../../types/reservation'
 
 // TABI-49: search box appears before the Activity form (Decision Log:
@@ -83,21 +85,40 @@ export function ActivitiesMenuScreen() {
           <div className="space-y-5">
             {groups.map((group) => (
               <MenuSection key={group.dateKey} label={group.label}>
-                {group.items.map((reservation) => (
-                  <MenuListRow
-                    key={reservation.id}
-                    to={`/reservations/${reservation.id}`}
-                    type={reservation.type}
-                    title={reservation.name}
-                    status={reservation.status}
-                    secondaryLabel={endLabel(reservation)}
-                    rating={
-                      reservation.place_rating != null
-                        ? { rating: reservation.place_rating, userRatingsTotal: reservation.place_user_ratings_total }
-                        : null
-                    }
-                  />
-                ))}
+                {group.items.map((reservation) => {
+                  const closedAlert = checkClosedAtPlannedTime(
+                    reservation.place_opening_hours as RegularOpeningHours | null,
+                    reservation.start_at,
+                    reservation.start_timezone,
+                  )
+                  return (
+                    <MenuListRow
+                      key={reservation.id}
+                      to={`/reservations/${reservation.id}`}
+                      type={reservation.type}
+                      title={reservation.name}
+                      status={reservation.status}
+                      secondaryLabel={endLabel(reservation)}
+                      rating={
+                        reservation.place_rating != null
+                          ? { rating: reservation.place_rating, userRatingsTotal: reservation.place_user_ratings_total }
+                          : null
+                      }
+                      flags={
+                        closedAlert
+                          ? [
+                              {
+                                label: strings.activityPlaceSearch.closedOnDayFlag(
+                                  WEEKDAY_NAMES[closedAlert.weekdayIndex],
+                                ),
+                                tone: 'warning',
+                              },
+                            ]
+                          : undefined
+                      }
+                    />
+                  )
+                })}
               </MenuSection>
             ))}
           </div>

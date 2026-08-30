@@ -16,6 +16,7 @@ const DAILY_LIMITS = {
   'extract-plan': 10,
   'places-search': 50,
   'places-nearby': 50,
+  'place-opening-hours': 50,
 } as const
 
 export type RateLimitedEndpoint = keyof typeof DAILY_LIMITS

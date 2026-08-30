@@ -39,6 +39,21 @@ export function localTimeKey(isoUtc: string, timeZone: string | null): string {
   }).format(new Date(isoUtc))
 }
 
+const WEEKDAY_SHORT_TO_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+
+/**
+ * Local day-of-week index (0=Sunday..6=Saturday, matching `Date.getDay()` and
+ * Google Places' `regularOpeningHours.periods[].open.day` convention) for a UTC
+ * instant observed in `timeZone` — TABI-89's opening-hours check needs this to
+ * compare a planned Activity's local weekday against a place's regular hours.
+ */
+export function localWeekdayIndex(isoUtc: string, timeZone: string | null): number {
+  const short = new Intl.DateTimeFormat('en-US', { timeZone: timeZone ?? 'UTC', weekday: 'short' }).format(
+    new Date(isoUtc),
+  )
+  return WEEKDAY_SHORT_TO_INDEX[short]
+}
+
 export function formatDateHeader(isoUtc: string, timeZone: string | null): string {
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',

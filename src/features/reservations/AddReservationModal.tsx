@@ -22,7 +22,9 @@ import {
   type GeocodeResult,
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
+import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { strings } from '../../lib/strings'
+import type { Json } from '../../types/database.types'
 import { showSavedToast } from '../../lib/toast'
 import type {
   NewReservation,
@@ -58,6 +60,8 @@ export type ResolvedPlace = GeocodeResult & {
     userRatingsTotal: number | null
     photoRef: string | null
     category: string | null
+    /** TABI-89: null both when Google has no opening-hours data and when the lookup failed — never blocks attaching the place. */
+    openingHours: RegularOpeningHours | null
   } | null
 }
 
@@ -584,6 +588,7 @@ export function AddReservationModal({
       place_user_ratings_total: startGeo?.placeDetails?.userRatingsTotal ?? null,
       place_photo_ref: startGeo?.placeDetails?.photoRef ?? null,
       place_category: startGeo?.placeDetails?.category ?? null,
+      place_opening_hours: (startGeo?.placeDetails?.openingHours ?? null) as Json | null,
     }
 
     if (startAt && endAt && option.dbType !== 'activity') {

@@ -4,6 +4,7 @@ import { logClientError } from '../../lib/logError'
 import { showSavedToast } from '../../lib/toast'
 import { strings } from '../../lib/strings'
 import { Spinner } from '../../components/ui/Spinner'
+import type { Json } from '../../types/database.types'
 import type { NewReservation, Reservation } from '../../types/reservation'
 import { ActivityPlaceSearchModal } from './ActivityPlaceSearchModal'
 import { AddReservationModal, type ResolvedPlace } from './AddReservationModal'
@@ -70,6 +71,7 @@ export function SavePlaceModal({ tripId, onClose, onCreate }: SavePlaceModalProp
         place_user_ratings_total: place.placeDetails?.userRatingsTotal ?? null,
         place_photo_ref: place.placeDetails?.photoRef ?? null,
         place_category: place.placeDetails?.category ?? null,
+        place_opening_hours: (place.placeDetails?.openingHours ?? null) as Json | null,
       })
       showSavedToast(strings.savePlace.savedMessage)
       onClose()

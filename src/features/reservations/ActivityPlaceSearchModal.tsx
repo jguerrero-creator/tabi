@@ -4,6 +4,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { localDateKey, localTimeZone } from '../../lib/datetime'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
+import { fetchPlaceOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl, searchPlaces, type PlaceSearchBias, type PlaceSearchResult } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import type { ResolvedPlace } from './AddReservationModal'
@@ -86,7 +87,15 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
     setResolvingPlaceId(result.googlePlaceId)
     setError(null)
     try {
-      const geocoded = await fetchGeocodeByPlaceId(result.googlePlaceId)
+      const [geocoded, openingHours] = await Promise.all([
+        fetchGeocodeByPlaceId(result.googlePlaceId),
+        // TABI-89: opening hours are a nice-to-have enrichment, not required to attach
+        // the place — a lookup failure falls back to null rather than blocking selection.
+        fetchPlaceOpeningHours(result.googlePlaceId).catch((err) => {
+          logClientError('ActivityPlaceSearchModal.fetchPlaceOpeningHours', err)
+          return null
+        }),
+      ])
       onSelect({
         ...geocoded,
         placeName: result.name,
@@ -96,6 +105,7 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
           userRatingsTotal: result.userRatingsTotal,
           photoRef: result.photoRef,
           category: result.category,
+          openingHours,
         },
       })
     } catch (err) {

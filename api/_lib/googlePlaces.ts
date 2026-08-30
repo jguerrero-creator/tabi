@@ -41,6 +41,29 @@ export const PLACE_FIELD_MASK = [
   'places.primaryType',
 ].join(',')
 
+// TABI-89: Place Details response shape for regular opening hours — Text/Nearby
+// Search never return this field, so a dedicated Place Details call is needed.
+// `day` is 0=Sunday..6=Saturday, same convention as JS `Date.getDay()`.
+const OpeningHoursTimeSchema = z.object({ day: z.number(), hour: z.number(), minute: z.number() })
+
+export const RegularOpeningHoursSchema = z.object({
+  periods: z.array(
+    z.object({
+      open: OpeningHoursTimeSchema,
+      close: OpeningHoursTimeSchema.optional(),
+    }),
+  ),
+})
+
+export type RegularOpeningHours = z.infer<typeof RegularOpeningHoursSchema>
+
+export const GooglePlaceDetailsSchema = z.object({
+  id: z.string(),
+  regularOpeningHours: RegularOpeningHoursSchema.optional(),
+})
+
+export const PLACE_DETAILS_OPENING_HOURS_FIELD_MASK = 'id,regularOpeningHours'
+
 export function mapGooglePlaces(
   places: z.infer<typeof GoogleSearchResponseSchema>['places'],
   fallbackName: string,

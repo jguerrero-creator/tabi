@@ -143,6 +143,7 @@ export type Database = {
           note: string | null
           place_category: string | null
           place_google_id: string | null
+          place_opening_hours: Json | null
           place_photo_ref: string | null
           place_rating: number | null
           place_user_ratings_total: number | null
@@ -183,6 +184,7 @@ export type Database = {
           note?: string | null
           place_category?: string | null
           place_google_id?: string | null
+          place_opening_hours?: Json | null
           place_photo_ref?: string | null
           place_rating?: number | null
           place_user_ratings_total?: number | null
@@ -223,6 +225,7 @@ export type Database = {
           note?: string | null
           place_category?: string | null
           place_google_id?: string | null
+          place_opening_hours?: Json | null
           place_photo_ref?: string | null
           place_rating?: number | null
           place_user_ratings_total?: number | null

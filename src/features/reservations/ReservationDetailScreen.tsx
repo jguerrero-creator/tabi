@@ -29,12 +29,14 @@ import {
   type GeocodeResult,
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
+import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
+import { checkClosedAtPlannedTime, WEEKDAY_NAMES } from './closedOnDay'
 import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
@@ -1042,6 +1044,11 @@ function TypeSpecificZone({ reservation }: { reservation: Reservation }) {
         userRatingsTotal={reservation.place_user_ratings_total}
         photoRef={reservation.place_photo_ref}
         category={reservation.place_category}
+        closedAlert={checkClosedAtPlannedTime(
+          reservation.place_opening_hours as RegularOpeningHours | null,
+          reservation.start_at,
+          reservation.start_timezone,
+        )}
       />
     </div>
   )
@@ -1055,13 +1062,15 @@ function ActivityPlaceFlags({
   userRatingsTotal,
   photoRef,
   category,
+  closedAlert,
 }: {
   rating: number | null
   userRatingsTotal: number | null
   photoRef: string | null
   category: string | null
+  closedAlert: ReturnType<typeof checkClosedAtPlannedTime>
 }) {
-  if (rating === null && !photoRef && !category) return null
+  if (rating === null && !photoRef && !category && !closedAlert) return null
   return (
     <div className="flex items-center gap-3 pt-1">
       {photoRef && (
@@ -1076,6 +1085,11 @@ function ActivityPlaceFlags({
         {category && (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
             {category}
+          </span>
+        )}
+        {closedAlert && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+            {strings.activityPlaceSearch.closedOnDayFlag(WEEKDAY_NAMES[closedAlert.weekdayIndex])}
           </span>
         )}
       </div>

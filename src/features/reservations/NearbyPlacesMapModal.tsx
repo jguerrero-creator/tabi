@@ -6,6 +6,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
 import { mapId, mapsApiKey } from '../../lib/googleMaps'
 import { logClientError } from '../../lib/logError'
+import { fetchPlaceOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl, searchNearbyPlaces, type PlaceSearchResult } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import type { ResolvedPlace } from './AddReservationModal'
@@ -59,7 +60,15 @@ export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: Nea
     setResolving(true)
     setError(null)
     try {
-      const geocoded = await fetchGeocodeByPlaceId(selected.googlePlaceId)
+      const [geocoded, openingHours] = await Promise.all([
+        fetchGeocodeByPlaceId(selected.googlePlaceId),
+        // TABI-89: opening hours are a nice-to-have enrichment, not required to attach
+        // the place — a lookup failure falls back to null rather than blocking selection.
+        fetchPlaceOpeningHours(selected.googlePlaceId).catch((err) => {
+          logClientError('NearbyPlacesMapModal.fetchPlaceOpeningHours', err)
+          return null
+        }),
+      ])
       onSelect({
         ...geocoded,
         placeName: selected.name,
@@ -69,6 +78,7 @@ export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: Nea
           userRatingsTotal: selected.userRatingsTotal,
           photoRef: selected.photoRef,
           category: selected.category,
+          openingHours,
         },
       })
     } catch (err) {

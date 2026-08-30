@@ -464,6 +464,7 @@ export const strings = {
     manualFallbackCta: 'Enter manually instead',
     cancel: 'Cancel',
     ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
+    closedOnDayFlag: (weekday: string) => `Closed on ${weekday}s`,
   },
   nearbyPlaces: {
     title: 'Nearby places',
