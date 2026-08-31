@@ -13,6 +13,8 @@ export interface TripLeg {
   mode: TravelMode | null
   durationSeconds: number | null
   distanceMeters: number | null
+  /** TABI-88: true when the Routes API's transit steps confirmed a same-station transfer. */
+  hasDirectTransfer: boolean
   /** True once the user has explicitly dismissed a "no route" banner for this mode (TABI-200). */
   dismissed: boolean
   /**
@@ -52,7 +54,7 @@ export function useTripLegs(
     fromReservationId: string,
     toReservationId: string,
     mode: TravelMode,
-    result: { durationSeconds: number | null; distanceMeters: number | null },
+    result: { durationSeconds: number | null; distanceMeters: number | null; hasDirectTransfer: boolean },
   ) => void,
 ) {
   const [legs, setLegs] = useState<TripLeg[]>([])
@@ -95,7 +97,14 @@ export function useTripLegs(
         }
 
         if (!leg.origin || !mode) {
-          return { ...base, durationSeconds: null, distanceMeters: null, justComputed: false, needsPersist: false as const }
+          return {
+            ...base,
+            durationSeconds: null,
+            distanceMeters: null,
+            hasDirectTransfer: false,
+            justComputed: false,
+            needsPersist: false as const,
+          }
         }
 
         // Already have an authoritative result (possibly a confirmed "no route") for this
@@ -109,6 +118,7 @@ export function useTripLegs(
             ...base,
             durationSeconds: persisted.durationSeconds,
             distanceMeters: persisted.distanceMeters,
+            hasDirectTransfer: persisted.hasDirectTransfer,
             justComputed: freshlyComputedKeys.current.has(key),
             needsPersist: false as const,
           }
@@ -124,6 +134,7 @@ export function useTripLegs(
             ...base,
             durationSeconds: result.durationSeconds,
             distanceMeters: result.distanceMeters,
+            hasDirectTransfer: result.hasDirectTransfer,
             justComputed: true,
             needsPersist: true as const,
             persistResult: result,
@@ -132,7 +143,14 @@ export function useTripLegs(
           logClientError('useTripLegs.fetchLeg', err)
           // Transient error (network/5xx) — not persisted, so it's retried on next load
           // rather than treated as a confirmed failure like a legitimate no-route result.
-          return { ...base, durationSeconds: null, distanceMeters: null, justComputed: false, needsPersist: false as const }
+          return {
+            ...base,
+            durationSeconds: null,
+            distanceMeters: null,
+            hasDirectTransfer: false,
+            justComputed: false,
+            needsPersist: false as const,
+          }
         }
       }),
     )

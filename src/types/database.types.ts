@@ -388,6 +388,7 @@ export type Database = {
           distance_meters: number | null
           duration_seconds: number | null
           from_reservation_id: string
+          has_direct_transfer: boolean | null
           id: string
           mode: Database["public"]["Enums"]["travel_mode"]
           to_reservation_id: string
@@ -401,6 +402,7 @@ export type Database = {
           distance_meters?: number | null
           duration_seconds?: number | null
           from_reservation_id: string
+          has_direct_transfer?: boolean | null
           id?: string
           mode: Database["public"]["Enums"]["travel_mode"]
           to_reservation_id: string
@@ -414,6 +416,7 @@ export type Database = {
           distance_meters?: number | null
           duration_seconds?: number | null
           from_reservation_id?: string
+          has_direct_transfer?: boolean | null
           id?: string
           mode?: Database["public"]["Enums"]["travel_mode"]
           to_reservation_id?: string

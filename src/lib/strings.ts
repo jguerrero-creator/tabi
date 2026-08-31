@@ -226,6 +226,7 @@ export const strings = {
     dismissError: 'Dismiss',
     selectMode: 'Select a travel mode to see travel time',
     addAsReservation: '+ Add reservation',
+    directTransferBadge: 'Direct transfer',
   },
   stayMenu: {
     title: 'Stay',

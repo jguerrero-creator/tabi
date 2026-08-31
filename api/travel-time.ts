@@ -47,13 +47,20 @@ export default async function handler(request: Request): Promise<Response> {
   // rail via transitPreferences, so the "train" spec requirement stays distinct
   // from general public transit.
   const isTrain = mode === 'TRAIN'
+  const isTransit = mode === 'TRANSIT' || isTrain
+
+  // TABI-88: transit-only step data (travelMode + stop names), needed to detect a
+  // same-station transfer — skipped for non-transit modes, which have no steps to check.
+  const fieldMask = isTransit
+    ? 'routes.duration,routes.distanceMeters,routes.legs.steps.travelMode,routes.legs.steps.transitDetails.stopDetails.arrivalStop.name,routes.legs.steps.transitDetails.stopDetails.departureStop.name'
+    : 'routes.duration,routes.distanceMeters'
 
   const routesResponse = await fetch(ROUTES_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters',
+      'X-Goog-FieldMask': fieldMask,
     },
     body: JSON.stringify({
       origin: { location: { latLng: toGoogleLatLng(origin) } },
@@ -77,13 +84,57 @@ export default async function handler(request: Request): Promise<Response> {
   // developer forum). Same "unknown, not zero" null-duration convention callers already
   // handle for a malformed route below, rather than a distinct error path per mode/region.
   if (!route) {
-    return jsonResponse({ durationSeconds: null, distanceMeters: null })
+    return jsonResponse({ durationSeconds: null, distanceMeters: null, hasDirectTransfer: false })
   }
 
   return jsonResponse({
     durationSeconds: parseDurationSeconds(route.duration),
     distanceMeters: route.distanceMeters ?? null,
+    hasDirectTransfer: isTransit ? hasDirectTransfer(route) : false,
   })
+}
+
+interface RouteLegStep {
+  travelMode?: string
+  transitDetails?: {
+    stopDetails?: {
+      arrivalStop?: { name?: string }
+      departureStop?: { name?: string }
+    }
+  }
+}
+
+// TABI-88: a "direct transfer" is two consecutive TRANSIT steps (no WALK step between
+// them in the raw, ordered steps list — adjacency in that list is itself proof nothing
+// was interposed) whose station names match, i.e. the rider changes vehicle without
+// leaving the station. Never inferred/guessed — only ever derived from real Routes API
+// stop names, per the "AI never invents facts" principle (this path has no AI involved
+// at all, but the same real-data-only bar applies).
+function hasDirectTransfer(route: { legs?: { steps?: RouteLegStep[] }[] }): boolean {
+  const steps = (route.legs ?? []).flatMap((leg) => leg.steps ?? [])
+  for (let i = 0; i < steps.length - 1; i++) {
+    const current = steps[i]
+    const next = steps[i + 1]
+    if (current.travelMode !== 'TRANSIT' || next.travelMode !== 'TRANSIT') continue
+
+    const arrivalName = current.transitDetails?.stopDetails?.arrivalStop?.name
+    const departureName = next.transitDetails?.stopDetails?.departureStop?.name
+    if (arrivalName && departureName && normalizeStationName(arrivalName) === normalizeStationName(departureName)) {
+      return true
+    }
+  }
+  return false
+}
+
+// Loose match: case/whitespace/punctuation-insensitive, and strips generic
+// "station" wording so e.g. "Shinjuku Station" and "Shinjuku Sta." both match "shinjuku".
+function normalizeStationName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[.,]/g, '')
+    .replace(/\bstation\b|\bsta\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function toGoogleLatLng(value: LatLng): { latitude: number; longitude: number } {

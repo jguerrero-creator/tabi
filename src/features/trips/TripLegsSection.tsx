@@ -120,6 +120,11 @@ export function TripLegsSection({
                       {strings.tripLegs.longTravel(formatDuration(freeBlock.travelSeconds))}
                     </p>
                   )}
+                  {leg.hasDirectTransfer && (
+                    <span className="mt-1 inline-block rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">
+                      {strings.tripLegs.directTransferBadge}
+                    </span>
+                  )}
                 </div>
                 <TravelModePicker
                   value={leg.mode}

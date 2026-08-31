@@ -8,6 +8,8 @@ export interface TripLegModeState {
   mode: TravelMode
   durationSeconds: number | null
   distanceMeters: number | null
+  /** TABI-88: true when a computed transit result confirmed a same-station transfer. */
+  hasDirectTransfer: boolean
   /** True once a result (even a "no route found" null) has been computed and persisted for this mode. */
   computed: boolean
   /** True once the user has acknowledged a "no route" banner for this mode — suppresses re-showing it. */
@@ -47,6 +49,7 @@ export function useTripLegTravelModes(tripId: string) {
               mode: row.mode,
               durationSeconds: row.duration_seconds,
               distanceMeters: row.distance_meters,
+              hasDirectTransfer: row.has_direct_transfer ?? false,
               computed: row.computed_at !== null,
               dismissed: row.dismissed_at !== null,
             },
@@ -68,7 +71,14 @@ export function useTripLegTravelModes(tripId: string) {
       const key = legKey(fromReservationId, toReservationId)
       setStateByKey((prev) => ({
         ...prev,
-        [key]: { mode, durationSeconds: null, distanceMeters: null, computed: false, dismissed: false },
+        [key]: {
+          mode,
+          durationSeconds: null,
+          distanceMeters: null,
+          hasDirectTransfer: false,
+          computed: false,
+          dismissed: false,
+        },
       }))
 
       const { error: saveError } = await supabase.from('trip_leg_travel_modes').upsert(
@@ -79,6 +89,7 @@ export function useTripLegTravelModes(tripId: string) {
           mode,
           duration_seconds: null,
           distance_meters: null,
+          has_direct_transfer: null,
           computed_at: null,
           dismissed_at: null,
         },
@@ -97,7 +108,7 @@ export function useTripLegTravelModes(tripId: string) {
       fromReservationId: string,
       toReservationId: string,
       mode: TravelMode,
-      result: { durationSeconds: number | null; distanceMeters: number | null },
+      result: { durationSeconds: number | null; distanceMeters: number | null; hasDirectTransfer: boolean },
     ) => {
       const key = legKey(fromReservationId, toReservationId)
       const { data, error: saveError } = await supabase
@@ -105,6 +116,7 @@ export function useTripLegTravelModes(tripId: string) {
         .update({
           duration_seconds: result.durationSeconds,
           distance_meters: result.distanceMeters,
+          has_direct_transfer: result.hasDirectTransfer,
           computed_at: new Date().toISOString(),
         })
         .eq('trip_id', tripId)
@@ -126,6 +138,7 @@ export function useTripLegTravelModes(tripId: string) {
           mode: data.mode,
           durationSeconds: data.duration_seconds,
           distanceMeters: data.distance_meters,
+          hasDirectTransfer: data.has_direct_transfer ?? false,
           computed: true,
           dismissed: prev[key]?.dismissed ?? false,
         },
