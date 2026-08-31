@@ -30,5 +30,17 @@ export function useTripReservations(tripId: string) {
     fetchReservations()
   }, [fetchReservations])
 
-  return { reservations, loading, error, refetch: fetchReservations }
+  const updateReservationNote = useCallback(async (reservationId: string, note: string): Promise<void> => {
+    const { data, error: updateError } = await supabase
+      .from('reservations')
+      .update({ note: note.trim() || null })
+      .eq('id', reservationId)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
+    setReservations((prev) => prev.map((r) => (r.id === reservationId ? data : r)))
+  }, [])
+
+  return { reservations, loading, error, refetch: fetchReservations, updateReservationNote }
 }

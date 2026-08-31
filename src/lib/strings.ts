@@ -509,6 +509,13 @@ export const strings = {
     remove: 'Remove',
     errorGeneric: 'Could not save this note. Please try again.',
   },
+  reservationNote: {
+    openLabel: 'Note',
+    title: (reservationName: string) => `Note — ${reservationName}`,
+    save: 'Save',
+    cancel: 'Cancel',
+    errorGeneric: 'Could not save this note. Please try again.',
+  },
   reminders: {
     title: 'Reminders',
     addCta: '+ Add reminder',

@@ -1,3 +1,4 @@
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ReservationIcon, reservationTypeTextClasses } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
@@ -17,6 +18,7 @@ import type { TripDayNote } from '../../types/dayNote'
 import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
+import { ReservationNotePopup } from './ReservationNotePopup'
 import type { DayLocationInput } from './useTripDayLocations'
 
 /** Where a free block's "+ Add" should center its nearby-places search (TABI-24). */
@@ -101,6 +103,12 @@ interface DayColumnProps {
   onClearDayNote?: () => Promise<void>
   /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
   onAddAtFreeBlock?: (input: FreeBlockAddPayload) => void
+  /**
+   * Quick note access on a reservation card (Backlog: Planning slide-to-reveal /
+   * icon-strip pour ouvrir une pop-up des notes) — edits the same `note` column
+   * as ReservationDetailScreen's Notes field, just reachable without leaving Planning.
+   */
+  onSaveReservationNote?: (reservationId: string, note: string) => Promise<void>
   className?: string
 }
 
@@ -120,8 +128,10 @@ export function DayColumn({
   onSaveDayNote,
   onClearDayNote,
   onAddAtFreeBlock,
+  onSaveReservationNote,
   className,
 }: DayColumnProps) {
+  const [noteReservation, setNoteReservation] = useState<Reservation | null>(null)
   const dayTimezone = items[0]?.start_timezone ?? localTimeZone()
   const anchorInstant = items[0]?.start_at
 
@@ -199,10 +209,18 @@ export function DayColumn({
                 {entry.time ? formatTimeInZone(entry.time, entry.timezone ?? dayTimezone) : ''}
               </span>
               <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
-              {renderEntry(entry, handleAddAtFreeBlock)}
+              {renderEntry(entry, handleAddAtFreeBlock, onSaveReservationNote && setNoteReservation)}
             </li>
           ))}
         </ul>
+      )}
+
+      {noteReservation && onSaveReservationNote && (
+        <ReservationNotePopup
+          reservation={noteReservation}
+          onSave={onSaveReservationNote}
+          onClose={() => setNoteReservation(null)}
+        />
       )}
     </div>
   )
@@ -353,10 +371,11 @@ function buildRailEntries(
 function renderEntry(
   entry: RailEntry,
   onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void,
+  onOpenNote?: (reservation: Reservation) => void,
 ) {
   switch (entry.kind) {
     case 'reservation':
-      return <ReservationCard reservation={entry.reservation} />
+      return <ReservationCard reservation={entry.reservation} onOpenNote={onOpenNote} />
     case 'stay':
       return <TonightStayCard reservation={entry.reservation} />
     case 'transit':
@@ -402,12 +421,15 @@ function renderEntry(
   }
 }
 
-function ReservationCard({ reservation }: { reservation: DayItem }) {
+function ReservationCard({
+  reservation,
+  onOpenNote,
+}: {
+  reservation: DayItem
+  onOpenNote?: (reservation: Reservation) => void
+}) {
   return (
-    <Link
-      to={`/reservations/${reservation.id}`}
-      className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200"
-    >
+    <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote}>
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${reservationTypeTextClasses[reservation.type]}`}
       >
@@ -420,7 +442,119 @@ function ReservationCard({ reservation }: { reservation: DayItem }) {
         </p>
         {rowLabel(reservation) && <p className="truncate text-xs text-slate-500">{rowLabel(reservation)}</p>}
       </div>
-    </Link>
+    </SwipeableReservationCard>
+  )
+}
+
+/** How far (px) the card slides to reveal the note action on a touch swipe. */
+const NOTE_REVEAL_WIDTH = 72
+
+/**
+ * Wraps a reservation card's Link with quick note access (Backlog: Planning
+ * slide-to-reveal / icon-strip). Touch devices swipe the card left to reveal
+ * a "Note" button underneath; non-touch pointers (mouse/trackpad) instead get
+ * a persistent icon strip on the card's right edge — Tailwind's `pointer-fine`/
+ * `pointer-coarse` variants pick between the two (no touch/device-detection JS
+ * needed, and no swipe library exists yet in this codebase to reuse). Tapping
+ * the card while the swipe reveal is open closes it instead of navigating,
+ * matching the standard swipe-to-reveal pattern.
+ */
+function SwipeableReservationCard({
+  reservation,
+  onOpenNote,
+  children,
+}: {
+  reservation: Reservation
+  onOpenNote?: (reservation: Reservation) => void
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [dragX, setDragX] = useState<number | null>(null)
+  const startXRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+
+  function handleTouchStart(event: ReactTouchEvent) {
+    startXRef.current = event.touches[0].clientX
+    draggingRef.current = true
+  }
+
+  function handleTouchMove(event: ReactTouchEvent) {
+    if (!draggingRef.current || startXRef.current === null) return
+    const delta = event.touches[0].clientX - startXRef.current
+    const base = open ? -NOTE_REVEAL_WIDTH : 0
+    setDragX(Math.max(-NOTE_REVEAL_WIDTH, Math.min(0, base + delta)))
+  }
+
+  function handleTouchEnd() {
+    if (dragX !== null) setOpen(dragX < -NOTE_REVEAL_WIDTH / 2)
+    draggingRef.current = false
+    startXRef.current = null
+    setDragX(null)
+  }
+
+  function handleLinkClick(event: ReactMouseEvent) {
+    if (open) {
+      event.preventDefault()
+      setOpen(false)
+    }
+  }
+
+  if (!onOpenNote) {
+    return (
+      <Link
+        to={`/reservations/${reservation.id}`}
+        className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200"
+      >
+        {children}
+      </Link>
+    )
+  }
+
+  const offset = dragX ?? (open ? -NOTE_REVEAL_WIDTH : 0)
+
+  return (
+    <div className="relative overflow-hidden rounded-xl">
+      <button
+        type="button"
+        onClick={() => {
+          onOpenNote(reservation)
+          setOpen(false)
+        }}
+        aria-label={strings.reservationNote.openLabel}
+        className="absolute inset-y-0 right-0 flex w-[72px] items-center justify-center gap-1 bg-teal-600 text-sm font-medium text-white pointer-fine:hidden"
+      >
+        📝 {strings.reservationNote.openLabel}
+      </button>
+      <div
+        className="relative flex touch-pan-y items-stretch"
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: dragX === null ? 'transform 150ms ease-out' : 'none',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <Link
+          to={`/reservations/${reservation.id}`}
+          onClick={handleLinkClick}
+          className="flex flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200 pointer-fine:rounded-r-none"
+        >
+          {children}
+        </Link>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            onOpenNote(reservation)
+          }}
+          aria-label={strings.reservationNote.openLabel}
+          className="hidden w-8 shrink-0 items-center justify-center rounded-r-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-teal-700 pointer-fine:flex"
+        >
+          📝
+        </button>
+      </div>
+    </div>
   )
 }
 

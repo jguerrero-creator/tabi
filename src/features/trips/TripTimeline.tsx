@@ -52,6 +52,8 @@ interface TripTimelineProps {
   onClearDayNote: (dateKey: string) => Promise<void>
   /** Opens the quick-add sheet from a free-time block on the rail (TABI-54). */
   onAddAtFreeBlock?: (input: FreeBlockAddPayload) => void
+  /** Quick note access on a reservation card (Backlog: Planning slide-to-reveal / icon-strip). */
+  onSaveReservationNote?: (reservationId: string, note: string) => Promise<void>
 }
 
 type DayEdges = { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }
@@ -79,6 +81,7 @@ export function TripTimeline({
   onSaveDayNote,
   onClearDayNote,
   onAddAtFreeBlock,
+  onSaveReservationNote,
 }: TripTimelineProps) {
   const dayOccurrences = buildDayOccurrences(reservations)
   const groups = groupByDate(
@@ -135,6 +138,7 @@ export function TripTimeline({
           }
           dayLocation={dayLocationsByKey.get(effectiveSelectedKey)}
           onAddAtFreeBlock={onAddAtFreeBlock}
+          onSaveReservationNote={onSaveReservationNote}
           onSaveDayLocation={
             effectiveSelectedKey === UNSCHEDULED_KEY
               ? undefined
@@ -172,6 +176,7 @@ export function TripTimeline({
             }
             dayLocation={dayLocationsByKey.get(day.key)}
             onAddAtFreeBlock={onAddAtFreeBlock}
+            onSaveReservationNote={onSaveReservationNote}
             onSaveDayLocation={
               day.key === UNSCHEDULED_KEY ? undefined : (input) => onSaveDayLocation(day.key, input)
             }
