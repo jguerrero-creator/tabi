@@ -470,6 +470,9 @@ export const strings = {
     cancel: 'Cancel',
     ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
     closedOnDayFlag: (weekday: string) => `Closed on ${weekday}s`,
+    localGemsFilterLabel: '💎 Local gems',
+    noFilterMatchTitle: 'No local gems found',
+    noFilterMatchBody: 'Try a different search, or clear the filter to see all results.',
   },
   nearbyPlaces: {
     title: 'Nearby places',

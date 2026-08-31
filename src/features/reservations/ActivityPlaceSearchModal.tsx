@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../components/ui/Button'
+import { SubtypeFilterPills } from '../../components/menu/SubtypeFilterPills'
 import { Spinner } from '../../components/ui/Spinner'
 import { localDateKey, localTimeZone } from '../../lib/datetime'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
@@ -12,6 +13,26 @@ import { useTrip } from '../trips/useTrip'
 import { useTripDayLocations } from '../trips/useTripDayLocations'
 
 const DEBOUNCE_MS = 250
+
+// TABI-51: Google Places surfaces the most-reviewed (often most touristic) places
+// first — this is a cheap client-side re-sort of results already in hand, not a
+// separate content-curation system. Thresholds chosen for the place types this app
+// deals with (restaurants, activities, landmarks): 4.6+ is a genuinely standout
+// rating band, and under 200 reviews reliably separates a locals' favorite from
+// something already on the tour-bus circuit. Adjust here if real usage shows these
+// are too tight/loose.
+const LOCAL_GEM_MIN_RATING = 4.6
+const LOCAL_GEM_MAX_REVIEWS = 200
+const LOCAL_GEMS_FILTER_OPTIONS = [{ value: 'localGems' as const, label: strings.activityPlaceSearch.localGemsFilterLabel }]
+
+function isLocalGem(result: PlaceSearchResult): boolean {
+  return (
+    result.rating !== null &&
+    result.rating >= LOCAL_GEM_MIN_RATING &&
+    result.userRatingsTotal !== null &&
+    result.userRatingsTotal < LOCAL_GEM_MAX_REVIEWS
+  )
+}
 
 interface ActivityPlaceSearchModalProps {
   tripId: string
@@ -36,6 +57,7 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [resolvingPlaceId, setResolvingPlaceId] = useState<string | null>(null)
+  const [localGemsFilter, setLocalGemsFilter] = useState<Set<'localGems'>>(new Set())
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
@@ -115,6 +137,11 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
     }
   }
 
+  const filteredResults = useMemo(
+    () => (localGemsFilter.has('localGems') ? results.filter(isLocalGem) : results),
+    [results, localGemsFilter],
+  )
+
   function computeBias(): PlaceSearchBias {
     const todayKey = localDateKey(new Date().toISOString(), localTimeZone())
     const todayLocation = locationsByDate.get(todayKey)
@@ -162,8 +189,22 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
           )}
 
           {!loading && !error && results.length > 0 && (
+            <SubtypeFilterPills
+              options={LOCAL_GEMS_FILTER_OPTIONS}
+              selected={localGemsFilter}
+              onToggle={() =>
+                setLocalGemsFilter((prev) => (prev.has('localGems') ? new Set() : new Set(['localGems'])))
+              }
+            />
+          )}
+
+          {!loading && !error && results.length > 0 && filteredResults.length === 0 && (
+            <p className="py-4 text-center text-sm text-slate-500">{strings.activityPlaceSearch.noFilterMatchBody}</p>
+          )}
+
+          {!loading && !error && filteredResults.length > 0 && (
             <div role="radiogroup" className="space-y-2">
-              {results.map((result) => (
+              {filteredResults.map((result) => (
                 <button
                   key={result.googlePlaceId}
                   type="button"
