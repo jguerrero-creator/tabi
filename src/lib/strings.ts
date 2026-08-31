@@ -240,6 +240,8 @@ export const strings = {
     noParkingFlag: 'No parking',
     parkingIncludedFlag: 'Parking included',
     checkInDeadlineFlag: (time: string) => `Check-in by ${time}`,
+    noFilterMatchTitle: 'No stays match this filter',
+    noFilterMatchBody: 'Try selecting a different stay type, or clear the filter.',
   },
   transportMenu: {
     title: 'Transport',
@@ -248,6 +250,8 @@ export const strings = {
     emptyTitle: 'No transport booked yet',
     emptyBody: 'This trip has no flights, trains, or local transport reservations.',
     addCta: 'Add reservation (Transport)',
+    noFilterMatchTitle: 'No transport matches this filter',
+    noFilterMatchBody: 'Try selecting a different transport type, or clear the filter.',
   },
   activitiesMenu: {
     title: 'Activities',

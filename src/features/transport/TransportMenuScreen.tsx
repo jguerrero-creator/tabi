@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuListRow } from '../../components/menu/MenuListRow'
 import { MenuSection } from '../../components/menu/MenuSection'
+import { SubtypeFilterPills } from '../../components/menu/SubtypeFilterPills'
 import { groupByDate } from '../../components/menu/groupByDate'
 import { nestOverlappingReservations } from '../../components/menu/nestOverlaps'
 import { Spinner } from '../../components/ui/Spinner'
@@ -12,7 +13,12 @@ import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
 import { formatDateHeader, localDateKey } from '../../lib/datetime'
-import type { Reservation } from '../../types/reservation'
+import type { Reservation, TransportSubtype } from '../../types/reservation'
+
+const TRANSPORT_SUBTYPE_OPTIONS = Object.entries(strings.addReservation.transportSubtypes).map(([value, label]) => ({
+  value: value as TransportSubtype,
+  label,
+}))
 
 export function TransportMenuScreen() {
   const { tripId } = useParams<{ tripId: string }>()
@@ -25,21 +31,41 @@ export function TransportMenuScreen() {
   } = useReservationsByType(tripId ?? '', 'transport')
   const { createReservation } = useCreateReservation(tripId ?? '')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [subtypeFilter, setSubtypeFilter] = useState<Set<TransportSubtype>>(new Set())
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
 
-  const { nestedIds, childrenByMainId } = useMemo(() => nestOverlappingReservations(reservations), [reservations])
+  const toggleSubtypeFilter = (subtype: TransportSubtype) => {
+    setSubtypeFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(subtype)) next.delete(subtype)
+      else next.add(subtype)
+      return next
+    })
+  }
+
+  const filteredReservations = useMemo(() => {
+    if (subtypeFilter.size === 0) return reservations
+    return reservations.filter(
+      (reservation) => reservation.transport_subtype && subtypeFilter.has(reservation.transport_subtype),
+    )
+  }, [reservations, subtypeFilter])
+
+  const { nestedIds, childrenByMainId } = useMemo(
+    () => nestOverlappingReservations(filteredReservations),
+    [filteredReservations],
+  )
   const groups = useMemo(
     () =>
       groupByDate(
-        reservations.filter((reservation) => !nestedIds.has(reservation.id)),
+        filteredReservations.filter((reservation) => !nestedIds.has(reservation.id)),
         (reservation) => ({
           at: reservation.start_at,
           timezone: reservation.start_timezone,
         }),
       ),
-    [reservations, nestedIds],
+    [filteredReservations, nestedIds],
   )
 
   return (
@@ -64,10 +90,25 @@ export function TransportMenuScreen() {
           <p className="py-16 text-center text-sm text-red-600">{strings.transportMenu.errorLoading}</p>
         )}
 
-        {!loading && !error && groups.length === 0 && (
+        {!loading && !error && reservations.length > 0 && (
+          <SubtypeFilterPills
+            options={TRANSPORT_SUBTYPE_OPTIONS}
+            selected={subtypeFilter}
+            onToggle={toggleSubtypeFilter}
+          />
+        )}
+
+        {!loading && !error && reservations.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <h2 className="text-base font-medium text-slate-900">{strings.transportMenu.emptyTitle}</h2>
             <p className="text-sm text-slate-500">{strings.transportMenu.emptyBody}</p>
+          </div>
+        )}
+
+        {!loading && !error && reservations.length > 0 && groups.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <h2 className="text-base font-medium text-slate-900">{strings.transportMenu.noFilterMatchTitle}</h2>
+            <p className="text-sm text-slate-500">{strings.transportMenu.noFilterMatchBody}</p>
           </div>
         )}
 

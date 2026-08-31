@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { MenuHeader } from '../../components/menu/MenuHeader'
 import { MenuListRow, type MenuRowFlag } from '../../components/menu/MenuListRow'
 import { MenuSection } from '../../components/menu/MenuSection'
+import { SubtypeFilterPills } from '../../components/menu/SubtypeFilterPills'
 import { groupByDate, type DateGroup } from '../../components/menu/groupByDate'
 import { nestOverlappingReservations } from '../../components/menu/nestOverlaps'
 import { Spinner } from '../../components/ui/Spinner'
@@ -12,8 +13,13 @@ import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
 import { localDateKey, formatDateRangeLabel, formatTimeOnly } from '../../lib/datetime'
-import type { Reservation } from '../../types/reservation'
+import type { Reservation, StaySubtype } from '../../types/reservation'
 import { computeAccommodationGaps, nightsBetween, type AccommodationGap } from './computeAccommodationGaps'
+
+const STAY_SUBTYPE_OPTIONS = Object.entries(strings.addReservation.staySubtypes).map(([value, label]) => ({
+  value: value as StaySubtype,
+  label,
+}))
 
 type TimelineEntry =
   | { kind: 'group'; sortKey: string; group: DateGroup<Reservation> }
@@ -33,19 +39,39 @@ export function StayMenuScreen() {
   const { reservations: transportReservations } = useReservationsByType(tripId ?? '', 'transport')
   const { createReservation } = useCreateReservation(tripId ?? '')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [subtypeFilter, setSubtypeFilter] = useState<Set<StaySubtype>>(new Set())
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
 
+  const toggleSubtypeFilter = (subtype: StaySubtype) => {
+    setSubtypeFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(subtype)) next.delete(subtype)
+      else next.add(subtype)
+      return next
+    })
+  }
+
+  // Gaps reflect real accommodation coverage, so they're computed from every
+  // reservation regardless of the display-only subtype filter below.
   const gaps = useMemo(() => {
     if (!trip) return []
     return computeAccommodationGaps(trip, [...reservations, ...transportReservations])
   }, [trip, reservations, transportReservations])
 
-  const { nestedIds, childrenByMainId } = useMemo(() => nestOverlappingReservations(reservations), [reservations])
+  const filteredReservations = useMemo(() => {
+    if (subtypeFilter.size === 0) return reservations
+    return reservations.filter((reservation) => reservation.stay_subtype && subtypeFilter.has(reservation.stay_subtype))
+  }, [reservations, subtypeFilter])
+
+  const { nestedIds, childrenByMainId } = useMemo(
+    () => nestOverlappingReservations(filteredReservations),
+    [filteredReservations],
+  )
   const timeline = useMemo(
-    () => buildTimeline(reservations.filter((reservation) => !nestedIds.has(reservation.id)), gaps),
-    [reservations, gaps, nestedIds],
+    () => buildTimeline(filteredReservations.filter((reservation) => !nestedIds.has(reservation.id)), gaps),
+    [filteredReservations, gaps, nestedIds],
   )
 
   return (
@@ -76,10 +102,21 @@ export function StayMenuScreen() {
           </p>
         )}
 
-        {!loading && !error && timeline.length === 0 && (
+        {!loading && !error && reservations.length > 0 && (
+          <SubtypeFilterPills options={STAY_SUBTYPE_OPTIONS} selected={subtypeFilter} onToggle={toggleSubtypeFilter} />
+        )}
+
+        {!loading && !error && reservations.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <h2 className="text-base font-medium text-slate-900">{strings.stayMenu.emptyTitle}</h2>
             <p className="text-sm text-slate-500">{strings.stayMenu.emptyBody}</p>
+          </div>
+        )}
+
+        {!loading && !error && reservations.length > 0 && timeline.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <h2 className="text-base font-medium text-slate-900">{strings.stayMenu.noFilterMatchTitle}</h2>
+            <p className="text-sm text-slate-500">{strings.stayMenu.noFilterMatchBody}</p>
           </div>
         )}
 
