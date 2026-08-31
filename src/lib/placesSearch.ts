@@ -49,9 +49,21 @@ export function placePhotoUrl(photoRef: string, width = 400): string {
   return `/api/places-photo?ref=${encodeURIComponent(photoRef)}&w=${width}`
 }
 
+export interface NearbyPlacesOptions {
+  /** TABI-135: 'tourist' scopes results to restaurant/bar/cafe/tourist_attraction/museum. */
+  mode?: 'default' | 'tourist'
+  /** Meters; server clamps this independently, so an out-of-range value here is only advisory. */
+  radius?: number
+}
+
 // TABI-24: nearby-places map on the free-block "+ Add" — same auth/response shape as
-// searchPlaces above, but centered on a point instead of a typed query.
-export async function searchNearbyPlaces(lat: number, lng: number): Promise<PlaceSearchResult[]> {
+// searchPlaces above, but centered on a point instead of a typed query. TABI-135 reuses
+// this same endpoint/quota for the "Show tourist places" map overlay via `options.mode`.
+export async function searchNearbyPlaces(
+  lat: number,
+  lng: number,
+  options?: NearbyPlacesOptions,
+): Promise<PlaceSearchResult[]> {
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
 
@@ -61,7 +73,7 @@ export async function searchNearbyPlaces(lat: number, lng: number): Promise<Plac
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify({ lat, lng }),
+    body: JSON.stringify({ lat, lng, ...options }),
   })
 
   if (!response.ok) {

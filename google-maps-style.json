@@ -1,0 +1,27 @@
+[
+  {
+    "featureType": "poi",
+    "elementType": "all",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "road.local",
+    "elementType": "labels",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "road.pedestrian",
+    "elementType": "geometry.fill",
+    "stylers": [{ "color": "#5eead4" }]
+  },
+  {
+    "featureType": "road.pedestrian",
+    "elementType": "geometry.stroke",
+    "stylers": [{ "color": "#0d9488" }, { "weight": 1.5 }]
+  },
+  {
+    "featureType": "road.pedestrian",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#0f766e" }]
+  }
+]

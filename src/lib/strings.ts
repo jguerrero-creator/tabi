@@ -177,6 +177,9 @@ export const strings = {
     needsAttentionTitle: 'Needs attention',
     needsAttentionEmpty: 'Nothing needs attention right now.',
     aiAccessRequired: "AI-assisted import isn't available on your plan.",
+    showTouristPlaces: 'Show tourist places',
+    hideTouristPlaces: 'Hide tourist places',
+    touristPlacesError: 'Could not load tourist places.',
   },
   planning: {
     unscheduledLabel: 'Unscheduled',

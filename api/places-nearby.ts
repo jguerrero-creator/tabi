@@ -11,6 +11,12 @@ import { GoogleSearchResponseSchema, mapGooglePlaces, PLACE_FIELD_MASK, type Pla
 interface PlacesNearbyRequestBody {
   lat?: number
   lng?: number
+  // TABI-135: 'tourist' powers the opt-in "Show tourist places" map overlay
+  // (restaurant/bar/cafe/tourist_attraction/museum, scoped to the viewport),
+  // scoped to a caller-supplied radius. Omitted/'default' keeps the original
+  // TABI-24 free-block "nearby suggestions" behavior unchanged.
+  mode?: 'default' | 'tourist'
+  radius?: number
 }
 
 type PlacesNearbyResponse = { status: 'ok'; results: PlaceSearchResult[] }
@@ -20,6 +26,13 @@ const RADIUS_METERS = 1500
 // Suggestions here are "things to do" for a free block, not lodging — TABI-24 spec.
 // A static exclusion, not per-country logic (CLAUDE.md #3).
 const EXCLUDED_TYPES = ['lodging']
+
+// TABI-135: fixed server-side allow-list — a client-supplied `mode: 'tourist'` never
+// lets arbitrary Google place types through, only these five.
+const TOURIST_TYPES = ['restaurant', 'bar', 'cafe', 'tourist_attraction', 'museum']
+const TOURIST_MAX_RESULTS = 20
+const TOURIST_MIN_RADIUS_METERS = 200
+const TOURIST_MAX_RADIUS_METERS = 3000
 
 export const config = { runtime: 'edge' }
 
@@ -56,13 +69,17 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'lat and lng are required' }, 400)
   }
 
+  const isTourist = body.mode === 'tourist'
+  const requestedRadius = Number.isFinite(body.radius) ? (body.radius as number) : RADIUS_METERS
+  const radius = isTourist ? clamp(requestedRadius, TOURIST_MIN_RADIUS_METERS, TOURIST_MAX_RADIUS_METERS) : RADIUS_METERS
+
   const requestBody = {
     locationRestriction: {
-      circle: { center: { latitude: body.lat, longitude: body.lng }, radius: RADIUS_METERS },
+      circle: { center: { latitude: body.lat, longitude: body.lng }, radius },
     },
-    maxResultCount: MAX_RESULTS,
+    maxResultCount: isTourist ? TOURIST_MAX_RESULTS : MAX_RESULTS,
     rankPreference: 'POPULARITY',
-    excludedTypes: EXCLUDED_TYPES,
+    ...(isTourist ? { includedTypes: TOURIST_TYPES } : { excludedTypes: EXCLUDED_TYPES }),
   }
 
   let googleResponse: Response
@@ -100,4 +117,8 @@ export default async function handler(request: Request): Promise<Response> {
 
 function jsonResponse<T>(body: T, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
 }
