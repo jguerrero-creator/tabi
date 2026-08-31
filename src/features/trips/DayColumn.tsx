@@ -538,7 +538,7 @@ function SwipeableReservationCard({
         <Link
           to={`/reservations/${reservation.id}`}
           onClick={handleLinkClick}
-          className="flex flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200 pointer-fine:rounded-r-none"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200 pointer-fine:rounded-r-none"
         >
           {children}
         </Link>
