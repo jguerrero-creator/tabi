@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { statusTextClasses } from '../../components/menu/statusDotClasses'
-import { ReservationTypeIcon, VehicleRentalIcon } from '../../components/ui/ReservationTypeIcon'
+import { JetlagIcon, ReservationTypeIcon, VehicleRentalIcon } from '../../components/ui/ReservationTypeIcon'
 import { strings } from '../../lib/strings'
 import type { ReservationStatus } from '../../types/reservation'
 
@@ -11,6 +11,12 @@ export interface DayTab {
   stayStatus: ReservationStatus | null
   /** The at-disposal vehicle rental's status covering this day, or null if none (TABI-143, added 20/07). */
   vehicleRentalStatus: ReservationStatus | null
+  /**
+   * Whether a Transport leg lands on this day with a 3+ hour timezone offset
+   * shift from departure (TABI-66) — purely a visual cue, never fed into
+   * `freeTimeBlocks.ts` or any other calculation.
+   */
+  hasJetlag: boolean
   /** Total reservations + activities (+ manual blocks, once TABI-143's dependency exists) planned this day. */
   itemCount: number
 }
@@ -77,6 +83,11 @@ export function DayTabs({ days, selectedKey, onSelect }: DayTabsProps) {
                   className="shrink-0"
                 >
                   <VehicleRentalIcon className={`h-3.5 w-3.5 ${statusTextClasses[day.vehicleRentalStatus]}`} />
+                </span>
+              )}
+              {day.hasJetlag && (
+                <span title={strings.planning.dayPillJetlag} className="shrink-0">
+                  <JetlagIcon className={`h-3.5 w-3.5 ${selected ? 'text-white/70' : 'text-slate-400'}`} />
                 </span>
               )}
               {day.itemCount > 0 && (

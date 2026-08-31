@@ -193,6 +193,7 @@ export const strings = {
     dayPillStayStatus: (status: ReservationStatus) => `Stay: ${strings.status[status]}`,
     dayPillVehicleRentalStatus: (status: ReservationStatus) => `Vehicle rental: ${strings.status[status]}`,
     dayPillItemCount: (count: number) => `${count} planned item${count === 1 ? '' : 's'}`,
+    dayPillJetlag: 'Probable jetlag day',
     tonightsStay: "Tonight's stay",
     inTransit: 'In transit',
   },

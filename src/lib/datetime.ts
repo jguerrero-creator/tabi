@@ -184,6 +184,23 @@ export function durationHoursMinutes(startIso: string, endIso: string): { hours:
   return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 }
 }
 
+/**
+ * Absolute difference in hours between two IANA timezones' UTC offsets, each
+ * evaluated at its own instant (so DST on either side of the leg resolves
+ * correctly) — used by the TABI-66 "probable jetlag" day-tab indicator.
+ * Purely informational: never feed this into `freeTimeBlocks.ts`.
+ */
+export function timeZoneOffsetDiffHours(
+  startAt: string,
+  startTimeZone: string,
+  endAt: string,
+  endTimeZone: string,
+): number {
+  const startOffset = timeZoneOffsetMinutes(new Date(startAt), startTimeZone)
+  const endOffset = timeZoneOffsetMinutes(new Date(endAt), endTimeZone)
+  return Math.abs(endOffset - startOffset) / 60
+}
+
 function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,

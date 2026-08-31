@@ -157,3 +157,23 @@ export function VehicleRentalIcon({ className = 'h-5 w-5' }: { className?: strin
     </svg>
   )
 }
+
+/** Flags a Transport leg's arrival day as "probable jetlag" (3+ hour timezone offset shift, TABI-66). */
+export function JetlagIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 0 0 18" fill="currentColor" stroke="none" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  )
+}

@@ -9,6 +9,7 @@ import {
 } from '../../lib/freeTimeBlocks'
 import { strings } from '../../lib/strings'
 import { findActiveStay } from '../stay/computeAccommodationGaps'
+import { findArrivalJetlagLeg } from '../transport/findArrivalJetlagLeg'
 import { findActiveVehicleRental } from '../transport/findActiveVehicleRental'
 import { findInProgressTransportLeg } from '../transport/findInProgressTransportLeg'
 import type { Reservation } from '../../types/reservation'
@@ -195,8 +196,8 @@ export function TripTimeline({
  * "Unscheduled" pill is only shown when it's actually got items.
  *
  * Each pill also carries the day's accommodation status, at-disposal vehicle
- * rental status, and total item count (TABI-143), computed here once for
- * every day rather than re-derived per pill.
+ * rental status, probable-jetlag flag (TABI-66), and total item count
+ * (TABI-143), computed here once for every day rather than re-derived per pill.
  */
 function buildDayTabs(
   trip: Trip | null,
@@ -218,6 +219,7 @@ function buildDayTabs(
       label: formatDayPillLabel(key),
       stayStatus: activeStay?.status ?? null,
       vehicleRentalStatus: activeRental?.status ?? null,
+      hasJetlag: findArrivalJetlagLeg(key, reservations) !== null,
       itemCount: countDayItems(items, activeStay, inProgressLeg),
     }
   })
@@ -229,6 +231,7 @@ function buildDayTabs(
       label: unscheduledGroup.label,
       stayStatus: null,
       vehicleRentalStatus: null,
+      hasJetlag: false,
       itemCount: unscheduledGroup.items.length,
     })
   }
