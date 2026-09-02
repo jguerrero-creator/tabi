@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps'
 import type { MapPoint } from '../../components/ui/MiniMap'
-import { mapCameraFor, MapTrace, MiniMap } from '../../components/ui/MiniMap'
+import { mapCameraFor, MapTrace, MiniMap, pointsForCamera } from '../../components/ui/MiniMap'
 import { MapErrorBoundary } from '../../components/ui/MapErrorBoundary'
 import { Spinner } from '../../components/ui/Spinner'
 import { mapId, mapsApiKey } from '../../lib/googleMaps'
@@ -70,7 +70,7 @@ export function OverviewMap({ points }: OverviewMapProps) {
 
   return (
     <div className="relative">
-      <MiniMap points={points} heightClassName="h-40 lg:h-[calc(100vh-8rem)]" />
+      <MiniMap points={points} cameraPoints={pointsForCamera(points)} heightClassName="h-40 lg:h-[calc(100vh-8rem)]" />
       {canExpand && (
         <button
           type="button"
@@ -88,7 +88,7 @@ export function OverviewMap({ points }: OverviewMapProps) {
             <Map
               id={FULLSCREEN_MAP_ID}
               mapId={mapId}
-              {...mapCameraFor(points, 11, 48)}
+              {...mapCameraFor(pointsForCamera(points), 11, 48)}
               gestureHandling="greedy"
               onIdle={(event) => {
                 if (showTouristPlaces) loadTouristPlaces(event.map)

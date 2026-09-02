@@ -17,9 +17,18 @@ interface MiniMapProps {
   points: MapPoint[]
   className?: string
   heightClassName?: string
+  /**
+   * Overview-only: which points the camera frames, if different from the full
+   * `points` being rendered — e.g. `pointsForCamera(points)` to skip past a
+   * long-haul flight's origin. Every point still renders (marker + trace)
+   * regardless; this only narrows what the viewport fits to. Defaults to
+   * `points`, i.e. every other MiniMap caller (reservation detail pages, etc.)
+   * is unaffected.
+   */
+  cameraPoints?: MapPoint[]
 }
 
-export function MiniMap({ points, className = '', heightClassName = 'h-40' }: MiniMapProps) {
+export function MiniMap({ points, className = '', heightClassName = 'h-40', cameraPoints }: MiniMapProps) {
   if (!mapsApiKey || points.length === 0) {
     return (
       <div
@@ -33,7 +42,7 @@ export function MiniMap({ points, className = '', heightClassName = 'h-40' }: Mi
   return (
     <div className={`${heightClassName} w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
       <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-        <Map mapId={mapId} {...mapCameraFor(points, 14, 24)} gestureHandling="cooperative" disableDefaultUI>
+        <Map mapId={mapId} {...mapCameraFor(cameraPoints ?? points, 14, 24)} gestureHandling="cooperative" disableDefaultUI>
           <MapTrace points={points} />
         </Map>
       </MapErrorBoundary>
@@ -66,6 +75,37 @@ export function mapCameraFor(points: MapPoint[], singlePointZoom: number, paddin
     return { defaultCenter: { lat: north, lng: east }, defaultZoom: singlePointZoom }
   }
   return { defaultBounds: { north, south, east, west, padding } }
+}
+
+const LONG_FLIGHT_KM = 3000
+const EARTH_RADIUS_KM = 6371
+
+function haversineKm(a: MapPoint, b: MapPoint): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const sinLat = Math.sin(dLat / 2)
+  const sinLng = Math.sin(dLng / 2)
+  const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * Overview maps only: the chronologically-first point is presumed to be where
+ * the traveler lives, not a destination worth framing the map around. Once a
+ * long-haul jump (>= LONG_FLIGHT_KM) is crossed, the camera should follow the
+ * trip from there onward — everything from the first post-flight point on.
+ * Trips with no such jump (e.g. multi-city but all within one region) keep
+ * framing every point, unchanged. `points` must be chronologically ordered
+ * (buildMapPoints in OverviewScreen.tsx guarantees this).
+ */
+export function pointsForCamera(points: MapPoint[]): MapPoint[] {
+  for (let i = 1; i < points.length; i++) {
+    if (haversineKm(points[i - 1], points[i]) >= LONG_FLIGHT_KM) {
+      return points.slice(i)
+    }
+  }
+  return points
 }
 
 /**
