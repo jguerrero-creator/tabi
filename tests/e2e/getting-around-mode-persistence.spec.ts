@@ -141,9 +141,12 @@ test('a leg travel mode and its computed/failed result persist across a reload',
 
     // 4. Reload without dismissing — the failure is now persisted, so no fresh Routes API call
     // happens, AND the banner does NOT re-show (this is the literal TABI-200 symptom: the error
-    // used to reappear on every single Overview open).
+    // used to reappear on every single Overview open). A failure already known from a previous
+    // session (as opposed to one just computed this session) now collapses into a compact line
+    // instead of a full card — tapping it re-expands the card, including the mode picker.
     await page.reload()
     await expect(page.getByText('E2E Stay Tokyo → E2E Stay Osaka')).toBeVisible()
+    await page.getByRole('button', { name: /no travel time available, tap to change mode/ }).click()
     await expect(page.getByRole('radio', { name: 'Transit' })).toHaveAttribute('aria-checked', 'true')
     await page.waitForTimeout(1000)
     await expect(

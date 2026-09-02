@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { TravelModePicker } from '../../components/ui/TravelModePicker'
 import { Spinner } from '../../components/ui/Spinner'
 import { localDateKey, zonedTimeToUtc } from '../../lib/datetime'
@@ -51,6 +51,36 @@ export function TripLegsSection({
     return new Map(blocks.map((block) => [legKey(block.fromReservationId, block.toReservationId), block]))
   }, [reservations, legs])
 
+  // TABI collapse: legs needing attention (no mode picked, or a picked mode that failed to
+  // compute) surface first so they're not buried among legs that already have a valid travel
+  // time — a stable partition, not a new secondary sort, so relative order within each group
+  // stays exactly what buildTripLegs/useTripLegs already produced.
+  const orderedLegs = useMemo(() => {
+    const needsAttention: TripLeg[] = []
+    const resolved: TripLeg[] = []
+    for (const leg of legs) {
+      if (needsAttentionLeg(leg)) needsAttention.push(leg)
+      else resolved.push(leg)
+    }
+    return [...needsAttention, ...resolved]
+  }, [legs])
+
+  // Legs whose failed-mode compact line has been tapped open back into the full card —
+  // session-local UI state only, not persisted (TABI-200's persisted mode/dismiss state is untouched).
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+  // A failure the user just triggered by picking a mode this session (leg.justComputed) stays
+  // as a full card so the result of that action — the banner, the dismiss control — is visible
+  // right away; only a failure already known from a previous session collapses on load.
+  const isExpanded = (leg: TripLeg, key: string) => leg.justComputed || expandedKeys.has(key)
+
   const byId = new Map(reservations.map((reservation) => [reservation.id, reservation]))
 
   if (!loading && !error && legs.length === 0) return null
@@ -76,10 +106,25 @@ export function TripLegsSection({
 
       {!loading && !error && (
         <ul className="space-y-2">
-          {legs.map((leg) => {
+          {orderedLegs.map((leg) => {
             const from = byId.get(leg.fromReservationId)
             const to = byId.get(leg.toReservationId)
             const key = legKey(leg.fromReservationId, leg.toReservationId)
+
+            if (failedModeLeg(leg) && !isExpanded(leg, key)) {
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(key)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-500 hover:bg-slate-50"
+                  >
+                    {strings.tripLegs.noInfoCompact(from?.name ?? '—', to?.name ?? '—')}
+                  </button>
+                </li>
+              )
+            }
+
             const freeBlock = freeTimeByLeg.get(key)
             const quickAddPayload = buildQuickAddPayload(leg, from, to, trip)
             return (
@@ -158,6 +203,16 @@ function formatLeg(durationSeconds: number | null, distanceMeters: number | null
 /** TRAIN is TRANSIT narrowed to rail (see api/travel-time.ts) — both hit the same no-route gap. */
 function isTransitMode(mode: TravelMode): boolean {
   return mode === 'TRANSIT' || mode === 'TRAIN'
+}
+
+/** A mode was picked but produced no usable result — no route, no origin, or a fetch error (useTripLegs). */
+function failedModeLeg(leg: TripLeg): boolean {
+  return leg.mode !== null && leg.durationSeconds === null
+}
+
+/** No mode picked yet, or a picked mode that failed — either way the user still has something to do here. */
+function needsAttentionLeg(leg: TripLeg): boolean {
+  return leg.mode === null || failedModeLeg(leg)
 }
 
 /**
