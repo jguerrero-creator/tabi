@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { AdvancedMarker, Map, useMap } from '@vis.gl/react-google-maps'
 import type { MapPoint } from '../../components/ui/MiniMap'
-import { MapTrace, MiniMap } from '../../components/ui/MiniMap'
+import { mapCameraFor, MapTrace, MiniMap } from '../../components/ui/MiniMap'
 import { MapErrorBoundary } from '../../components/ui/MapErrorBoundary'
 import { Spinner } from '../../components/ui/Spinner'
 import { mapId, mapsApiKey } from '../../lib/googleMaps'
@@ -88,8 +88,7 @@ export function OverviewMap({ points }: OverviewMapProps) {
             <Map
               id={FULLSCREEN_MAP_ID}
               mapId={mapId}
-              defaultCenter={centerOf(points)}
-              defaultZoom={11}
+              {...mapCameraFor(points, 11, 48)}
               gestureHandling="greedy"
               onIdle={(event) => {
                 if (showTouristPlaces) loadTouristPlaces(event.map)
@@ -135,12 +134,6 @@ export function OverviewMap({ points }: OverviewMapProps) {
       )}
     </div>
   )
-}
-
-function centerOf(points: MapPoint[]) {
-  const lat = points.reduce((sum, point) => sum + point.lat, 0) / points.length
-  const lng = points.reduce((sum, point) => sum + point.lng, 0) / points.length
-  return { lat, lng }
 }
 
 const EARTH_RADIUS_METERS = 6371000

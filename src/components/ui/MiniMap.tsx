@@ -30,23 +30,42 @@ export function MiniMap({ points, className = '', heightClassName = 'h-40' }: Mi
     )
   }
 
-  const center = points.length === 2 ? midpoint(points[0], points[1]) : points[0]
-
   return (
     <div className={`${heightClassName} w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
       <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-        <Map
-          mapId={mapId}
-          defaultCenter={center}
-          defaultZoom={points.length === 2 ? 10 : 14}
-          gestureHandling="cooperative"
-          disableDefaultUI
-        >
+        <Map mapId={mapId} {...mapCameraFor(points, 14, 24)} gestureHandling="cooperative" disableDefaultUI>
           <MapTrace points={points} />
         </Map>
       </MapErrorBoundary>
     </div>
   )
+}
+
+export type MapCamera =
+  | { defaultCenter: google.maps.LatLngLiteral; defaultZoom: number }
+  | { defaultBounds: google.maps.LatLngBoundsLiteral & { padding: number } }
+
+/**
+ * Bugfix (Bugs DB: "centerOf(points) calcule probablement une moyenne naïve
+ * lat/lng"): a naive lat/lng average — or, for 3+ points, just picking the
+ * first one — can land nowhere near any actual point once they're far apart
+ * (e.g. Tokyo + Brussels averages to rural Kazakhstan). fitBounds via
+ * defaultBounds always frames every point correctly regardless of spread.
+ * Single-point trips keep a fixed zoom, since fitBounds on a zero-area bounds
+ * doesn't produce a meaningful "wide view" zoom level.
+ */
+export function mapCameraFor(points: MapPoint[], singlePointZoom: number, padding: number): MapCamera {
+  const lats = points.map((point) => point.lat)
+  const lngs = points.map((point) => point.lng)
+  const north = Math.max(...lats)
+  const south = Math.min(...lats)
+  const east = Math.max(...lngs)
+  const west = Math.min(...lngs)
+
+  if (north === south && east === west) {
+    return { defaultCenter: { lat: north, lng: east }, defaultZoom: singlePointZoom }
+  }
+  return { defaultBounds: { north, south, east, west, padding } }
 }
 
 /**
@@ -77,8 +96,4 @@ export function MapTrace({ points }: { points: MapPoint[] }) {
       ))}
     </>
   )
-}
-
-function midpoint(a: MapPoint, b: MapPoint) {
-  return { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 }
 }
