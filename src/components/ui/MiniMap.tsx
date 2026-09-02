@@ -78,6 +78,10 @@ export function mapCameraFor(points: MapPoint[], singlePointZoom: number, paddin
 }
 
 const LONG_FLIGHT_KM = 3000
+// "Same place as home" tolerance for excluding a recurring home point (e.g. a
+// return flight landing at a different airport in the same metro area) — well
+// under LONG_FLIGHT_KM so it can never itself get mistaken for a destination.
+const HOME_PROXIMITY_KM = 150
 const EARTH_RADIUS_KM = 6371
 
 function haversineKm(a: MapPoint, b: MapPoint): number {
@@ -93,19 +97,23 @@ function haversineKm(a: MapPoint, b: MapPoint): number {
 /**
  * Overview maps only: the chronologically-first point is presumed to be where
  * the traveler lives, not a destination worth framing the map around. Once a
- * long-haul jump (>= LONG_FLIGHT_KM) is crossed, the camera should follow the
- * trip from there onward — everything from the first post-flight point on.
- * Trips with no such jump (e.g. multi-city but all within one region) keep
- * framing every point, unchanged. `points` must be chronologically ordered
- * (buildMapPoints in OverviewScreen.tsx guarantees this).
+ * long-haul jump (>= LONG_FLIGHT_KM) from home is found anywhere in the trip,
+ * every point near home is excluded — not just a prefix up to the first jump,
+ * since a round trip revisits home on the way back (e.g. Brussels -> Tokyo ->
+ * Brussels) and a plain prefix-trim would let that return point drag the
+ * camera back out to frame both home and the destination again. Trips with no
+ * such jump (e.g. multi-city but all within one region) keep framing every
+ * point, unchanged. `points` must be chronologically ordered (buildMapPoints
+ * in OverviewScreen.tsx guarantees this).
  */
 export function pointsForCamera(points: MapPoint[]): MapPoint[] {
-  for (let i = 1; i < points.length; i++) {
-    if (haversineKm(points[i - 1], points[i]) >= LONG_FLIGHT_KM) {
-      return points.slice(i)
-    }
-  }
-  return points
+  if (points.length === 0) return points
+  const home = points[0]
+  const hasLongFlight = points.some((point) => haversineKm(home, point) >= LONG_FLIGHT_KM)
+  if (!hasLongFlight) return points
+
+  const awayFromHome = points.filter((point) => haversineKm(home, point) > HOME_PROXIMITY_KM)
+  return awayFromHome.length > 0 ? awayFromHome : points
 }
 
 /**

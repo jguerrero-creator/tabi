@@ -89,6 +89,55 @@ test('Overview map skips the pre-flight "home" point and frames the post-flight 
   }
 })
 
+// Bugs DB follow-up: a round trip (Brussels -> Tokyo -> Brussels) still showed the
+// whole map, because the original fix only trimmed the *prefix* before the first
+// long-haul jump — a later return-to-home point survived the trim and dragged
+// fitBounds back out to frame both continents. pointsForCamera() now excludes any
+// point near home by proximity, wherever it falls in the sequence.
+test('Overview map excludes home even when it recurs (round trip: Brussels -> Tokyo -> Brussels)', async ({
+  page,
+  registerTrip,
+}) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({ organizer_id: user.id, name: `E2E round-trip ${runId}`, start_date: null, end_date: null, currency: 'USD' })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
+
+  try {
+    const { error: reservationError } = await client.from('reservations').insert([
+      reservation(trip.id, 'Brussels-depart', 50.8503, 4.3517, '2026-09-08T06:00:00.000Z', '2026-09-08T08:00:00.000Z'),
+      reservation(trip.id, 'Tokyo', 35.6762, 139.6503, '2026-09-10T06:00:00.000Z', '2026-09-15T06:00:00.000Z'),
+      reservation(trip.id, 'Brussels-return', 50.8503, 4.3517, '2026-09-17T06:00:00.000Z', '2026-09-17T08:00:00.000Z'),
+    ])
+    if (reservationError) throw reservationError
+
+    await page.goto(`/trips/${trip.id}`)
+    await expect(page.getByRole('heading', { name: 'Trip' })).toBeVisible()
+
+    const normalMap = page.getByTestId('map').first()
+    await expect(normalMap).toBeVisible()
+    await expect(normalMap.getByTitle('Tokyo')).toBeVisible()
+    await expect(normalMap.getByTitle('Brussels-depart')).not.toBeVisible()
+    await expect(normalMap.getByTitle('Brussels-return')).not.toBeVisible()
+  } finally {
+    await client.from('reservations').delete().eq('trip_id', trip.id)
+    await client.from('trips').delete().eq('id', trip.id)
+  }
+})
+
 test('Overview map still frames both points when no long-haul flight is involved (Tokyo -> Kyoto)', async ({
   page,
   registerTrip,
