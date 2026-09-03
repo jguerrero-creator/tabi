@@ -26,11 +26,20 @@ export function DesktopSidebar({ tripId }: DesktopSidebarProps) {
 
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6 lg:flex">
-      <div className="mb-6 min-w-0">
-        <h1 className="truncate text-lg font-semibold text-slate-900">{trip?.name ?? strings.overview.title}</h1>
-        {trip && formatTripDateRange(trip.start_date, trip.end_date) && (
-          <p className="truncate text-xs text-slate-500">{formatTripDateRange(trip.start_date, trip.end_date)}</p>
-        )}
+      <div className="mb-6 flex items-center gap-3">
+        <Link
+          to="/"
+          aria-label={strings.common.back}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+        >
+          ←
+        </Link>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold text-slate-900">{trip?.name ?? strings.overview.title}</h1>
+          {trip && formatTripDateRange(trip.start_date, trip.end_date) && (
+            <p className="truncate text-xs text-slate-500">{formatTripDateRange(trip.start_date, trip.end_date)}</p>
+          )}
+        </div>
       </div>
 
       <div className="mb-6 flex rounded-full border border-slate-200 bg-slate-50 p-1">
@@ -79,10 +88,6 @@ export function DesktopSidebar({ tripId }: DesktopSidebarProps) {
           )
         })}
       </nav>
-
-      <Link to="/" className="mt-6 text-sm font-medium text-slate-500 hover:text-slate-700">
-        ← {strings.sidebar.allTrips}
-      </Link>
     </aside>
   )
 }

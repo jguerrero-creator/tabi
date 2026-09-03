@@ -208,9 +208,6 @@ export const strings = {
     budget: 'Budget',
     souvenirs: 'Souvenirs',
   },
-  sidebar: {
-    allTrips: 'All trips',
-  },
   travelMode: {
     DRIVE: 'Drive',
     WALK: 'Walk',
