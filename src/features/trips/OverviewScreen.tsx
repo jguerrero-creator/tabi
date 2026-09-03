@@ -289,17 +289,6 @@ export function OverviewScreen() {
                 </div>
 
                 <div className="space-y-5 lg:order-1">
-                  <TripLegsSection
-                    reservations={reservations}
-                    legs={legs}
-                    loading={legsLoading}
-                    error={legsError}
-                    trip={trip}
-                    onModeChange={setLegMode}
-                    onDismissError={dismissLegError}
-                    onQuickAddTransport={setLegQuickAdd}
-                  />
-
                   <section>
                     <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {strings.overview.needsAttentionTitle}
@@ -347,6 +336,17 @@ export function OverviewScreen() {
                       </ul>
                     )}
                   </section>
+
+                  <TripLegsSection
+                    reservations={reservations}
+                    legs={legs}
+                    loading={legsLoading}
+                    error={legsError}
+                    trip={trip}
+                    onModeChange={setLegMode}
+                    onDismissError={dismissLegError}
+                    onQuickAddTransport={setLegQuickAdd}
+                  />
 
                   <RemindersSection onCreate={createReminder} />
                 </div>
