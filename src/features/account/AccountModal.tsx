@@ -4,7 +4,7 @@ import { FormSheet } from '../../components/ui/FormSheet'
 import { Spinner } from '../../components/ui/Spinner'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
-import { supabase } from '../../lib/supabase'
+import { ensureAnonSession, supabase } from '../../lib/supabase'
 import { showSavedToast } from '../../lib/toast'
 
 type Mode = 'loading' | 'signed-in' | 'create' | 'login'
@@ -29,6 +29,7 @@ export function AccountModal({ onClose }: AccountModalProps) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [code, setCode] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
+  const [resetSent, setResetSent] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +63,7 @@ export function AccountModal({ onClose }: AccountModalProps) {
     setConfirmPassword('')
     setCode('')
     setLoginPassword('')
+    setResetSent(false)
     if (prefillEmail !== undefined) setEmail(prefillEmail)
   }
 
@@ -198,6 +200,53 @@ export function AccountModal({ onClose }: AccountModalProps) {
     window.location.href = '/'
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) return
+
+    setSubmitting(true)
+    setError(null)
+    // redirectTo must be an allow-listed origin in Supabase's Auth > URL
+    // Configuration (production URL + localhost for local testing) — the
+    // click lands here and App.tsx's onAuthStateChange listener catches the
+    // resulting PASSWORD_RECOVERY event regardless of which route it hits.
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    })
+    setSubmitting(false)
+
+    if (resetError) {
+      logClientError('AccountModal.handleForgotPassword', resetError)
+      setError(strings.account.errorGeneric)
+      return
+    }
+
+    setResetSent(true)
+  }
+
+  async function handleSignOut() {
+    setSubmitting(true)
+    setError(null)
+    const { error: signOutError } = await supabase.auth.signOut()
+
+    if (signOutError) {
+      logClientError('AccountModal.handleSignOut', signOutError)
+      setSubmitting(false)
+      setError(strings.account.errorGeneric)
+      return
+    }
+
+    // Signing out never touches trips/reservations — they stay owned by the
+    // real account's user id and reappear on the next log-in. The app just
+    // shouldn't be left fully unauthenticated, so re-establish an anonymous
+    // session (same as a fresh first visit) before reloading.
+    try {
+      await ensureAnonSession()
+    } catch (err) {
+      logClientError('AccountModal.handleSignOut.ensureAnonSession', err)
+    }
+    window.location.href = '/'
+  }
+
   if (mode === 'loading') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -207,12 +256,18 @@ export function AccountModal({ onClose }: AccountModalProps) {
   }
 
   if (mode === 'signed-in') {
+    const message = error
+      ? `${strings.account.signedInAs} ${signedInEmail}. ${strings.account.signedInHint} ${error}`
+      : `${strings.account.signedInAs} ${signedInEmail}. ${strings.account.signedInHint}`
     return (
       <ConfirmDialog
         title={strings.account.accountCta}
-        message={`${strings.account.signedInAs} ${signedInEmail}. ${strings.account.signedInHint}`}
+        message={message}
         confirmLabel={strings.account.close}
         onConfirm={onClose}
+        secondaryLabel={strings.account.signOutCta}
+        onSecondary={handleSignOut}
+        confirming={submitting}
       />
     )
   }
@@ -257,6 +312,15 @@ export function AccountModal({ onClose }: AccountModalProps) {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
           />
         </div>
+        <button
+          type="button"
+          onClick={handleForgotPassword}
+          disabled={submitting || !email.trim()}
+          className="text-sm text-teal-700 underline hover:text-teal-800 disabled:opacity-50"
+        >
+          {strings.account.forgotPasswordCta}
+        </button>
+        {resetSent && <p className="text-sm text-slate-600">{strings.account.resetSentBody(email)}</p>}
         <button
           type="button"
           onClick={() => switchMode('create')}

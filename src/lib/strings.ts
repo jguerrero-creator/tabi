@@ -143,6 +143,14 @@ export const strings = {
     logInTitle: 'Log in',
     logInCta: 'Log in',
     errorInvalidCredentials: 'Incorrect email or password.',
+    forgotPasswordCta: 'Forgot password?',
+    resetSentBody: (email: string) => `We sent a password reset link to ${email}.`,
+    // Signed-in-as state
+    signOutCta: 'Sign out',
+    // Password recovery (from a reset-password email link)
+    recoveryTitle: 'Set a new password',
+    recoveryIntro: 'Choose a new password for your account.',
+    passwordUpdatedToast: 'Password updated',
   },
   sections: {
     upcoming: 'Upcoming',
