@@ -97,6 +97,53 @@ export const strings = {
     cancelCta: 'Cancel',
     errorGeneric: 'Could not delete this trip. Please try again.',
   },
+  account: {
+    accountCta: 'Account',
+    cancel: 'Cancel',
+    // Signed-in-as state (already a real, non-anonymous user)
+    signedInAs: 'Signed in as',
+    signedInHint: 'This account works from any device — log in with this email to see your trips anywhere.',
+    close: 'Close',
+    // Mode toggle
+    switchToLogIn: 'Already have an account? Log in',
+    switchToCreate: 'Need an account? Create one',
+    // Create — step "details"
+    createTitle: 'Create an account',
+    createIntro: 'Add an email and password so you can log in from any device — your trips stay exactly as they are.',
+    emailLabel: 'Email',
+    emailPlaceholder: 'you@example.com',
+    passwordLabel: 'Password',
+    confirmPasswordLabel: 'Confirm password',
+    continueCta: 'Continue',
+    errorPasswordMismatch: "Passwords don't match.",
+    errorPasswordTooShort: 'Password must be at least 8 characters.',
+    errorEmailExists: 'This email is already registered.',
+    errorEmailExistsLogInLink: 'Log in instead',
+    errorManualLinkingDisabled: "Account upgrades aren't enabled on this server yet. Please try again later.",
+    errorGeneric: 'Something went wrong. Please try again.',
+    // Create — step "code"
+    codeTitle: 'Check your email',
+    codeIntro: (email: string) => `We sent a 6-digit code to ${email}.`,
+    codeLabel: 'Verification code',
+    codePlaceholder: '123456',
+    verifyCta: 'Verify',
+    resendCta: 'Resend code',
+    errorCodeInvalid: 'That code is incorrect or has expired. Please try again.',
+    errorRateLimited: 'Too many attempts. Please try again in a few minutes.',
+    // Create — step "password-retry"
+    passwordRetryTitle: 'Set your password',
+    passwordRetryIntro: 'Your email is confirmed. Choose a password to finish setting up your account.',
+    saveCta: 'Save',
+    // Create — step "success"
+    successTitle: 'Account created',
+    successBody: (email: string) =>
+      `Your account is set up — your trips are now available by logging in with ${email} on any device.`,
+    savedToast: 'Account created',
+    // Log in
+    logInTitle: 'Log in',
+    logInCta: 'Log in',
+    errorInvalidCredentials: 'Incorrect email or password.',
+  },
   sections: {
     upcoming: 'Upcoming',
     past: 'Past',

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AccountModal } from '../account/AccountModal'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Spinner } from '../../components/ui/Spinner'
@@ -15,6 +16,7 @@ import { useTrips } from './useTrips'
 export function TripsListScreen() {
   const { trips, loading, error, createTrip, updateTrip, deleteTrip } = useTrips()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showAccountModal, setShowAccountModal] = useState(false)
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
   const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -49,16 +51,27 @@ export function TripsListScreen() {
     <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-5xl">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4">
         <h1 className="text-lg font-semibold text-slate-900">{strings.home.title}</h1>
-        <button
-          type="button"
-          onClick={() => setShowCreateModal(true)}
-          disabled={atTripLimit}
-          aria-label={strings.home.createCta}
-          title={atTripLimit ? strings.home.tripLimitReached : undefined}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
-        >
-          +
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAccountModal(true)}
+            aria-label={strings.account.accountCta}
+            title={strings.account.accountCta}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            👤
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            disabled={atTripLimit}
+            aria-label={strings.home.createCta}
+            title={atTripLimit ? strings.home.tripLimitReached : undefined}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
+          >
+            +
+          </button>
+        </div>
       </header>
 
       <main className="px-4 py-4 lg:px-8">
@@ -107,6 +120,8 @@ export function TripsListScreen() {
           </Link>
         </footer>
       </main>
+
+      {showAccountModal && <AccountModal onClose={() => setShowAccountModal(false)} />}
 
       {showCreateModal && (
         <TripFormModal onClose={() => setShowCreateModal(false)} onSubmit={createTrip} />
