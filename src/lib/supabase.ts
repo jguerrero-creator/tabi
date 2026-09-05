@@ -25,6 +25,22 @@ async function fetchWithClockSkewRetry(input: RequestInfo | URL, init?: RequestI
   return fetch(input, init)
 }
 
+// TABI-44: must be read synchronously here, at module load, before createClient()
+// below gets a chance to run any async work. createClient()'s constructor kicks off
+// GoTrueClient's own initialize() immediately (fire-and-forget, not awaited) to detect
+// a session from this same URL hash — and if it finds a `type=recovery` redirect, it
+// fires the PASSWORD_RECOVERY event via a bare `setTimeout(..., 0)`, not synchronously.
+// Meanwhile main.tsx gates the whole React render behind ensureAnonSession(), whose
+// getSession() call awaits that *same* internal init promise — so the render (and thus
+// App.tsx's onAuthStateChange subscription) can unblock and run before that setTimeout's
+// macrotask ever fires. Confirmed directly in the installed @supabase/auth-js source
+// (GoTrueClient.js), not assumed: this is a genuine race, not a hypothetical one.
+// Reading the hash ourselves, synchronously, sidesteps it entirely — nothing here can
+// run later than this line, since nothing has yielded to the event loop yet.
+export const isPasswordRecoveryRedirect =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.hash.replace(/^#/, '')).get('type') === 'recovery'
+
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   global: { fetch: fetchWithClockSkewRetry },
 })

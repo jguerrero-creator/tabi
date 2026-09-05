@@ -15,7 +15,7 @@ import { TransportMenuScreen } from './features/transport/TransportMenuScreen'
 import { OverviewScreen } from './features/trips/OverviewScreen'
 import { TripsListScreen } from './features/trips/TripsListScreen'
 import { MAPS_LIBRARIES, mapsApiKey } from './lib/googleMaps'
-import { supabase } from './lib/supabase'
+import { isPasswordRecoveryRedirect, supabase } from './lib/supabase'
 
 // Single Maps JS API load for the whole app lifecycle (never unmounted, unlike the
 // per-screen/per-modal APIProviders this replaced — those mounted and unmounted on
@@ -23,7 +23,14 @@ import { supabase } from './lib/supabase'
 // which made the Maps loader think its parameters kept changing and spammed
 // "already been loaded with different parameters" on nearly every action).
 export function App() {
-  const [showPasswordRecovery, setShowPasswordRecovery] = useState(false)
+  // Seeded from a synchronous URL-hash check (see isPasswordRecoveryRedirect in
+  // lib/supabase.ts) rather than solely from the event below — the PASSWORD_RECOVERY
+  // event fires via a bare setTimeout(0) inside supabase-js's own init chain, which can
+  // resolve before this component ever mounts and subscribes (confirmed race, not
+  // hypothetical: main.tsx's ensureAnonSession() awaits the same init promise, so
+  // render can start before that timeout fires). The listener below stays as a
+  // backstop for any other path that might emit this event.
+  const [showPasswordRecovery, setShowPasswordRecovery] = useState(isPasswordRecoveryRedirect)
 
   // TABI-44 follow-up: Supabase fires this when the user lands here via a
   // password-reset email link (already authenticated as that user at this
