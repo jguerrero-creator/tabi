@@ -58,6 +58,7 @@ export function BudgetCategoryItemList({ type, reservations, currency, travelerC
               status={reservation.status}
               staySubtype={reservation.stay_subtype}
               transportSubtype={reservation.transport_subtype}
+              transportMode={reservation.transport_mode}
               trailing={costLabel(reservation)}
             />
           ))}

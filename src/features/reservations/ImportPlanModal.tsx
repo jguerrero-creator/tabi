@@ -148,6 +148,7 @@ export function ImportPlanModal({ tripId, onClose, onCreate, onSaveDayLocation }
         requireTypeChoice={prefill.requireTypeChoice}
         defaultStaySubtype={prefill.defaultStaySubtype}
         defaultTransportSubtype={prefill.defaultTransportSubtype}
+        defaultTransportMode={prefill.defaultTransportMode}
         initialName={prefill.initialName}
         initialStartAddressText={prefill.initialStartAddressText}
         initialEndAddressText={prefill.initialEndAddressText}

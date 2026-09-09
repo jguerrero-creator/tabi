@@ -436,6 +436,9 @@ function ReservationCard({
         <ReservationIcon reservation={reservation} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
+        {transportModeCaption(reservation) && (
+          <p className="truncate text-xs font-medium text-slate-500">{transportModeCaption(reservation)}</p>
+        )}
         <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
           <span className="truncate">{reservation.name}</span>
@@ -444,6 +447,19 @@ function ReservationCard({
       </div>
     </SwipeableReservationCard>
   )
+}
+
+/**
+ * Mode prefix shown as a caption above the card's name, kept separate from the stored
+ * `name` value itself (Backlog: mode icon + title prefix) — `name` stays exactly as
+ * TABI-122 derived it (pure route, no drift risk); this is purely a display-time label,
+ * absent whenever transport_mode is unset so older/undetermined reservations render
+ * exactly as before.
+ */
+function transportModeCaption(reservation: Reservation): string | null {
+  if (reservation.type !== 'transport' || reservation.transport_subtype !== 'point_to_point') return null
+  if (!reservation.transport_mode) return null
+  return strings.addReservation.transportModes[reservation.transport_mode]
 }
 
 /** How far (px) the card slides to reveal the note action on a touch swipe. */
@@ -601,7 +617,11 @@ function InTransitCard({ reservation }: { reservation: Reservation }) {
         <ReservationIcon reservation={reservation} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium text-slate-500">{strings.planning.inTransit}</p>
+        <p className="truncate text-xs font-medium text-slate-500">
+          {transportModeCaption(reservation)
+            ? `${strings.planning.inTransit} · ${transportModeCaption(reservation)}`
+            : strings.planning.inTransit}
+        </p>
         <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
           <span className="truncate">{reservation.name}</span>

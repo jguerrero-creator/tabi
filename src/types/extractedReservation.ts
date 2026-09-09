@@ -1,4 +1,4 @@
-import type { ReservationType, StaySubtype, TransportSubtype } from './reservation'
+import type { ReservationType, StaySubtype, TransportMode, TransportSubtype } from './reservation'
 
 // Mirrors api/extract-reservation.ts's response shape (TABI-8). Duplicated rather than
 // imported: api/ isn't covered by any tsconfig project reference shared with src/, so there's
@@ -7,6 +7,7 @@ export interface ExtractedReservation {
   type: ReservationType | null
   staySubtype: StaySubtype | null
   transportSubtype: TransportSubtype | null
+  transportMode: TransportMode | null
   name: string | null
   startAddress: string | null
   endAddress: string | null

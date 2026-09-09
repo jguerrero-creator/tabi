@@ -1,11 +1,12 @@
 import type { ExtractedReservation } from '../../types/extractedReservation'
-import type { ReservationType, StaySubtype, TransportSubtype } from '../../types/reservation'
+import type { ReservationType, StaySubtype, TransportMode, TransportSubtype } from '../../types/reservation'
 
 export interface ExtractedReservationPrefill {
   defaultType: ReservationType
   requireTypeChoice: boolean
   defaultStaySubtype: StaySubtype
   defaultTransportSubtype: TransportSubtype
+  defaultTransportMode: TransportMode | null
   initialName: string | null
   initialStartAddressText: string | null
   initialEndAddressText: string | null
@@ -42,6 +43,7 @@ export function mapExtractedReservation(
     requireTypeChoice: extracted.type === null,
     defaultStaySubtype: extracted.staySubtype ?? 'hotel',
     defaultTransportSubtype: extracted.transportSubtype ?? 'point_to_point',
+    defaultTransportMode: extracted.transportMode,
     initialName: extracted.name,
     initialStartAddressText: extracted.startAddress,
     initialEndAddressText: extracted.endAddress,

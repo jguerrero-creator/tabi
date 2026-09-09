@@ -50,6 +50,7 @@ export function QuickAddModal({ tripId, onClose, onCreate }: QuickAddModalProps)
         requireTypeChoice={prefill.requireTypeChoice}
         defaultStaySubtype={prefill.defaultStaySubtype}
         defaultTransportSubtype={prefill.defaultTransportSubtype}
+        defaultTransportMode={prefill.defaultTransportMode}
         initialName={prefill.initialName}
         initialStartAddressText={prefill.initialStartAddressText}
         initialEndAddressText={prefill.initialEndAddressText}

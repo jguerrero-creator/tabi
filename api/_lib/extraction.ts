@@ -23,6 +23,7 @@ export const ExtractedReservationSchema = z.object({
   type: z.enum(['stay', 'transport', 'activity']).nullable(),
   staySubtype: z.enum(['hotel', 'camping', 'airbnb', 'ryokan', 'other']).nullable(),
   transportSubtype: z.enum(['point_to_point', 'at_disposal']).nullable(),
+  transportMode: z.enum(['flight', 'train', 'bus', 'ferry', 'car', 'other']).nullable(),
   name: z.string().nullable(),
   startAddress: z.string().nullable(),
   endAddress: z.string().nullable(),
@@ -48,7 +49,9 @@ Extract only facts explicitly present in the document. Never infer or invent a v
 
 If the document describes one journey made of multiple connected legs (a connecting flight, a train/transfer to the departure airport or station, a layover), extract it as a single reservation spanning the whole journey: startDateTime is the first leg's departure and endDateTime is the final leg's arrival at the traveler's actual destination — not an intermediate connection point. If the document contains more than one separate journey (for example an outbound trip and a separate return trip), extract only the first one chronologically.
 
-startAddress and endAddress: for a point-to-point Transport booking (flight/train/bus), startAddress is the departure location and endAddress is the arrival location — always extract both when the document states them. For a Stay or Activity, or a Transport at-disposal (vehicle rental) booking, there is only one location; put it in startAddress and leave endAddress null.`
+startAddress and endAddress: for a point-to-point Transport booking (flight/train/bus), startAddress is the departure location and endAddress is the arrival location — always extract both when the document states them. For a Stay or Activity, or a Transport at-disposal (vehicle rental) booking, there is only one location; put it in startAddress and leave endAddress null.
+
+transportMode: only for a point-to-point Transport booking, classify the vehicle as flight/train/bus/ferry/car/other when the document clearly indicates it (an airline name, flight number, or "boarding pass" clearly means flight; a rail operator or "platform" clearly means train; a booked car/taxi/rideshare transfer means car; etc.). Never guess from weak or absent signals — if the document doesn't make the mode clear, leave transportMode null. This field never applies to Stay, Activity, or at-disposal Transport (vehicle rental) — leave it null for those.`
 
 const EXTRACT_TOOL = {
   name: EXTRACT_TOOL_NAME,
@@ -63,6 +66,11 @@ const EXTRACT_TOOL = {
       },
       transportSubtype: {
         anyOf: [{ type: 'string', enum: ['point_to_point', 'at_disposal'] }, { type: 'null' }],
+      },
+      transportMode: {
+        anyOf: [{ type: 'string', enum: ['flight', 'train', 'bus', 'ferry', 'car', 'other'] }, { type: 'null' }],
+        description:
+          'Point-to-point Transport vehicle type, only when clearly stated/evident in the document (e.g. an airline/flight number, a rail operator). Null if not determinable — never guessed. Always null for Stay, Activity, or at-disposal Transport.',
       },
       name: { anyOf: [{ type: 'string' }, { type: 'null' }] },
       startAddress: {
@@ -95,6 +103,7 @@ const EXTRACT_TOOL = {
       'type',
       'staySubtype',
       'transportSubtype',
+      'transportMode',
       'name',
       'startAddress',
       'endAddress',

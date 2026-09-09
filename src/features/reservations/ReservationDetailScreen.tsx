@@ -33,7 +33,7 @@ import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
-import type { Reservation, ReservationStatus } from '../../types/reservation'
+import type { Reservation, ReservationStatus, TransportMode } from '../../types/reservation'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
 import { checkClosedAtPlannedTime, WEEKDAY_NAMES } from './closedOnDay'
@@ -152,6 +152,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [priceAmount, setPriceAmount] = useState(reservation.price_amount?.toString() ?? '')
   const [confirmationNumber, setConfirmationNumber] = useState(reservation.confirmation_number ?? '')
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(reservation.stay_parking_included)
+  const [transportMode, setTransportMode] = useState<TransportMode | null>(reservation.transport_mode)
   const [checkInDeadline, setCheckInDeadline] = useState(reservation.stay_check_in_deadline?.slice(0, 5) ?? '')
   // TABI-144: check-in/check-out time may be a standard default (see AddReservationModal) —
   // editable here, with the original snapshot kept to detect an actual edit before clearing
@@ -485,6 +486,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             stay_check_in_deadline: checkInDeadline || null,
           }
         : {}),
+      ...(isAutoNamedTransport ? { transport_mode: transportMode } : {}),
       ...stayDatePatch,
       ...activityDatePatch,
       ...transportDatePatch,
@@ -667,6 +669,14 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
               </Field>
+            )}
+            {isAutoNamedTransport && (
+              <div>
+                <p className="mb-1 text-sm font-medium text-slate-700">
+                  {strings.addReservation.transportModeLabel}
+                </p>
+                <TransportModePicker value={transportMode} onChange={setTransportMode} />
+              </div>
             )}
             {reservation.type === 'stay' && (
               <div className="flex gap-3">
@@ -1209,6 +1219,52 @@ function DurationField({
         />
       </div>
     </fieldset>
+  )
+}
+
+function TransportModePicker({
+  value,
+  onChange,
+}: {
+  value: TransportMode | null
+  onChange: (mode: TransportMode | null) => void
+}) {
+  const options: TransportMode[] = ['flight', 'train', 'bus', 'ferry', 'car', 'other']
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === null}
+        onClick={() => onChange(null)}
+        className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+          value === null
+            ? 'border-teal-600 bg-teal-50 text-teal-700'
+            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        {strings.addReservation.transportModeUnset}
+      </button>
+      {options.map((mode) => {
+        const selected = mode === value
+        return (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(mode)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.transportModes[mode]}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

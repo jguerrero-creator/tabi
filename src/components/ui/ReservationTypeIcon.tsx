@@ -1,4 +1,4 @@
-import type { ReservationType, StaySubtype, TransportSubtype } from '../../types/reservation'
+import type { ReservationType, StaySubtype, TransportMode, TransportSubtype } from '../../types/reservation'
 
 /**
  * Type-identity colors (TABI-217) — distinct from the 3-state booking-status
@@ -118,6 +118,7 @@ interface ReservationIconInput {
   type: ReservationType
   stay_subtype?: StaySubtype | null
   transport_subtype?: TransportSubtype | null
+  transport_mode?: TransportMode | null
 }
 
 /** Single place picking the right glyph for a reservation, sub-type included (TABI-130). */
@@ -134,7 +135,70 @@ export function ReservationIcon({
   if (reservation.type === 'transport' && reservation.transport_subtype === 'at_disposal') {
     return <VehicleRentalIcon className={className} />
   }
+  if (reservation.type === 'transport' && reservation.transport_subtype === 'point_to_point') {
+    return <TransportModeIcon mode={reservation.transport_mode} className={className} />
+  }
   return <ReservationTypeIcon type={reservation.type} className={className} />
+}
+
+/**
+ * Distinct glyphs per point-to-point Transport mode (Backlog: mode icon + title prefix) —
+ * 'flight'/'other'/unset all fall back to the existing generic transport glyph (already a
+ * paper-plane silhouette, so "flight" needs no new path of its own). 'car' reuses
+ * VehicleRentalIcon's car glyph — a car is a car whether it's a one-off ride or a rental.
+ */
+const transportModePaths: Partial<Record<TransportMode, React.ReactNode>> = {
+  train: (
+    <>
+      <path d="M6 3h12a2 2 0 0 1 2 2v9a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V5a2 2 0 0 1 2-2Z" />
+      <path d="M4 11h16" />
+      <circle cx="8.5" cy="15" r="1.1" />
+      <circle cx="15.5" cy="15" r="1.1" />
+      <path d="M8 21l-2 2M16 21l2 2" />
+    </>
+  ),
+  bus: (
+    <>
+      <path d="M4 16V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9" />
+      <path d="M4 16a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1" />
+      <path d="M4 11h16" />
+      <path d="M8 5v6M16 5v6" />
+      <circle cx="7.5" cy="17.5" r="1.4" />
+      <circle cx="16.5" cy="17.5" r="1.4" />
+    </>
+  ),
+  ferry: (
+    <>
+      <path d="M3 15h18l-2 4.2a2 2 0 0 1-1.8 1.1H6.8A2 2 0 0 1 5 19.2Z" />
+      <path d="M5 15V9l7-4 7 4v6" />
+      <path d="M12 5v10" />
+    </>
+  ),
+}
+
+export function TransportModeIcon({
+  mode,
+  className = 'h-5 w-5',
+}: {
+  mode?: TransportMode | null
+  className?: string
+}) {
+  if (mode === 'car') return <VehicleRentalIcon className={className} />
+  const path = (mode && transportModePaths[mode]) || paths.transport
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {path}
+    </svg>
+  )
 }
 
 /** Distinct from the generic `transport` (plane) icon — flags a day covered by an at-disposal vehicle rental (TABI-143). */

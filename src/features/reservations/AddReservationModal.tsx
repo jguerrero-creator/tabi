@@ -32,6 +32,7 @@ import type {
   ReservationStatus,
   ReservationType,
   StaySubtype,
+  TransportMode,
   TransportSubtype,
 } from '../../types/reservation'
 import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationGaps'
@@ -88,6 +89,7 @@ const END_DATE_FIELD_ID = 'reservation-date-end'
 const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
 const transportSubtypeOptions: TransportSubtype[] = ['point_to_point', 'at_disposal']
+const transportModeOptions: TransportMode[] = ['flight', 'train', 'bus', 'ferry', 'car', 'other']
 
 interface AddReservationModalProps {
   tripId: string
@@ -127,6 +129,8 @@ interface AddReservationModalProps {
    * geocoding path — exactly as if the user had typed them in by hand.
    */
   defaultStaySubtype?: StaySubtype
+  /** Backlog: mode-specific icon + title prefix — null/omitted means unset, a valid state never guessed by extraction. */
+  defaultTransportMode?: TransportMode | null
   initialName?: string | null
   initialStartAddressText?: string | null
   initialEndAddressText?: string | null
@@ -156,6 +160,7 @@ export function AddReservationModal({
   defaultType = 'stay',
   defaultStaySubtype = 'hotel',
   defaultTransportSubtype = 'point_to_point',
+  defaultTransportMode = null,
   requireTypeChoice = false,
   initialStartAt = null,
   initialTimezone = null,
@@ -190,6 +195,7 @@ export function AddReservationModal({
   // TABI-121: Transport's own sub-type (point-to-point vs vehicle rental), symmetric to Stay's —
   // shown whenever the main type is Transport, not folded into the main type selector.
   const [transportSubtype, setTransportSubtype] = useState<TransportSubtype>(defaultTransportSubtype)
+  const [transportMode, setTransportMode] = useState<TransportMode | null>(defaultTransportMode)
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
   const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState(initialName ?? '')
@@ -557,6 +563,7 @@ export function AddReservationModal({
     const input: Omit<NewReservation, 'trip_id'> = {
       type: option.dbType,
       transport_subtype: option.transportSubtype,
+      transport_mode: isPointToPoint ? transportMode : null,
       stay_subtype: option.dbType === 'stay' ? staySubtype : null,
       stay_parking_included: option.dbType === 'stay' ? parkingIncluded : null,
       stay_check_in_deadline: option.dbType === 'stay' && checkInDeadline ? checkInDeadline : null,
@@ -786,6 +793,15 @@ export function AddReservationModal({
               {strings.addReservation.transportSubtypeLabel}
             </p>
             <TransportSubtypePicker value={transportSubtype} onChange={setTransportSubtype} />
+          </div>
+        )}
+
+        {isPointToPoint && (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">
+              {strings.addReservation.transportModeLabel}
+            </p>
+            <TransportModePicker value={transportMode} onChange={setTransportMode} />
           </div>
         )}
 
@@ -1144,6 +1160,51 @@ function TransportSubtypePicker({
             }`}
           >
             {strings.addReservation.transportSubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function TransportModePicker({
+  value,
+  onChange,
+}: {
+  value: TransportMode | null
+  onChange: (mode: TransportMode | null) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === null}
+        onClick={() => onChange(null)}
+        className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+          value === null
+            ? 'border-teal-600 bg-teal-50 text-teal-700'
+            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        {strings.addReservation.transportModeUnset}
+      </button>
+      {transportModeOptions.map((mode) => {
+        const selected = mode === value
+        return (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(mode)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.transportModes[mode]}
           </button>
         )
       })}

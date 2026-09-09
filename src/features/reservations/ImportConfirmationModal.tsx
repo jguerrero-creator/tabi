@@ -199,6 +199,7 @@ export function ImportConfirmationModal({ tripId, onClose, onCreate }: ImportCon
         requireTypeChoice={prefill.requireTypeChoice}
         defaultStaySubtype={prefill.defaultStaySubtype}
         defaultTransportSubtype={prefill.defaultTransportSubtype}
+        defaultTransportMode={prefill.defaultTransportMode}
         initialName={prefill.initialName}
         initialStartAddressText={prefill.initialStartAddressText}
         initialEndAddressText={prefill.initialEndAddressText}
