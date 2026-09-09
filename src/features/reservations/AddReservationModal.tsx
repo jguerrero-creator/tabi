@@ -151,6 +151,14 @@ interface AddReservationModalProps {
    * this only skips the "user notices the form and clicks Save" step for a clean, unambiguous item.
    */
   autoSubmit?: boolean
+  /**
+   * Bug (Bugs db): TABI-203's suggested name (e.g. "New Hotel") must not apply on the
+   * fallback manual-entry form shown after a failed AI extraction — a blank Name field
+   * is the honest signal that extraction didn't run/succeed. Defaults to true (genuine
+   * fresh manual "Add reservation" keeps the suggestion); the failed-extraction fallback
+   * callers pass false.
+   */
+  suggestDefaultName?: boolean
   onClose: () => void
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
 }
@@ -180,6 +188,7 @@ export function AddReservationModal({
   initialNote = null,
   extractionNotice = false,
   autoSubmit = false,
+  suggestDefaultName = true,
   onClose,
   onCreate,
 }: AddReservationModalProps) {
@@ -288,7 +297,7 @@ export function AddReservationModal({
   // instead of leaving the field blank, re-suggesting whenever the type/sub-type changes —
   // but only until the user actually types their own name in the field.
   useEffect(() => {
-    if (nameManuallyEdited || isAutoNamedTransport) return
+    if (nameManuallyEdited || isAutoNamedTransport || !suggestDefaultName) return
     const subtypeLabel =
       option.dbType === 'stay'
         ? strings.addReservation.staySubtypes[staySubtype]
@@ -298,7 +307,7 @@ export function AddReservationModal({
             ? strings.reservationType.activity
             : null
     if (subtypeLabel) setName(strings.addReservation.suggestedName(subtypeLabel))
-  }, [nameManuallyEdited, isAutoNamedTransport, option.dbType, isAtDisposal, staySubtype])
+  }, [nameManuallyEdited, isAutoNamedTransport, suggestDefaultName, option.dbType, isAtDisposal, staySubtype])
   // Overlap detection (TABI-108) only applies within Stay or within Transport — fetch
   // whichever type is currently selected so switching type mid-form checks against the right set.
   const { reservations: sameTypeReservations, loading: sameTypeLoading } = useReservationsByType(

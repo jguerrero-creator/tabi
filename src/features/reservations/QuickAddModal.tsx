@@ -69,7 +69,15 @@ export function QuickAddModal({ tripId, onClose, onCreate }: QuickAddModalProps)
   }
 
   if (manualFallback) {
-    return <AddReservationModal tripId={tripId} requireTypeChoice onClose={onClose} onCreate={onCreate} />
+    return (
+      <AddReservationModal
+        tripId={tripId}
+        requireTypeChoice
+        suggestDefaultName={false}
+        onClose={onClose}
+        onCreate={onCreate}
+      />
+    )
   }
 
   return (
