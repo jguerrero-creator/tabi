@@ -45,6 +45,15 @@ export function BudgetCategoryItemList({ type, reservations, currency, travelerC
     )
   }
 
+  if (reservations.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-1 bg-slate-50 px-4 py-6 text-center">
+        <p className="text-sm font-medium text-slate-900">{strings.budgetCategoryDetail.emptyTitle}</p>
+        <p className="text-xs text-slate-500">{strings.budgetCategoryDetail.emptyBody}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3 bg-slate-50 px-2 py-3">
       {groups.map((group) => (

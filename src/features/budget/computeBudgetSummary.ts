@@ -1,3 +1,4 @@
+import { logClientError } from '../../lib/logError'
 import type { BudgetCategory } from '../../types/budgetCategory'
 import type { Reservation, ReservationType } from '../../types/reservation'
 
@@ -26,11 +27,27 @@ export function computeBudgetSummary(
   reservations: Reservation[],
   budgetCategories: BudgetCategory[] = [],
   travelerCount = 1,
+  tripCurrency?: string,
 ): BudgetSummary {
   const categories = categoryOrder.map((type): BudgetCategoryTotal => {
     const items = reservations.filter((reservation) => reservation.type === type)
     const priced = items.filter((reservation) => reservation.price_amount != null)
-    const total = priced.reduce((sum, reservation) => sum + reservation.price_amount!, 0)
+    // Summary math assumes single-currency reservations (price_currency is force-set to
+    // trip.currency at save time). Guard it anyway so a future save-path change can't
+    // silently mis-sum mixed currencies.
+    const summable = priced.filter((reservation) => {
+      const mismatched = tripCurrency != null && reservation.price_currency !== tripCurrency
+      if (mismatched) {
+        logClientError(
+          'computeBudgetSummary',
+          new Error(
+            `Reservation ${reservation.id} has price_currency "${reservation.price_currency}", expected trip currency "${tripCurrency}" — excluded from budget total`,
+          ),
+        )
+      }
+      return !mismatched
+    })
+    const total = summable.reduce((sum, reservation) => sum + reservation.price_amount!, 0)
     return {
       type,
       total,

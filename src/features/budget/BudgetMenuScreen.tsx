@@ -47,8 +47,8 @@ export function BudgetMenuScreen() {
   const loading = tripLoading || reservationsLoading || categoriesLoading
   const error = tripError || reservationsError || categoriesError
   const summary = useMemo(
-    () => computeBudgetSummary(reservations, budgetCategories, trip?.traveler_count ?? 1),
-    [reservations, budgetCategories, trip?.traveler_count],
+    () => computeBudgetSummary(reservations, budgetCategories, trip?.traveler_count ?? 1, trip?.currency),
+    [reservations, budgetCategories, trip?.traveler_count, trip?.currency],
   )
   const currency = trip?.currency ?? ''
   const travelerCount = trip?.traveler_count ?? 1
