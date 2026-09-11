@@ -159,7 +159,7 @@ export const strings = {
   status: {
     booked: 'Booked',
     to_book: 'To book',
-    decide_later: 'Decide later',
+    decide_later: 'On location',
   },
   reservationType: {
     stay: 'Stay',
@@ -613,7 +613,7 @@ export const strings = {
         list: [
           'Account data: an anonymous session identifier created automatically the first time you open Tabi, used to associate your trips with your device/browser. This version does not require or collect an email address or password.',
           'Trip data: trip name, destination countries, start/end dates, currency, and any notes you add.',
-          "Reservation data: booking type, name, price, status (Booked / To book / Decide later), notes, and — for stay, transport, and activity items — addresses, place names, geographic coordinates (latitude/longitude), and time zone, resolved via Google's Geocoding and Time Zone APIs. For stay items specifically: whether parking is included and a check-in deadline, if you enter them.",
+          "Reservation data: booking type, name, price, status (Booked / To book / On location), notes, and — for stay, transport, and activity items — addresses, place names, geographic coordinates (latitude/longitude), and time zone, resolved via Google's Geocoding and Time Zone APIs. For stay items specifically: whether parking is included and a check-in deadline, if you enter them.",
           'Planned-location data: for days without a fixed booking, an address or area you enter, geocoded the same way.',
           'Reminders: any reminder titles and dates you create.',
         ],
