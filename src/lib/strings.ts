@@ -255,6 +255,13 @@ export const strings = {
     tonightsStay: "Tonight's stay",
     inTransit: 'In transit',
   },
+  planningDrag: {
+    handleLabel: 'Press and hold to move',
+    doesNotFit: "Doesn't fit in this free time slot.",
+    invalidRange: "Can't move here.",
+    overlapRejected: (name: string) => `Would overlap with "${name}".`,
+    saveError: 'Could not move this reservation. Please try again.',
+  },
   menus: {
     overview: 'Overview',
     stay: 'Stay',

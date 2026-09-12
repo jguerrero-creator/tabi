@@ -19,6 +19,8 @@ import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
 import { ReservationNotePopup } from './ReservationNotePopup'
+import { dropTargetProps, hitTestDayTab, hitTestDropTarget, type FreeDropTarget } from '../../lib/reservationMove'
+import { useReservationDrag } from './reservationDrag'
 import type { DayLocationInput } from './useTripDayLocations'
 
 /** Where a free block's "+ Add" should center its nearby-places search (TABI-24). */
@@ -109,6 +111,13 @@ interface DayColumnProps {
    * as ReservationDetailScreen's Notes field, just reachable without leaving Planning.
    */
   onSaveReservationNote?: (reservationId: string, note: string) => Promise<void>
+  /**
+   * Drag-and-drop only (TABI-195): mobile shows a single DayColumn at a time
+   * (DayTabs picks which), so a cross-day drop needs hovering a day-tab pill
+   * to switch which day is mounted before the finger can reach that day's own
+   * free-time blocks to drop into — same callback DayTabs itself uses.
+   */
+  onHoverDaySwitch?: (dayKey: string) => void
   className?: string
 }
 
@@ -129,6 +138,7 @@ export function DayColumn({
   onClearDayNote,
   onAddAtFreeBlock,
   onSaveReservationNote,
+  onHoverDaySwitch,
   className,
 }: DayColumnProps) {
   const [noteReservation, setNoteReservation] = useState<Reservation | null>(null)
@@ -209,7 +219,7 @@ export function DayColumn({
                 {entry.time ? formatTimeInZone(entry.time, entry.timezone ?? dayTimezone) : ''}
               </span>
               <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
-              {renderEntry(entry, handleAddAtFreeBlock, onSaveReservationNote && setNoteReservation)}
+              {renderEntry(entry, dayKey, handleAddAtFreeBlock, onSaveReservationNote && setNoteReservation, onHoverDaySwitch)}
             </li>
           ))}
         </ul>
@@ -370,12 +380,14 @@ function buildRailEntries(
 
 function renderEntry(
   entry: RailEntry,
+  dayKey: string,
   onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void,
   onOpenNote?: (reservation: Reservation) => void,
+  onHoverDaySwitch?: (dayKey: string) => void,
 ) {
   switch (entry.kind) {
     case 'reservation':
-      return <ReservationCard reservation={entry.reservation} onOpenNote={onOpenNote} />
+      return <ReservationCard reservation={entry.reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch} />
     case 'stay':
       return <TonightStayCard reservation={entry.reservation} />
     case 'transit':
@@ -403,33 +415,67 @@ function renderEntry(
       )
     case 'free':
       return (
-        <div className="flex items-center justify-between gap-2 rounded-xl border-2 border-dashed border-teal-200 bg-white px-4 py-3 text-sm font-medium text-teal-700">
-          <span>{strings.planning.freeTime(formatDuration(entry.durationSeconds))}</span>
-          {onAddAtFreeBlock && (
-            <button
-              type="button"
-              onClick={() => onAddAtFreeBlock({ startAt: entry.time, timezone: entry.timezone })}
-              aria-label={strings.planning.addAtFreeTime}
-              title={strings.planning.addAtFreeTime}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 hover:bg-teal-200"
-            >
-              +
-            </button>
-          )}
-        </div>
+        <FreeTimeBlockRow dayKey={dayKey} entry={entry} onAddAtFreeBlock={onAddAtFreeBlock} />
       )
   }
+}
+
+/**
+ * A free-time rail entry, doubling as a Planning drag-and-drop target
+ * (TABI-195) — every free block, including the whole-day fallback shown on an
+ * empty day, is a place a dragged reservation can be dropped, since it's
+ * already exactly "time this reservation could occupy without conflicting
+ * with anything else." Highlights while a drag is in progress and this
+ * specific block is the one currently under the finger.
+ */
+function FreeTimeBlockRow({
+  dayKey,
+  entry,
+  onAddAtFreeBlock,
+}: {
+  dayKey: string
+  entry: RailEntry & { kind: 'free' }
+  onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void
+}) {
+  const { activeDropKey } = useReservationDrag()
+  const dropId = `${dayKey}:${entry.key}`
+  const target: FreeDropTarget = { dayKey, time: entry.time, timezone: entry.timezone, durationSeconds: entry.durationSeconds }
+  const isActiveDrop = activeDropKey === dropId
+
+  return (
+    <div
+      {...dropTargetProps(dropId, target)}
+      className={`flex items-center justify-between gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm font-medium transition-colors ${
+        isActiveDrop ? 'border-teal-500 bg-teal-100 text-teal-800' : 'border-teal-200 bg-white text-teal-700'
+      }`}
+    >
+      <span>{strings.planning.freeTime(formatDuration(entry.durationSeconds))}</span>
+      {onAddAtFreeBlock && (
+        <button
+          type="button"
+          onClick={() => onAddAtFreeBlock({ startAt: entry.time, timezone: entry.timezone })}
+          aria-label={strings.planning.addAtFreeTime}
+          title={strings.planning.addAtFreeTime}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 hover:bg-teal-200"
+        >
+          +
+        </button>
+      )}
+    </div>
+  )
 }
 
 function ReservationCard({
   reservation,
   onOpenNote,
+  onHoverDaySwitch,
 }: {
   reservation: DayItem
   onOpenNote?: (reservation: Reservation) => void
+  onHoverDaySwitch?: (dayKey: string) => void
 }) {
   return (
-    <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote}>
+    <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch}>
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${reservationTypeTextClasses[reservation.type]}`}
       >
@@ -478,16 +524,20 @@ const NOTE_REVEAL_WIDTH = 72
 function SwipeableReservationCard({
   reservation,
   onOpenNote,
+  onHoverDaySwitch,
   children,
 }: {
-  reservation: Reservation
+  reservation: DayItem
   onOpenNote?: (reservation: Reservation) => void
+  onHoverDaySwitch?: (dayKey: string) => void
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [dragX, setDragX] = useState<number | null>(null)
   const startXRef = useRef<number | null>(null)
   const draggingRef = useRef(false)
+  const { session } = useReservationDrag()
+  const isBeingDragged = session?.occurrence.id === reservation.id
 
   function handleTouchStart(event: ReactTouchEvent) {
     startXRef.current = event.touches[0].clientX
@@ -515,12 +565,11 @@ function SwipeableReservationCard({
     }
   }
 
+  const cardClasses = `flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200 ${isBeingDragged ? 'opacity-40' : ''}`
+
   if (!onOpenNote) {
     return (
-      <Link
-        to={`/reservations/${reservation.id}`}
-        className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200"
-      >
+      <Link to={`/reservations/${reservation.id}`} className={cardClasses}>
         {children}
       </Link>
     )
@@ -551,10 +600,11 @@ function SwipeableReservationCard({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        <DragHandle reservation={reservation} onHoverDaySwitch={onHoverDaySwitch} />
         <Link
           to={`/reservations/${reservation.id}`}
           onClick={handleLinkClick}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200 pointer-fine:rounded-r-none"
+          className={`${cardClasses} pointer-fine:rounded-r-none`}
         >
           {children}
         </Link>
@@ -571,6 +621,96 @@ function SwipeableReservationCard({
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * Dedicated drag-and-drop grip (TABI-195), deliberately its own element
+ * separate from the card body: the existing swipe-to-reveal above listens for
+ * a touch starting anywhere on the card and reads horizontal delta
+ * immediately, so a drag trigger sharing that same touch target would need
+ * a long-press-vs-swipe disambiguation race on every touch. A dedicated
+ * handle sidesteps that entirely — dragging only ever starts here, swiping
+ * only ever starts on the card body — while also being the visible "this can
+ * be moved" affordance the swipe gesture never had.
+ */
+function DragHandle({
+  reservation,
+  onHoverDaySwitch,
+}: {
+  reservation: DayItem
+  onHoverDaySwitch?: (dayKey: string) => void
+}) {
+  const { beginDrag, updateDrag, endDrag, cancelDrag } = useReservationDrag()
+  const hoveredDayTabRef = useRef<string | null>(null)
+  const hoverSwitchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function point(event: ReactTouchEvent) {
+    const touch = event.touches[0] ?? event.changedTouches[0]
+    return { x: touch.clientX, y: touch.clientY }
+  }
+
+  function clearHoverSwitch() {
+    if (hoverSwitchTimerRef.current) clearTimeout(hoverSwitchTimerRef.current)
+    hoverSwitchTimerRef.current = null
+    hoveredDayTabRef.current = null
+  }
+
+  function handleTouchStart(event: ReactTouchEvent) {
+    beginDrag(reservation, point(event))
+  }
+
+  function handleTouchMove(event: ReactTouchEvent) {
+    const { x, y } = point(event)
+    updateDrag({ x, y }, hitTestDropTarget(x, y)?.dropId ?? null)
+
+    const dayTab = onHoverDaySwitch ? hitTestDayTab(x, y) : null
+    if (dayTab !== hoveredDayTabRef.current) {
+      clearHoverSwitch()
+      hoveredDayTabRef.current = dayTab
+      if (dayTab && onHoverDaySwitch) {
+        hoverSwitchTimerRef.current = setTimeout(() => onHoverDaySwitch(dayTab), 500)
+      }
+    }
+  }
+
+  function handleTouchEnd(event: ReactTouchEvent) {
+    clearHoverSwitch()
+    const { x, y } = point(event)
+    endDrag(hitTestDropTarget(x, y)?.target ?? null)
+  }
+
+  function handleTouchCancel() {
+    clearHoverSwitch()
+    cancelDrag()
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={strings.planningDrag.handleLabel}
+      title={strings.planningDrag.handleLabel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
+      className="flex w-6 shrink-0 touch-none items-center justify-center self-stretch rounded-l-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing"
+    >
+      <GripIcon className="h-4 w-4" />
+    </button>
+  )
+}
+
+function GripIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <circle cx="9" cy="6" r="1.5" />
+      <circle cx="15" cy="6" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="18" r="1.5" />
+      <circle cx="15" cy="18" r="1.5" />
+    </svg>
   )
 }
 

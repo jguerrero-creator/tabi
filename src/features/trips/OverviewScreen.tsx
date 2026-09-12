@@ -44,6 +44,7 @@ export function OverviewScreen() {
     error: reservationsError,
     refetch: refetchReservations,
     updateReservationNote,
+    updateReservationDates,
   } = useTripReservations(tripId ?? '')
   const { createReservation } = useCreateReservation(tripId ?? '')
   // TABI-54: "+" on a free-time timeline block opens the shared Add sheet
@@ -371,6 +372,7 @@ export function OverviewScreen() {
                   onClearDayNote={clearDayNote}
                   onAddAtFreeBlock={handleAddAtFreeBlock}
                   onSaveReservationNote={updateReservationNote}
+                  onMoveReservation={updateReservationDates}
                 />
               </div>
             )}

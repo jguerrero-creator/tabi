@@ -64,6 +64,7 @@ export function DayTabs({ days, selectedKey, onSelect }: DayTabsProps) {
             <button
               key={day.key}
               type="button"
+              data-day-tab={day.key}
               onClick={() => onSelect(day.key)}
               className={`flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
                 selected

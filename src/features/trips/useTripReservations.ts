@@ -42,5 +42,24 @@ export function useTripReservations(tripId: string) {
     setReservations((prev) => prev.map((r) => (r.id === reservationId ? data : r)))
   }, [])
 
-  return { reservations, loading, error, refetch: fetchReservations, updateReservationNote }
+  /** TABI-195: Planning drag-and-drop — moves a reservation to a validated new start/end. */
+  const updateReservationDates = useCallback(
+    async (
+      reservationId: string,
+      dates: { start_at: string; start_timezone: string | null; end_at: string | null; end_timezone: string | null },
+    ): Promise<void> => {
+      const { data, error: updateError } = await supabase
+        .from('reservations')
+        .update(dates)
+        .eq('id', reservationId)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+      setReservations((prev) => prev.map((r) => (r.id === reservationId ? data : r)))
+    },
+    [],
+  )
+
+  return { reservations, loading, error, refetch: fetchReservations, updateReservationNote, updateReservationDates }
 }

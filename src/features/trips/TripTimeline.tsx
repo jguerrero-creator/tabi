@@ -18,6 +18,8 @@ import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
 import { DayColumn, type DayItem, type FreeBlockAddPayload } from './DayColumn'
 import { DayTabs, type DayTab } from './DayTabs'
+import { ReservationDragProvider } from './reservationDrag'
+import type { MoveCandidateDates } from '../../lib/reservationMove'
 import type { TripLeg } from './useTripLegs'
 import type { DayLocationInput } from './useTripDayLocations'
 
@@ -54,6 +56,8 @@ interface TripTimelineProps {
   onAddAtFreeBlock?: (input: FreeBlockAddPayload) => void
   /** Quick note access on a reservation card (Backlog: Planning slide-to-reveal / icon-strip). */
   onSaveReservationNote?: (reservationId: string, note: string) => Promise<void>
+  /** Drag-and-drop reschedule on a reservation card (TABI-195). */
+  onMoveReservation: (reservationId: string, dates: MoveCandidateDates) => Promise<void>
 }
 
 type DayEdges = { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }
@@ -82,6 +86,7 @@ export function TripTimeline({
   onClearDayNote,
   onAddAtFreeBlock,
   onSaveReservationNote,
+  onMoveReservation,
 }: TripTimelineProps) {
   const dayOccurrences = buildDayOccurrences(reservations)
   const groups = groupByDate(
@@ -119,7 +124,7 @@ export function TripTimeline({
   const dayEdgesByKey = trip ? buildDayEdgesByKey(trip, days, groupsByKey, reservations) : new Map<string, DayEdges>()
 
   return (
-    <>
+    <ReservationDragProvider reservations={reservations} onMove={onMoveReservation}>
       <div data-testid="mobile-day-view" className="space-y-4 lg:hidden">
         <DayTabs days={days} selectedKey={effectiveSelectedKey} onSelect={onSelectDay} />
         <DayColumn
@@ -139,6 +144,7 @@ export function TripTimeline({
           dayLocation={dayLocationsByKey.get(effectiveSelectedKey)}
           onAddAtFreeBlock={onAddAtFreeBlock}
           onSaveReservationNote={onSaveReservationNote}
+          onHoverDaySwitch={onSelectDay}
           onSaveDayLocation={
             effectiveSelectedKey === UNSCHEDULED_KEY
               ? undefined
@@ -188,7 +194,7 @@ export function TripTimeline({
           />
         ))}
       </div>
-    </>
+    </ReservationDragProvider>
   )
 }
 
