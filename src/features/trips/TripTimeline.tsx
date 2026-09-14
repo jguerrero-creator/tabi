@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { groupByDate, UNSCHEDULED_KEY, type DateGroup } from '../../components/menu/groupByDate'
 import { buildDayOccurrences } from '../../lib/dayOccurrences'
 import { formatDayPillLabel, localTimeZone } from '../../lib/datetime'
@@ -39,8 +40,10 @@ interface TripTimelineProps {
    * Controlled by the parent (URL search param) rather than owned locally
    * (TABI-131) — so leaving Planning for a reservation's detail screen and
    * pressing back restores the same day instead of resetting to the first.
-   * Only exercised by the mobile single-day view — the desktop carousel
-   * (TABI-149) shows every day at once, so it has no selection to restore.
+   * Drives the mobile single-day view's selection directly; the desktop
+   * carousel (TABI-149) shows every day at once so it has no equivalent
+   * "selection", but it does read this once on mount to restore horizontal
+   * scroll position, and writes back to it as the user scrolls.
    */
   selectedDayKey: string | null
   onSelectDay: (key: string) => void
@@ -109,6 +112,67 @@ export function TripTimeline({
 
   const days = buildDayTabs(trip, groups, groupsByKey, reservations)
 
+  // Desktop has no day-tab concept (CLAUDE.md #18 — "Planning shows 3 days
+  // side by side instead of tabs"): "the selected day" there is just
+  // whichever column is scrolled into view in this overflow-x-auto
+  // carousel, tracked nowhere. TABI-131's `?day=` URL persistence only ever
+  // drove the mobile DayTabs below; a remount (e.g. navigating to a
+  // reservation's detail screen — a separate top-level route — and back)
+  // always reset the carousel to scrollLeft 0, silently losing whatever day
+  // the user had actually scrolled to (Bugs DB regression report). These
+  // hooks must run unconditionally before the empty-state early return
+  // below, so they're declared here rather than next to the JSX that uses
+  // them.
+  const desktopCarouselRef = useRef<HTMLDivElement>(null)
+  const initialDayKeyRef = useRef(selectedDayKey)
+  const hasRestoredDesktopScrollRef = useRef(false)
+  const daysRef = useRef(days)
+  daysRef.current = days
+
+  useEffect(() => {
+    const el = desktopCarouselRef.current
+    if (!el) return
+    // scrollWidth / count rather than a hardcoded column width — approximates
+    // one column's on-screen pitch (width + gap) however the carousel is
+    // actually styled, instead of hardcoding Tailwind's current w-80/gap-4.
+    const columnPitch = () => el.scrollWidth / Math.max(1, daysRef.current.length)
+
+    if (!hasRestoredDesktopScrollRef.current) {
+      hasRestoredDesktopScrollRef.current = true
+      const targetKey = initialDayKeyRef.current
+      const index = targetKey ? daysRef.current.findIndex((day) => day.key === targetKey) : -1
+      if (index > 0) el.scrollLeft = index * columnPitch()
+    }
+
+    // Keeps the URL's `day` param in sync as the user scrolls, so the
+    // *next* remount has something to restore from above. Debounced to
+    // settle after scrolling stops rather than firing (and writing history)
+    // on every frame.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const handleScroll = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        const currentDays = daysRef.current
+        const index = Math.max(
+          0,
+          Math.min(currentDays.length - 1, Math.round(el.scrollLeft / columnPitch())),
+        )
+        const day = currentDays[index]
+        if (day) onSelectDay(day.key)
+      }, 150)
+    }
+    el.addEventListener('scroll', handleScroll)
+    return () => {
+      el.removeEventListener('scroll', handleScroll)
+      if (debounceTimer) clearTimeout(debounceTimer)
+    }
+    // Re-run when the carousel div actually mounts (days.length flips from
+    // 0, below the empty-state return) or `onSelectDay` changes identity —
+    // not on every `days` recompute, which would tear down and reattach the
+    // listener on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days.length === 0, onSelectDay])
+
   if (days.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-16 text-center">
@@ -165,7 +229,11 @@ export function TripTimeline({
         />
       </div>
 
-      <div className="hidden gap-4 overflow-x-auto pb-4 lg:flex lg:snap-x lg:snap-mandatory">
+      <div
+        ref={desktopCarouselRef}
+        data-testid="desktop-day-carousel"
+        className="hidden gap-4 overflow-x-auto pb-4 lg:flex lg:snap-x lg:snap-mandatory"
+      >
         {days.map((day) => (
           <DayColumn
             key={day.key}
