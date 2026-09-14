@@ -42,7 +42,13 @@ export function MiniMap({ points, className = '', heightClassName = 'h-40', came
   return (
     <div className={`${heightClassName} w-full overflow-hidden rounded-xl border border-slate-200 ${className}`}>
       <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-        <Map mapId={mapId} {...mapCameraFor(cameraPoints ?? points, 14, 24)} gestureHandling="cooperative" disableDefaultUI>
+        <Map
+          mapId={mapId}
+          reuseMaps
+          {...mapCameraFor(cameraPoints ?? points, 14, 24)}
+          gestureHandling="cooperative"
+          disableDefaultUI
+        >
           <MapTrace points={points} />
         </Map>
       </MapErrorBoundary>

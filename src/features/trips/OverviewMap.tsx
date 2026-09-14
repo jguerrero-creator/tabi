@@ -88,6 +88,7 @@ export function OverviewMap({ points }: OverviewMapProps) {
             <Map
               id={FULLSCREEN_MAP_ID}
               mapId={mapId}
+              reuseMaps
               {...mapCameraFor(pointsForCamera(points), 11, 48)}
               gestureHandling="greedy"
               onIdle={(event) => {

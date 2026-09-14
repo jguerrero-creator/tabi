@@ -109,7 +109,14 @@ export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: Nea
 
           {mapsApiKey && (
             <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-              <Map mapId={mapId} defaultCenter={center} defaultZoom={15} gestureHandling="greedy" disableDefaultUI>
+              <Map
+                mapId={mapId}
+                reuseMaps
+                defaultCenter={center}
+                defaultZoom={15}
+                gestureHandling="greedy"
+                disableDefaultUI
+              >
                 <AdvancedMarker position={center}>
                   <span className="block h-3 w-3 rounded-full border-2 border-white bg-slate-500 shadow-sm" />
                 </AdvancedMarker>
