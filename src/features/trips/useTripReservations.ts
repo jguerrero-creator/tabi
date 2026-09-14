@@ -11,19 +11,28 @@ export function useTripReservations(tripId: string) {
   const fetchReservations = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const { data, error: fetchError } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('trip_id', tripId)
-      .order('start_at', { ascending: true })
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('start_at', { ascending: true })
 
-    if (fetchError) {
-      logClientError('useTripReservations.fetchReservations', fetchError)
-      setError(fetchError.message)
-    } else {
-      setReservations(data ?? [])
+      if (fetchError) {
+        logClientError('useTripReservations.fetchReservations', fetchError)
+        setError(fetchError.message)
+      } else {
+        setReservations(data ?? [])
+      }
+    } catch (err) {
+      // A rejected fetch (network blip, not a resolved PostgREST error) would
+      // otherwise skip setLoading(false) below entirely, stranding the screen
+      // on its loading spinner forever with no visible error.
+      logClientError('useTripReservations.fetchReservations', err)
+      setError('Failed to fetch')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [tripId])
 
   useEffect(() => {
