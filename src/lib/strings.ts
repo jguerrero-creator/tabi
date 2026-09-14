@@ -254,6 +254,11 @@ export const strings = {
     dayPillJetlag: 'Probable jetlag day',
     tonightsStay: "Tonight's stay",
     inTransit: 'In transit',
+    /** Corner badge on a Stay icon's check-in/check-out occurrence (Backlog: Icône Stay sur Planning —
+     * garder toujours la couleur de statut, badge in/out) — the icon itself always shows booking
+     * status color now, so this is the only remaining check-in/check-out signal on the icon. */
+    stayCheckInBadge: 'in',
+    stayCheckOutBadge: 'out',
   },
   planningDrag: {
     handleLabel: 'Press and hold to move',

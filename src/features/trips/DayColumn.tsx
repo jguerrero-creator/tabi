@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, t
 import { Link } from 'react-router-dom'
 import { ReservationIcon, reservationTypeTextClasses } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
-import { statusDotClasses } from '../../components/menu/statusDotClasses'
+import { statusDotClasses, statusTextClasses } from '../../components/menu/statusDotClasses'
 import { formatLocalTimeZoneLabel, formatTimeInZone, localTimeZone } from '../../lib/datetime'
 import { formatDuration } from '../../lib/duration'
 import {
@@ -474,12 +474,20 @@ function ReservationCard({
   onOpenNote?: (reservation: Reservation) => void
   onHoverDaySwitch?: (dayKey: string) => void
 }) {
+  const stayBadge = stayOccurrenceBadge(reservation)
   return (
     <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch}>
       <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${reservationTypeTextClasses[reservation.type]}`}
+        className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${
+          reservation.type === 'stay' ? statusTextClasses[reservation.status] : reservationTypeTextClasses[reservation.type]
+        }`}
       >
         <ReservationIcon reservation={reservation} className="h-4 w-4" />
+        {stayBadge && (
+          <span className="absolute -bottom-1 -right-1 rounded-full bg-white px-1 text-[8px] font-bold leading-[14px] text-slate-500 ring-1 ring-slate-200">
+            {stayBadge}
+          </span>
+        )}
       </span>
       <div className="min-w-0 flex-1">
         {transportModeCaption(reservation) && (
@@ -716,8 +724,11 @@ function GripIcon({ className }: { className?: string }) {
 
 /**
  * Untimed "tonight's accommodation" block (TABI-158) — visually distinct from
- * `ReservationCard`'s solid, timed style (dashed border, muted icon, a
- * caption above the name) so it never reads as a scheduled event.
+ * `ReservationCard`'s solid, timed style (dashed border, a caption above the
+ * name) so it never reads as a scheduled event. The icon still shows the
+ * stay's normal booking-status color (Backlog: Icône Stay sur Planning) —
+ * only the dashed card border/caption signal "not a timed event today," not
+ * a grayed-out icon.
  */
 function TonightStayCard({ reservation }: { reservation: Reservation }) {
   const location = reservation.start_place_name ?? reservation.start_city ?? reservation.start_address
@@ -726,7 +737,7 @@ function TonightStayCard({ reservation }: { reservation: Reservation }) {
       to={`/reservations/${reservation.id}`}
       className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 hover:bg-slate-50"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${statusTextClasses[reservation.status]}`}>
         <ReservationIcon reservation={reservation} className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
@@ -782,4 +793,17 @@ function rowLabel(reservation: DayItem): string | null {
   const isEndOccurrence = reservation.isCheckoutOccurrence || reservation.isArrivalOccurrence
   const label = isEndOccurrence ? labels.end : labels.start
   return `${label} · ${formatTimeInZone(reservation.start_at, reservation.start_timezone)}`
+}
+
+/**
+ * "in"/"out" corner badge on a Stay icon's check-in/check-out occurrence (Backlog: Icône
+ * Stay sur Planning — garder toujours la couleur de statut, badge in/out). Replaces the old
+ * signal of coloring the icon on check-in/check-out vs. graying it out on nights in between —
+ * the icon now always shows booking status color (see `ReservationCard`), so this badge is
+ * the only remaining check-in/check-out cue. No badge on `TonightStayCard`'s untimed
+ * in-between-nights block, matching `rowLabel`'s same start/end split above.
+ */
+function stayOccurrenceBadge(reservation: DayItem): string | null {
+  if (reservation.type !== 'stay') return null
+  return reservation.isCheckoutOccurrence ? strings.planning.stayCheckOutBadge : strings.planning.stayCheckInBadge
 }
