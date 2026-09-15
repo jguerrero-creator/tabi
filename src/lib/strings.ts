@@ -235,6 +235,11 @@ export const strings = {
     showTouristPlaces: 'Show tourist places',
     hideTouristPlaces: 'Hide tourist places',
     touristPlacesError: 'Could not load tourist places.',
+    touristPlaceTypeRestaurant: 'Restaurant',
+    touristPlaceTypeCafeBar: 'Café/Bar',
+    touristPlaceTypeAttraction: 'Attraction',
+    touristPlaceTypeMuseum: 'Museum',
+    touristPlacesNoFilterMatch: 'No places match this filter here — try clearing it or panning the map.',
   },
   planning: {
     unscheduledLabel: 'Unscheduled',

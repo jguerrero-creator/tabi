@@ -14,6 +14,11 @@ export interface PlaceSearchResult {
   userRatingsTotal: number | null
   photoRef: string | null
   category: string | null
+  // TABI-30: Google's `types` array, not just `primaryType` — a place's primaryType is
+  // often a narrow subtype (e.g. "italian_restaurant"), while `types` also carries the
+  // broader type ("restaurant") it belongs to, so client-side filtering by broad category
+  // matches consistently regardless of which subtype Google picked as primary.
+  types: string[]
 }
 
 // Validated before mapping — Google's response is external data, never trusted blindly.
@@ -26,6 +31,7 @@ const GooglePlaceSchema = z.object({
   userRatingCount: z.number().nullable().optional(),
   photos: z.array(z.object({ name: z.string() })).optional(),
   primaryType: z.string().nullable().optional(),
+  types: z.array(z.string()).optional(),
 })
 
 export const GoogleSearchResponseSchema = z.object({ places: z.array(GooglePlaceSchema).optional() })
@@ -39,6 +45,7 @@ export const PLACE_FIELD_MASK = [
   'places.userRatingCount',
   'places.photos',
   'places.primaryType',
+  'places.types',
 ].join(',')
 
 // TABI-89: Place Details response shape for regular opening hours — Text/Nearby
@@ -80,5 +87,6 @@ export function mapGooglePlaces(
       userRatingsTotal: place.userRatingCount ?? null,
       photoRef: place.photos?.[0]?.name ?? null,
       category: place.primaryType ?? null,
+      types: place.types ?? [],
     }))
 }

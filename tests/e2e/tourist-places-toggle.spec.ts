@@ -21,6 +21,7 @@ const TOURIST_PLACE_A = {
   userRatingsTotal: 8000,
   photoRef: null,
   category: 'tourist_attraction',
+  types: ['tourist_attraction', 'point_of_interest', 'establishment'],
 }
 const TOURIST_PLACE_B = {
   googlePlaceId: 'ChIJ_fixture_tourist_b',
@@ -32,6 +33,7 @@ const TOURIST_PLACE_B = {
   userRatingsTotal: 500,
   photoRef: null,
   category: 'bar',
+  types: ['bar', 'point_of_interest', 'establishment'],
 }
 
 test('toggling "Show tourist places" queries the tourist mode and renders/clears discover markers', async ({
@@ -111,6 +113,95 @@ test('toggling "Show tourist places" queries the tourist mode and renders/clears
     await page.getByRole('button', { name: 'Hide tourist places' }).click()
     await expect(discoverMarkers).toHaveCount(0)
     await expect(attribution).toBeVisible()
+  } finally {
+    await client.from('reservations').delete().eq('trip_id', trip.id)
+    await client.from('trips').delete().eq('id', trip.id)
+  }
+})
+
+// TABI-30 — filter the tourist-places overlay by type (Restaurant / Café-Bar /
+// Attraction / Museum), same client-side filter-on-already-fetched-results approach
+// as ActivityPlaceSearchModal's "Local gems" filter (TABI-51).
+const TOURIST_PLACE_MUSEUM = {
+  googlePlaceId: 'ChIJ_fixture_tourist_museum',
+  name: 'Edo-Tokyo Museum',
+  formattedAddress: '1 Chome Yokoami, Sumida City, Tokyo, Japan',
+  lat: 35.6966,
+  lng: 139.7961,
+  rating: 4.5,
+  userRatingsTotal: 6000,
+  photoRef: null,
+  category: 'museum',
+  types: ['museum', 'point_of_interest', 'establishment'],
+}
+
+test('the tourist-places type filter narrows markers and clearing it restores all', async ({ page, registerTrip }) => {
+  await page.route('**/api/places-nearby', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', results: [TOURIST_PLACE_A, TOURIST_PLACE_B, TOURIST_PLACE_MUSEUM] }),
+    }),
+  )
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({ organizer_id: user.id, name: `E2E tourist places filter trip ${runId}`, start_date: null, end_date: null, currency: 'USD' })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
+
+  try {
+    const { error: reservationError } = await client.from('reservations').insert({
+      trip_id: trip.id,
+      type: 'stay',
+      stay_subtype: 'hotel',
+      status: 'booked',
+      name: `E2E tourist places filter reservation ${runId}`,
+      start_at: '2026-09-10T06:00:00.000Z',
+      start_timezone: 'Asia/Tokyo',
+      end_at: '2026-09-12T02:00:00.000Z',
+      end_timezone: 'Asia/Tokyo',
+      start_lat: 35.6595,
+      start_lng: 139.7005,
+      start_place_name: 'Shibuya Crossing',
+    })
+    if (reservationError) throw reservationError
+
+    await page.goto(`/trips/${trip.id}`)
+    await expect(page.getByRole('heading', { name: 'Trip' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Expand map' }).click()
+    const fullscreenMap = page.locator('.fixed.inset-0.z-50')
+    await expect(fullscreenMap).toBeVisible()
+
+    const discoverMarkers = fullscreenMap.locator('span.border-sky-500')
+    await page.getByRole('button', { name: 'Show tourist places' }).click()
+    await expect(discoverMarkers).toHaveCount(3)
+
+    await page.getByRole('button', { name: 'Attraction' }).click()
+    await expect(discoverMarkers).toHaveCount(1)
+
+    // Multi-select adds to the filter rather than replacing it.
+    await page.getByRole('button', { name: 'Museum' }).click()
+    await expect(discoverMarkers).toHaveCount(2)
+
+    // Clearing every pill restores the full unfiltered set.
+    await page.getByRole('button', { name: 'Attraction' }).click()
+    await page.getByRole('button', { name: 'Museum' }).click()
+    await expect(discoverMarkers).toHaveCount(3)
   } finally {
     await client.from('reservations').delete().eq('trip_id', trip.id)
     await client.from('trips').delete().eq('id', trip.id)

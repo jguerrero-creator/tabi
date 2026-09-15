@@ -10,6 +10,7 @@ export interface PlaceSearchResult {
   userRatingsTotal: number | null
   photoRef: string | null
   category: string | null
+  types: string[]
 }
 
 export type PlaceSearchBias = { lat: number; lng: number } | { regionCode: string } | null
