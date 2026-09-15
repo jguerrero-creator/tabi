@@ -2,6 +2,7 @@ import { AdvancedMarker, Map } from '@vis.gl/react-google-maps'
 import { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { MapErrorBoundary } from '../../components/ui/MapErrorBoundary'
+import { PlaceAutocompleteField, type PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
 import { Spinner } from '../../components/ui/Spinner'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
 import { mapId, mapsApiKey } from '../../lib/googleMaps'
@@ -25,18 +26,27 @@ interface NearbyPlacesMapModalProps {
 // same ResolvedPlace shape through the same /api/geocode place-id lookup, so it
 // reuses the Activity/Place model exactly. "Enter manually instead" skips straight
 // to the existing TABI-54 blank form, same fallback as the text-search modal.
+//
+// A side list (TABI-24 follow-up) mirrors the map results so comparing options
+// doesn't require clicking every pin, and a "Change location" search lets the
+// user explore a different area on the fly without touching the day's planned
+// location — the automatic centering from the caller is just the starting point,
+// not the only way to steer this screen.
 export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: NearbyPlacesMapModalProps) {
+  const [effectiveCenter, setEffectiveCenter] = useState(center)
   const [results, setResults] = useState<PlaceSearchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<PlaceSearchResult | null>(null)
   const [resolving, setResolving] = useState(false)
+  const [changeLocationText, setChangeLocationText] = useState('')
+  const [changeLocationError, setChangeLocationError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    searchNearbyPlaces(center.lat, center.lng)
+    searchNearbyPlaces(effectiveCenter.lat, effectiveCenter.lng)
       .then((found) => {
         if (cancelled) return
         setResults(found)
@@ -53,7 +63,19 @@ export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: Nea
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center.lat, center.lng])
+  }, [effectiveCenter.lat, effectiveCenter.lng])
+
+  async function handleChangeLocation(selection: PlaceAutocompleteSelection) {
+    setChangeLocationError(null)
+    try {
+      const geocoded = await fetchGeocodeByPlaceId(selection.placeId)
+      setEffectiveCenter({ lat: geocoded.lat, lng: geocoded.lng })
+      setSelected(null)
+    } catch (err) {
+      logClientError('NearbyPlacesMapModal.handleChangeLocation', err)
+      setChangeLocationError(strings.nearbyPlaces.changeLocationError)
+    }
+  }
 
   async function handleAdd() {
     if (!selected) return
@@ -90,58 +112,123 @@ export function NearbyPlacesMapModal({ center, onSelect, onSkip, onCancel }: Nea
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-t-2xl bg-white p-6 sm:rounded-2xl">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">{strings.nearbyPlaces.title}</h2>
+      <div className="flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-t-2xl bg-white p-6 sm:max-w-2xl sm:rounded-2xl">
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">{strings.nearbyPlaces.title}</h2>
 
-        <div className="relative h-72 w-full overflow-hidden rounded-xl border border-slate-200">
-          {loading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-white/70 text-slate-500">
-              <Spinner />
-              <span className="text-sm">{strings.nearbyPlaces.loading}</span>
-            </div>
-          )}
+        <PlaceAutocompleteField
+          id="nearby-places-change-location"
+          label={strings.nearbyPlaces.changeLocationLabel}
+          value={changeLocationText}
+          onTextChange={setChangeLocationText}
+          onPlaceSelect={handleChangeLocation}
+          placeholder={strings.nearbyPlaces.changeLocationPlaceholder}
+          className="mb-3"
+        />
+        {changeLocationError && <p className="mb-3 text-sm text-red-600">{changeLocationError}</p>}
 
-          {!loading && !mapsApiKey && (
-            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
-              {strings.reservationDetail.mapUnavailable}
-            </div>
-          )}
+        {/* Deliberately no flex-1 here: this row's height must come from sm:h-96 itself, not
+            from growing to fill the modal (which has no fixed height of its own — only a
+            max-h cap) — flex-1's flex-basis:0 would otherwise collapse the row to near-zero
+            at the sm+ breakpoint since there's no free space for it to grow into. */}
+        <div className="flex flex-col gap-3 overflow-hidden sm:h-96 sm:flex-row">
+          <div className="relative h-56 w-full flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 sm:h-full sm:w-1/2">
+            {loading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-white/70 text-slate-500">
+                <Spinner />
+                <span className="text-sm">{strings.nearbyPlaces.loading}</span>
+              </div>
+            )}
 
-          {mapsApiKey && (
-            <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
-              <Map
-                mapId={mapId}
-                reuseMaps
-                defaultCenter={center}
-                defaultZoom={15}
-                gestureHandling="greedy"
-                disableDefaultUI
-              >
-                <AdvancedMarker position={center}>
-                  <span className="block h-3 w-3 rounded-full border-2 border-white bg-slate-500 shadow-sm" />
-                </AdvancedMarker>
-                {results.map((result) => (
-                  <AdvancedMarker
-                    key={result.googlePlaceId}
-                    position={{ lat: result.lat, lng: result.lng }}
-                    title={result.name}
-                    onClick={() => setSelected(result)}
-                  >
-                    <span
-                      className={`block h-5 w-5 rounded-full border-2 border-white shadow-sm ${
-                        selected?.googlePlaceId === result.googlePlaceId ? 'bg-teal-700' : 'bg-teal-500'
-                      }`}
-                    />
+            {!loading && !mapsApiKey && (
+              <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                {strings.reservationDetail.mapUnavailable}
+              </div>
+            )}
+
+            {mapsApiKey && (
+              <MapErrorBoundary heightClassName="h-full" className="rounded-none border-0">
+                <Map
+                  key={`${effectiveCenter.lat}-${effectiveCenter.lng}`}
+                  mapId={mapId}
+                  reuseMaps
+                  defaultCenter={effectiveCenter}
+                  defaultZoom={15}
+                  gestureHandling="greedy"
+                  disableDefaultUI
+                >
+                  <AdvancedMarker position={effectiveCenter}>
+                    <span className="block h-3 w-3 rounded-full border-2 border-white bg-slate-500 shadow-sm" />
                   </AdvancedMarker>
-                ))}
-              </Map>
-            </MapErrorBoundary>
-          )}
-        </div>
+                  {results.map((result) => (
+                    <AdvancedMarker
+                      key={result.googlePlaceId}
+                      position={{ lat: result.lat, lng: result.lng }}
+                      title={result.name}
+                      onClick={() => setSelected(result)}
+                    >
+                      <span
+                        className={`block h-5 w-5 rounded-full border-2 border-white shadow-sm ${
+                          selected?.googlePlaceId === result.googlePlaceId ? 'bg-teal-700' : 'bg-teal-500'
+                        }`}
+                      />
+                    </AdvancedMarker>
+                  ))}
+                </Map>
+              </MapErrorBoundary>
+            )}
+          </div>
 
-        {!loading && !error && results.length === 0 && (
-          <p className="py-3 text-center text-sm text-slate-500">{strings.nearbyPlaces.emptyResults}</p>
-        )}
+          <div className="min-h-0 flex-1 overflow-y-auto sm:h-full sm:w-1/2">
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-8 text-slate-500">
+                <Spinner />
+                <span className="text-sm">{strings.nearbyPlaces.loading}</span>
+              </div>
+            )}
+
+            {!loading && !error && results.length === 0 && (
+              <p className="py-3 text-center text-sm text-slate-500">{strings.nearbyPlaces.emptyResults}</p>
+            )}
+
+            {!loading && !error && results.length > 0 && (
+              <div role="listbox" aria-label={strings.nearbyPlaces.listLabel} className="space-y-2">
+                {results.map((result) => (
+                  <button
+                    key={result.googlePlaceId}
+                    type="button"
+                    role="option"
+                    aria-selected={selected?.googlePlaceId === result.googlePlaceId}
+                    onClick={() => setSelected(result)}
+                    className={`flex w-full items-start gap-3 rounded-lg border p-2 text-left transition-colors ${
+                      selected?.googlePlaceId === result.googlePlaceId
+                        ? 'border-teal-600 bg-teal-50'
+                        : 'border-slate-200 hover:border-teal-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    {result.photoRef ? (
+                      <img
+                        src={placePhotoUrl(result.photoRef, 80)}
+                        alt=""
+                        className="h-12 w-12 flex-shrink-0 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 flex-shrink-0 rounded-md bg-slate-100" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900">{result.name}</p>
+                      <p className="truncate text-xs text-slate-500">{result.formattedAddress}</p>
+                      {result.rating !== null && (
+                        <p className="mt-0.5 text-xs font-medium text-amber-700">
+                          {strings.nearbyPlaces.ratingLabel(result.rating, result.userRatingsTotal ?? 0)}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {error && <p className="py-3 text-center text-sm text-red-600">{error}</p>}
 

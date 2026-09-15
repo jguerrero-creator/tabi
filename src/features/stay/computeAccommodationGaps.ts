@@ -67,20 +67,22 @@ export function findActiveStay(dateKey: string, reservations: Reservation[]): Re
 
 /**
  * TABI-24: the contextual location to center a free block's nearby-places search on —
- * the accommodation active that day takes priority, falling back to the day's planned
- * location (TABI-114) if there's no active Stay yet. Deliberately its own precedence,
- * distinct from useTripLegs.resolveCoveredDayAnchor (day-location-first, for a different
- * purpose) and ActivityPlaceSearchModal.computeBias (never consults activeStay at all).
+ * an explicit day-level planned location (TABI-114) takes priority, since the user set
+ * it on purpose (e.g. a Nikko day-trip within a Tokyo-based stay); the accommodation
+ * active that day is only the fallback when no planned location is set. Deliberately
+ * its own precedence, distinct from useTripLegs.resolveCoveredDayAnchor (day-location-
+ * first, for a different purpose) and ActivityPlaceSearchModal.computeBias (never
+ * consults activeStay at all).
  */
 export function resolveContextualLocation(
   activeStay: Reservation | null,
   dayLocation: TripDayLocation | null | undefined,
 ): { lat: number; lng: number } | null {
-  if (activeStay?.start_lat != null && activeStay.start_lng != null) {
-    return { lat: activeStay.start_lat, lng: activeStay.start_lng }
-  }
   if (dayLocation) {
     return { lat: dayLocation.lat, lng: dayLocation.lng }
+  }
+  if (activeStay?.start_lat != null && activeStay.start_lng != null) {
+    return { lat: activeStay.start_lat, lng: activeStay.start_lng }
   }
   return null
 }
