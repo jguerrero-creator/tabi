@@ -72,21 +72,25 @@ export function formatDayPillLabel(dateKey: string): string {
 }
 
 /**
+ * "Mon, Jul 20" label for a single plain calendar date (no time/timezone component) —
+ * anchors to UTC midnight for the same reason as `formatDayPillLabel`.
+ */
+export function formatDateLabel(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)))
+}
+
+/**
  * "Mon, Jul 20 → Wed, Jul 22" label for a plain calendar-date range (no time/timezone
- * component, e.g. an accommodation gap) — anchors to UTC midnight for the same reason as
- * `formatDayPillLabel`.
+ * component, e.g. an accommodation gap).
  */
 export function formatDateRangeLabel(startDate: string, endDate: string): string {
-  const format = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number)
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }).format(new Date(Date.UTC(year, month - 1, day)))
-  }
-  return `${format(startDate)} → ${format(endDate)}`
+  return `${formatDateLabel(startDate)} → ${formatDateLabel(endDate)}`
 }
 
 /** "HH:MM" from a DB `time` column value (already 24h, no timezone conversion needed). */

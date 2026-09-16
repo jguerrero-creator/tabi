@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -500,6 +500,84 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      vehicle_rental_legs: {
+        Row: {
+          arrival_address: string | null
+          arrival_at: string
+          arrival_lat: number
+          arrival_lng: number
+          arrival_place_name: string
+          arrival_timezone: string | null
+          created_at: string
+          date: string
+          departure_address: string | null
+          departure_at: string
+          departure_lat: number
+          departure_lng: number
+          departure_place_name: string
+          departure_timezone: string | null
+          id: string
+          reservation_id: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          arrival_address?: string | null
+          arrival_at: string
+          arrival_lat: number
+          arrival_lng: number
+          arrival_place_name: string
+          arrival_timezone?: string | null
+          created_at?: string
+          date: string
+          departure_address?: string | null
+          departure_at: string
+          departure_lat: number
+          departure_lng: number
+          departure_place_name: string
+          departure_timezone?: string | null
+          id?: string
+          reservation_id: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          arrival_address?: string | null
+          arrival_at?: string
+          arrival_lat?: number
+          arrival_lng?: number
+          arrival_place_name?: string
+          arrival_timezone?: string | null
+          created_at?: string
+          date?: string
+          departure_address?: string | null
+          departure_at?: string
+          departure_lat?: number
+          departure_lng?: number
+          departure_place_name?: string
+          departure_timezone?: string | null
+          id?: string
+          reservation_id?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_rental_legs_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_rental_legs_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

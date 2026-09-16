@@ -41,6 +41,7 @@ import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
+import { VehicleRentalLegsSection } from './VehicleRentalLegsSection'
 
 const STAY_CHECKIN_DATE_FIELD_ID = 'reservation-checkin-date'
 const STAY_CHECKOUT_DATE_FIELD_ID = 'reservation-checkout-date'
@@ -945,6 +946,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               </Button>
             </div>
           </form>
+
+          {isTransportAtDisposal && <VehicleRentalLegsSection reservation={reservation} />}
         </div>
         {candidates && (
           <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
