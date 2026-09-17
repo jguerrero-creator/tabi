@@ -324,6 +324,12 @@ export const strings = {
     errorGeneric: 'Something went wrong. Please try again.',
     loading: 'Loading daily legs…',
     errorLoading: 'Could not load daily legs.',
+    checkingTravelTime: 'Checking travel time…',
+    travelTimeWarningTitle: 'Tight travel time',
+    travelTimeWarningMessage: (estimated: string, planned: string) =>
+      `Google estimates ${estimated} of driving, you planned ${planned} — confirm anyway?`,
+    travelTimeWarningConfirmCta: 'Save anyway',
+    travelTimeWarningCancelCta: 'Go back',
   },
   stayMenu: {
     title: 'Stay',

@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from 'react'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Field } from '../../components/ui/Field'
 import { FormSheet } from '../../components/ui/FormSheet'
 import { MiniMap, type MapPoint } from '../../components/ui/MiniMap'
 import { PlaceAutocompleteField, type PlaceAutocompleteSelection } from '../../components/ui/PlaceAutocompleteField'
-import { dateKeyOverlapsRange, localDateKey, zonedTimeToUtc } from '../../lib/datetime'
+import { dateKeyOverlapsRange, durationHoursMinutes, localDateKey, zonedTimeToUtc } from '../../lib/datetime'
+import { formatDuration } from '../../lib/duration'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
+import { fetchTravelTime } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { LegPlaceInput, VehicleRentalLegInput } from './useVehicleRentalLegs'
 
@@ -30,8 +33,17 @@ export function AddVehicleRentalLegSheet({ reservation, onSave, onClose }: AddVe
   const [arrivalPlace, setArrivalPlace] = useState<LegPlaceInput | null>(null)
   const [arrivalTime, setArrivalTime] = useState('')
   const [geocoding, setGeocoding] = useState(false)
+  const [checkingTravelTime, setCheckingTravelTime] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // TABI-128: set once a fetchTravelTime() check finds the planned slot too short — holds
+  // the already-validated input so "confirm anyway" can save it without re-running the
+  // check, and the specific numbers (estimated vs. planned) to render in the dialog.
+  const [travelTimeWarning, setTravelTimeWarning] = useState<{
+    input: VehicleRentalLegInput
+    estimatedSeconds: number
+    plannedSeconds: number
+  } | null>(null)
 
   async function handleDeparturePlaceSelect({ placeId, placeName }: PlaceAutocompleteSelection) {
     setGeocoding(true)
@@ -92,20 +104,60 @@ export function AddVehicleRentalLegSheet({ reservation, onSave, onClose }: AddVe
       return
     }
 
+    const input: VehicleRentalLegInput = {
+      date,
+      departureTime,
+      departure: departurePlace,
+      arrivalTime,
+      arrival: arrivalPlace,
+    }
+
+    // TABI-128: vehicle rental legs are inherently driving — same Routes API integration
+    // Getting Around/point-to-point Transport already use (fetchTravelTime), just always
+    // DRIVE mode here. A failed/no-route check must never block saving (#5): fall back to
+    // null, same "unknown, not zero" convention useTripLegs.ts already uses for this API.
+    setCheckingTravelTime(true)
+    let estimatedSeconds: number | null = null
+    try {
+      const result = await fetchTravelTime(
+        { lat: departurePlace.lat, lng: departurePlace.lng },
+        { lat: arrivalPlace.lat, lng: arrivalPlace.lng },
+        'DRIVE',
+        departureAt,
+      )
+      estimatedSeconds = result.durationSeconds
+    } catch (err) {
+      logClientError('AddVehicleRentalLegSheet.handleSubmit.fetchTravelTime', err)
+    }
+    setCheckingTravelTime(false)
+
+    if (estimatedSeconds !== null) {
+      const { hours, minutes } = durationHoursMinutes(departureAt, arrivalAt)
+      const plannedSeconds = hours * 3600 + minutes * 60
+      if (estimatedSeconds > plannedSeconds) {
+        setTravelTimeWarning({ input, estimatedSeconds, plannedSeconds })
+        return
+      }
+    }
+
+    await saveLeg(input)
+  }
+
+  async function saveLeg(input: VehicleRentalLegInput) {
     setSaving(true)
     try {
-      await onSave({
-        date,
-        departureTime,
-        departure: departurePlace,
-        arrivalTime,
-        arrival: arrivalPlace,
-      })
+      await onSave(input)
     } catch (err) {
-      logClientError('AddVehicleRentalLegSheet.handleSubmit', err)
+      logClientError('AddVehicleRentalLegSheet.saveLeg', err)
       setError(strings.vehicleRentalLegs.errorGeneric)
       setSaving(false)
     }
+  }
+
+  function handleConfirmSaveAnyway() {
+    const pending = travelTimeWarning
+    setTravelTimeWarning(null)
+    if (pending) saveLeg(pending.input)
   }
 
   // Anchored to 'UTC', not the reservation's own start/end timezone: dateKeyOverlapsRange
@@ -141,8 +193,13 @@ export function AddVehicleRentalLegSheet({ reservation, onSave, onClose }: AddVe
       onClose={onClose}
       cancelLabel={strings.vehicleRentalLegs.cancel}
       submitLabel={strings.vehicleRentalLegs.save}
-      submitting={saving}
-      submitDisabled={geocoding || !date || !departureTime || !arrivalTime || !departurePlace || !arrivalPlace}
+      // `submitting` also disables Cancel (FormSheet's only close path — no backdrop/Escape
+      // dismiss) — must cover checkingTravelTime too, or Cancel mid-check unmounts this sheet
+      // while fetchTravelTime is still in flight, setting state on an unmounted component.
+      submitting={saving || checkingTravelTime}
+      submitDisabled={
+        geocoding || checkingTravelTime || !date || !departureTime || !arrivalTime || !departurePlace || !arrivalPlace
+      }
     >
       <Field label={strings.vehicleRentalLegs.dateLabel}>
         <input
@@ -198,7 +255,25 @@ export function AddVehicleRentalLegSheet({ reservation, onSave, onClose }: AddVe
 
       {points.length > 0 && <MiniMap points={points} />}
       {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
+      {checkingTravelTime && (
+        <p className="text-sm text-slate-500">{strings.vehicleRentalLegs.checkingTravelTime}</p>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {travelTimeWarning && (
+        <ConfirmDialog
+          title={strings.vehicleRentalLegs.travelTimeWarningTitle}
+          message={strings.vehicleRentalLegs.travelTimeWarningMessage(
+            formatDuration(travelTimeWarning.estimatedSeconds),
+            formatDuration(travelTimeWarning.plannedSeconds),
+          )}
+          confirmLabel={strings.vehicleRentalLegs.travelTimeWarningConfirmCta}
+          onConfirm={handleConfirmSaveAnyway}
+          cancelLabel={strings.vehicleRentalLegs.travelTimeWarningCancelCta}
+          onCancel={() => setTravelTimeWarning(null)}
+          confirming={saving}
+        />
+      )}
     </FormSheet>
   )
 }
