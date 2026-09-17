@@ -590,6 +590,12 @@ export const strings = {
     localGemsFilterLabel: '💎 Local gems',
     noFilterMatchTitle: 'No local gems found',
     noFilterMatchBody: 'Try a different search, or clear the filter to see all results.',
+    nlSearchToggleCta: '✨ Describe what you want instead',
+    nlSearchLabel: "Describe what you're looking for",
+    nlSearchPlaceholder: 'e.g. a short hike and an ice cream',
+    nlSearchSubmitCta: 'Search',
+    nlSearchClarificationFallback: "I'm not sure what you're looking for — try being more specific.",
+    aiAccessRequired: "AI search isn't available on your plan.",
   },
   nearbyPlaces: {
     title: 'Nearby places',

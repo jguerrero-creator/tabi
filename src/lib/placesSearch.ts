@@ -20,7 +20,10 @@ export class PlaceSearchFailedError extends Error {}
 // TABI-49: rich Google Places search for the Activities menu's Add flow — distinct
 // from the plain address-autocomplete (PlaceAutocompleteField), which never surfaces
 // rating/photo/category metadata.
-export async function searchPlaces(query: string, bias: PlaceSearchBias): Promise<PlaceSearchResult[]> {
+// TABI-79: `radiusMeters` is optional and only ever passed by the natural-language search flow
+// (a detour radius Claude estimated from the traveler's free-text request) — omitted, the
+// server keeps its original fixed default, so the plain manual search above is unaffected.
+export async function searchPlaces(query: string, bias: PlaceSearchBias, radiusMeters?: number): Promise<PlaceSearchResult[]> {
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
 
@@ -30,7 +33,7 @@ export async function searchPlaces(query: string, bias: PlaceSearchBias): Promis
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify({ query, ...(bias ?? {}) }),
+    body: JSON.stringify({ query, ...(bias ?? {}), ...(radiusMeters ? { radiusMeters } : {}) }),
   })
 
   if (!response.ok) {

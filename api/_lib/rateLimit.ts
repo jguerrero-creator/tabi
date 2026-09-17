@@ -17,6 +17,7 @@ const DAILY_LIMITS = {
   'places-search': 50,
   'places-nearby': 50,
   'place-opening-hours': 50,
+  'nl-places-search': 20,
 } as const
 
 export type RateLimitedEndpoint = keyof typeof DAILY_LIMITS

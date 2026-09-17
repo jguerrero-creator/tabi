@@ -5,9 +5,11 @@ import { Spinner } from '../../components/ui/Spinner'
 import { localDateKey, localTimeZone } from '../../lib/datetime'
 import { fetchGeocodeByPlaceId } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
+import { translateSearchIntent } from '../../lib/nlPlacesSearch'
 import { fetchPlaceOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl, searchPlaces, type PlaceSearchBias, type PlaceSearchResult } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
+import { useProfile } from '../../lib/useProfile'
 import type { ResolvedPlace } from './AddReservationModal'
 import { useTrip } from '../trips/useTrip'
 import { useTripDayLocations } from '../trips/useTripDayLocations'
@@ -34,6 +36,17 @@ function isLocalGem(result: PlaceSearchResult): boolean {
   )
 }
 
+// TABI-79: a multi-intent NL search ("a short hike and an ice cream") runs one Places search
+// per intent — the same place can plausibly come back from more than one of them.
+function dedupeByPlaceId(results: PlaceSearchResult[]): PlaceSearchResult[] {
+  const seen = new Set<string>()
+  return results.filter((result) => {
+    if (seen.has(result.googlePlaceId)) return false
+    seen.add(result.googlePlaceId)
+    return true
+  })
+}
+
 interface ActivityPlaceSearchModalProps {
   tripId: string
   onSelect: (place: ResolvedPlace) => void
@@ -50,6 +63,8 @@ interface ActivityPlaceSearchModalProps {
 export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }: ActivityPlaceSearchModalProps) {
   const { trip } = useTrip(tripId)
   const { locationsByDate } = useTripDayLocations(tripId)
+  const { profile, can } = useProfile()
+  const aiAccessDenied = profile !== null && !can({ feature: 'aiAccess' })
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PlaceSearchResult[]>([])
@@ -58,6 +73,15 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
   const [searched, setSearched] = useState(false)
   const [resolvingPlaceId, setResolvingPlaceId] = useState<string | null>(null)
   const [localGemsFilter, setLocalGemsFilter] = useState<Set<'localGems'>>(new Set())
+
+  // TABI-79: natural-language search — a separate, explicit-submit entry point (not
+  // debounce-as-you-type like the manual search above, per principle #8: AI is
+  // action-triggered, never fired on every keystroke). Shares the results/loading/error
+  // state above so the existing results UI just works unchanged; `clarification` is the one
+  // new bit of state, shown instead of "no results" when Claude couldn't parse a real intent.
+  const [nlExpanded, setNlExpanded] = useState(false)
+  const [nlQuery, setNlQuery] = useState('')
+  const [clarification, setClarification] = useState<string | null>(null)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const requestIdRef = useRef(0)
@@ -78,6 +102,7 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
       setLoading(false)
       setError(null)
       setSearched(false)
+      setClarification(null)
       return
     }
 
@@ -88,6 +113,7 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
     const requestId = ++requestIdRef.current
     setLoading(true)
     setError(null)
+    setClarification(null)
 
     try {
       const bias = computeBias()
@@ -98,6 +124,44 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
     } catch (err) {
       if (requestId !== requestIdRef.current) return
       logClientError('ActivityPlaceSearchModal.runSearch', err)
+      setError(strings.activityPlaceSearch.errorGeneric)
+      setResults([])
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false)
+    }
+  }
+
+  // TABI-79: submitted explicitly (not debounced) — first translates the free-text request
+  // into structured filters via Claude, then feeds each intent into the SAME searchPlaces()
+  // the manual search above uses (no separate Places-calling path). A `matched: false` result
+  // (nonsense/unparseable input) shows `clarification` instead of running any Places search.
+  async function runNlSearch(text: string) {
+    const requestId = ++requestIdRef.current
+    setLoading(true)
+    setError(null)
+    setClarification(null)
+
+    try {
+      const filters = await translateSearchIntent(text)
+      if (requestId !== requestIdRef.current) return
+
+      if (!filters.matched || filters.intents.length === 0) {
+        setResults([])
+        setSearched(true)
+        setClarification(filters.clarification ?? strings.activityPlaceSearch.nlSearchClarificationFallback)
+        return
+      }
+
+      const bias = computeBias()
+      const resultsByIntent = await Promise.all(
+        filters.intents.map((intent) => searchPlaces(intent.searchQuery, bias, intent.radiusMeters)),
+      )
+      if (requestId !== requestIdRef.current) return
+      setResults(dedupeByPlaceId(resultsByIntent.flat()))
+      setSearched(true)
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return
+      logClientError('ActivityPlaceSearchModal.runNlSearch', err)
       setError(strings.activityPlaceSearch.errorGeneric)
       setResults([])
     } finally {
@@ -174,6 +238,41 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
         />
 
+        <button
+          type="button"
+          onClick={() => setNlExpanded((prev) => !prev)}
+          disabled={aiAccessDenied}
+          title={aiAccessDenied ? strings.activityPlaceSearch.aiAccessRequired : undefined}
+          className="mt-2 self-start text-xs font-medium text-teal-700 underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+        >
+          {strings.activityPlaceSearch.nlSearchToggleCta}
+        </button>
+
+        {nlExpanded && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (nlQuery.trim()) runNlSearch(nlQuery.trim())
+            }}
+            className="mt-2 space-y-2"
+          >
+            <label htmlFor="activity-place-nl-search" className="sr-only">
+              {strings.activityPlaceSearch.nlSearchLabel}
+            </label>
+            <textarea
+              id="activity-place-nl-search"
+              value={nlQuery}
+              onChange={(event) => setNlQuery(event.target.value)}
+              placeholder={strings.activityPlaceSearch.nlSearchPlaceholder}
+              rows={2}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            />
+            <Button type="submit" disabled={loading || !nlQuery.trim()}>
+              {strings.activityPlaceSearch.nlSearchSubmitCta}
+            </Button>
+          </form>
+        )}
+
         <div className="mt-3 flex-1 space-y-2">
           {loading && (
             <div className="flex items-center justify-center gap-2 py-8 text-slate-500">
@@ -184,7 +283,11 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
 
           {!loading && error && <p className="py-4 text-center text-sm text-red-600">{error}</p>}
 
-          {!loading && !error && searched && results.length === 0 && (
+          {!loading && !error && clarification && (
+            <p className="py-4 text-center text-sm text-slate-500">{clarification}</p>
+          )}
+
+          {!loading && !error && !clarification && searched && results.length === 0 && (
             <p className="py-4 text-center text-sm text-slate-500">{strings.activityPlaceSearch.emptyResults}</p>
           )}
 

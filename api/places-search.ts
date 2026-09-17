@@ -15,6 +15,10 @@ interface PlacesSearchRequestBody {
   lat?: number
   lng?: number
   regionCode?: string
+  // TABI-79: optional detour radius (meters), currently only ever sent by the NL search flow
+  // (a radius the LLM estimated from the traveler's request) — the plain manual search never
+  // sends this and keeps the original fixed BIAS_RADIUS_METERS behavior unchanged.
+  radiusMeters?: number
 }
 
 export type { PlaceSearchResult }
@@ -23,6 +27,8 @@ type PlacesSearchResponse = { status: 'ok'; results: PlaceSearchResult[] }
 
 const MAX_RESULTS = 8
 const BIAS_RADIUS_METERS = 15000
+const MIN_RADIUS_METERS = 300
+const MAX_RADIUS_METERS = 30000
 
 export const config = { runtime: 'edge' }
 
@@ -60,10 +66,15 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'query is required' }, 400)
   }
 
+  // Server clamps independently, same pattern as places-nearby.ts — a caller-supplied radius is
+  // only ever advisory.
+  const radius =
+    typeof body.radiusMeters === 'number' ? clamp(body.radiusMeters, MIN_RADIUS_METERS, MAX_RADIUS_METERS) : BIAS_RADIUS_METERS
+
   const requestBody: Record<string, unknown> = { textQuery: query, maxResultCount: MAX_RESULTS }
   if (typeof body.lat === 'number' && typeof body.lng === 'number') {
     requestBody.locationBias = {
-      circle: { center: { latitude: body.lat, longitude: body.lng }, radius: BIAS_RADIUS_METERS },
+      circle: { center: { latitude: body.lat, longitude: body.lng }, radius },
     }
   } else if (body.regionCode) {
     requestBody.regionCode = body.regionCode
@@ -104,4 +115,8 @@ export default async function handler(request: Request): Promise<Response> {
 
 function jsonResponse<T>(body: T, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }

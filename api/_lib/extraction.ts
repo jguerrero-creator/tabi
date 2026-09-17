@@ -313,7 +313,12 @@ async function accumulateToolUseStream<T>(
 // caller until accumulation is done. Only api/extract-reservation.ts — the endpoint actually
 // hitting the 504 via Quick Add — uses openClaudeToolStream/accumulateToolUseStream directly to
 // get that benefit; see runExtractionStreaming below.
-async function callClaudeTool<T>(params: {
+// Exported for other Claude-calling endpoints that just need "forced tool call + zod
+// validation" against their own prompt/schema (e.g. ./placesFilterExtraction.ts, TABI-79) —
+// the "one pipeline" comment at the top of this file is about the reservation-import
+// channels specifically (never fork *that* pipeline per channel); this generic call
+// mechanics layer is meant to be reused by other bounded, single-purpose AI actions.
+export async function callClaudeTool<T>(params: {
   contentBlock: ContentBlockParam
   extraText: string
   apiKey: string
