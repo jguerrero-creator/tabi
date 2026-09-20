@@ -3,7 +3,7 @@
 // `requireEntitlement` first and bail out on a denied result — never compare
 // `plan` itself. Shares the same plan -> features/limits config and
 // checkEntitlement() logic as the client side, so the two can never disagree.
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { checkEntitlement, type EntitlementCheck, type Plan } from '../../src/lib/entitlements.js'
 import type { Database } from '../../src/types/database.types'
 
@@ -44,6 +44,32 @@ export async function requireEntitlement(
     .from('profiles')
     .select('plan')
     .eq('id', userData.user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return { allowed: false, reason: 'denied' }
+  }
+
+  return checkEntitlement(profile.plan as Plan, check)
+    ? { allowed: true }
+    : { allowed: false, reason: 'denied' }
+}
+
+// Service-role variant for server-to-server callers with no user session or
+// Authorization header at all — the inbound-email webhook (api/inbound-email.ts)
+// resolves a trip from which dedicated address the mail was sent to, not from a
+// logged-in caller, so requireEntitlement()'s header-based flow doesn't apply. Same
+// checkEntitlement()/plan source of truth as the client-key path above, just a
+// different (already-known) organizer id instead of one resolved from a JWT.
+export async function requireEntitlementForOrganizer(
+  serviceClient: SupabaseClient<Database>,
+  organizerId: string,
+  check: EntitlementCheck,
+): Promise<EntitlementResult> {
+  const { data: profile, error: profileError } = await serviceClient
+    .from('profiles')
+    .select('plan')
+    .eq('id', organizerId)
     .single()
 
   if (profileError || !profile) {

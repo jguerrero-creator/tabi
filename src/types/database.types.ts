@@ -70,6 +70,50 @@ export type Database = {
           },
         ]
       }
+      pending_reservation_imports: {
+        Row: {
+          created_at: string
+          extracted: Json
+          id: string
+          outcome: string | null
+          received_at: string
+          reviewed_at: string | null
+          sender_email: string
+          subject: string | null
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string
+          extracted: Json
+          id?: string
+          outcome?: string | null
+          received_at?: string
+          reviewed_at?: string | null
+          sender_email: string
+          subject?: string | null
+          trip_id: string
+        }
+        Update: {
+          created_at?: string
+          extracted?: Json
+          id?: string
+          outcome?: string | null
+          received_at?: string
+          reviewed_at?: string | null
+          sender_email?: string
+          subject?: string | null
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_reservation_imports_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -298,6 +342,35 @@ export type Database = {
           },
         ]
       }
+      trip_api_call_quotas: {
+        Row: {
+          count: number
+          day: string
+          endpoint: string
+          trip_id: string
+        }
+        Insert: {
+          count?: number
+          day?: string
+          endpoint: string
+          trip_id: string
+        }
+        Update: {
+          count?: number
+          day?: string
+          endpoint?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_api_call_quotas_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_day_locations: {
         Row: {
           address: string | null
@@ -459,6 +532,7 @@ export type Database = {
           destinations: string[]
           end_date: string | null
           id: string
+          inbound_email_local_part: string | null
           name: string
           note: string | null
           organizer_id: string
@@ -475,6 +549,7 @@ export type Database = {
           destinations?: string[]
           end_date?: string | null
           id?: string
+          inbound_email_local_part?: string | null
           name: string
           note?: string | null
           organizer_id: string
@@ -491,6 +566,7 @@ export type Database = {
           destinations?: string[]
           end_date?: string | null
           id?: string
+          inbound_email_local_part?: string | null
           name?: string
           note?: string | null
           organizer_id?: string
@@ -586,6 +662,10 @@ export type Database = {
     Functions: {
       increment_api_call_counter: {
         Args: { p_endpoint: string }
+        Returns: number
+      }
+      increment_trip_api_call_counter: {
+        Args: { p_endpoint: string; p_trip_id: string }
         Returns: number
       }
     }

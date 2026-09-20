@@ -651,6 +651,19 @@ export const strings = {
     remove: 'Remove reminder',
     errorGeneric: 'Could not save this reminder. Please try again.',
   },
+  inboundImportAddress: {
+    label: 'Import by email',
+    description: 'Forward a booking confirmation to this address to add it to this trip:',
+    copyCta: 'Copy',
+    copiedLabel: 'Copied',
+  },
+  pendingImports: {
+    title: 'From your inbox',
+    noSubject: '(no subject)',
+    fromLabel: (senderEmail: string) => `Forwarded by ${senderEmail}`,
+    reviewCta: 'Review',
+    dismissCta: 'Dismiss',
+  },
   privacyPolicy: {
     title: 'Privacy Policy',
     lastUpdated: 'Last updated: July 21, 2026',

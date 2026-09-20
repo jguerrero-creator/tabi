@@ -19,11 +19,14 @@ import { NearbyPlacesMapModal } from '../reservations/NearbyPlacesMapModal'
 import { QuickAddModal } from '../reservations/QuickAddModal'
 import { SavePlaceModal } from '../reservations/SavePlaceModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
+import { InboundImportAddressCard } from './InboundImportAddressCard'
 import { OverviewMap } from './OverviewMap'
 import type { FreeBlockAddPayload } from './DayColumn'
+import { PendingImportsSection } from './PendingImportsSection'
 import { RemindersSection } from './RemindersSection'
 import { TripLegsSection, type LegQuickAddPayload } from './TripLegsSection'
 import { TripTimeline } from './TripTimeline'
+import { usePendingReservationImports } from './usePendingReservationImports'
 import { useTrip } from './useTrip'
 import { useTripDayLocations } from './useTripDayLocations'
 import { useTripDayNotes } from './useTripDayNotes'
@@ -178,6 +181,10 @@ export function OverviewScreen() {
     error: legsError,
   } = useTripLegs(reservations, dayLocationsByKey, legModeState, setLegResult)
   const { reminders, createReminder, deleteReminder } = useTripReminders(tripId ?? '')
+  // TABI: forwarded-email import channel — extraction happens async (no active
+  // session watching it), so a successful one waits here as a pending row until the
+  // organizer reviews it, instead of going straight to a live confirmation screen.
+  const { pendingImports, resolvePendingImport } = usePendingReservationImports(tripId ?? '')
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -290,6 +297,18 @@ export function OverviewScreen() {
                 </div>
 
                 <div className="space-y-5 lg:order-1">
+                  <PendingImportsSection
+                    tripId={tripId ?? ''}
+                    tripCurrency={trip?.currency ?? null}
+                    pendingImports={pendingImports}
+                    onResolve={resolvePendingImport}
+                    onCreate={async (input) => {
+                      const created = await createReservation(input)
+                      await refetchReservations()
+                      return created
+                    }}
+                  />
+
                   <section>
                     <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {strings.overview.needsAttentionTitle}
@@ -350,6 +369,8 @@ export function OverviewScreen() {
                   />
 
                   <RemindersSection onCreate={createReminder} />
+
+                  <InboundImportAddressCard localPart={trip?.inbound_email_local_part ?? null} />
                 </div>
               </>
             )}
