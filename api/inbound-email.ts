@@ -18,8 +18,8 @@
 // any additional trust to a forwarded email over a pasted/uploaded one.
 import { createClient } from '@supabase/supabase-js'
 import { requireEntitlementForOrganizer } from './_lib/entitlements.js'
-import type { ContentBlockParam } from './_lib/extraction.js'
-import { runExtraction } from './_lib/extraction.js'
+import type { ContentBlockParam, ExtractResult } from './_lib/extraction.js'
+import { runExtractionStreaming } from './_lib/extraction.js'
 import { checkTripRateLimit } from './_lib/tripRateLimit.js'
 import { verifySvixSignature } from './_lib/svixVerify.js'
 import type { Database } from '../src/types/database.types'
@@ -32,6 +32,13 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 // Same ceilings as ImportConfirmationModal's client-side upload limits — a booking
 // confirmation attachment has no legitimate reason to approach either.
 const MAX_ATTACHMENT_SIZE_BYTES = 15 * 1024 * 1024
+
+// A real photo of a ticket/receipt, even compressed, is essentially always well above
+// this — a genuinely tiny image attachment is a template logo/icon, not booking
+// content. Second layer of defense behind the content_disposition filter in
+// buildContentBlock below, for a sender/client that omits that header. Not applied to
+// PDFs, since a real single-page e-ticket PDF can legitimately be a few KB.
+const MIN_IMAGE_ATTACHMENT_SIZE_BYTES = 15 * 1024
 
 // Cheap pre-filter before ever calling Claude: only applies when there's no supported
 // attachment (an attachment is already a strong positive signal worth extracting on its
@@ -57,7 +64,13 @@ interface ResendWebhookEvent {
 interface ResendReceivedEmail {
   html: string | null
   text: string | null
-  attachments: Array<{ id: string; filename: string; content_type: string; size: number }>
+  attachments: Array<{
+    id: string
+    filename: string
+    content_type: string
+    content_disposition: string | null
+    size: number
+  }>
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -158,35 +171,69 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response('No usable content', { status: 200 })
   }
 
-  const result = await runExtraction(
+  // TABI-8's fix, reused: Vercel Edge's 25s cap is on time-to-first-byte, not total
+  // duration. The original blocking runExtraction() call here (like import-url.ts)
+  // hit exactly this on 2026-09-22 — a real forwarded email 504'd on its first
+  // delivery attempt (Claude's stream took 23s to open) and was only saved by
+  // Resend's own webhook retry. Opening the stream and committing to a Response
+  // immediately, before it's fully consumed, is what actually satisfies the cap —
+  // see api/extract-reservation.ts and api/_lib/extraction.ts's comments for the
+  // full mechanism. The trade-off (same one extract-reservation.ts already accepts):
+  // once the stream has opened, Resend gets its 200 regardless of what happens during
+  // accumulation, so a genuine mid-stream failure no longer gets a retry — only a
+  // stream-open failure (returned synchronously below) still does.
+  const opened = await runExtractionStreaming(
     contentBlock,
     'Extract this reservation from the forwarded email above.',
     anthropicApiKey,
     'inbound-email',
   )
 
-  if (result.status === 'error') {
-    console.error('inbound-email: extraction failed', trip.id, result.error)
-    // Non-2xx so Resend retries once — worth it in case this was a transient
-    // Claude/network failure rather than genuinely unparseable content, since a
-    // dropped booking email here is silent by definition (nobody's waiting on this
-    // request the way an interactive upload has a user watching it fail).
+  if (opened.status === 'error') {
+    console.error('inbound-email: failed to open extraction stream', trip.id, opened.error)
+    // Non-2xx so Resend retries — this is a fast failure (bad request, auth, network
+    // error before the stream ever opened), same distinction extract-reservation.ts
+    // makes, so retrying costs nothing and might catch a transient issue.
     return new Response('Extraction failed', { status: 500 })
   }
 
-  const { error: insertError } = await supabase.from('pending_reservation_imports').insert({
-    trip_id: trip.id,
-    sender_email: event.data.from,
-    subject: event.data.subject ?? null,
-    extracted: result.result,
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder()
+      let result: ExtractResult
+      try {
+        result = await opened.consume()
+      } catch (error) {
+        console.error('inbound-email: streamed extraction failed unexpectedly', trip.id, error)
+        controller.enqueue(encoder.encode('Extraction failed'))
+        controller.close()
+        return
+      }
+
+      if (result.status === 'error') {
+        console.error('inbound-email: extraction failed', trip.id, result.error)
+        controller.enqueue(encoder.encode('Extraction failed'))
+        controller.close()
+        return
+      }
+
+      const { error: insertError } = await supabase.from('pending_reservation_imports').insert({
+        trip_id: trip.id,
+        sender_email: event.data.from,
+        subject: event.data.subject ?? null,
+        extracted: result.result,
+      })
+
+      if (insertError) {
+        console.error('inbound-email: failed to store pending import', trip.id, insertError)
+      }
+
+      controller.enqueue(encoder.encode('OK'))
+      controller.close()
+    },
   })
 
-  if (insertError) {
-    console.error('inbound-email: failed to store pending import', trip.id, insertError)
-    return new Response('Failed to store import', { status: 500 })
-  }
-
-  return new Response('OK', { status: 200 })
+  return new Response(stream, { status: 200 })
 }
 
 function extractLocalPart(address: string): string | null {
@@ -200,10 +247,24 @@ async function buildContentBlock(
   resendApiKey: string,
   emailId: string,
 ): Promise<ContentBlockParam | null> {
-  const supportedAttachment = email.attachments?.find(
-    (attachment) =>
-      attachment.content_type === 'application/pdf' || ALLOWED_IMAGE_TYPES.includes(attachment.content_type),
-  )
+  // Incident (2026-09-22): a real forwarded Booking.com confirmation carried 13
+  // attachments, all tiny (< 8KB) PNG/GIF template logos/icons — Outlook/Hotmail
+  // re-serializes an HTML email's inline `cid:`-referenced images as numbered
+  // attachment parts (ATT00001.png, ...) when forwarding. The original `.find()` had
+  // no concept of inline-vs-attached and grabbed the first one, sending Claude a
+  // logo instead of the actual booking text (which was sitting right there in the
+  // body) — extraction correctly returned all-null for a logo. `content_disposition
+  // === 'inline'` is the real, direct signal for this (a genuinely user-attached
+  // ticket/photo is never marked inline); the size floor below is a second layer for
+  // a sender/client that omits that header rather than the primary defense.
+  const supportedAttachment = email.attachments?.find((attachment) => {
+    if (attachment.content_disposition === 'inline') return false
+    if (attachment.content_type === 'application/pdf') return true
+    if (ALLOWED_IMAGE_TYPES.includes(attachment.content_type)) {
+      return attachment.size >= MIN_IMAGE_ATTACHMENT_SIZE_BYTES
+    }
+    return false
+  })
 
   if (supportedAttachment) {
     if (supportedAttachment.size > MAX_ATTACHMENT_SIZE_BYTES) {
