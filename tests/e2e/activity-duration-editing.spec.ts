@@ -73,6 +73,9 @@ test('Activity duration is entered on add and editable on the detail screen', as
     // --- TABI-181: creating a brand-new Activity via the Add sheet with a duration ---
     await page.goto(`/trips/${trip.id}/activities`)
     await page.getByRole('button', { name: 'Add activity' }).click()
+    // TABI-79 added a Places search step in front of the plain form — bypass it to reach the
+    // manual fields this test actually exercises (Bugs DB, "timeout depuis TABI-79").
+    await page.getByRole('button', { name: 'Enter manually instead' }).click()
     await page.getByLabel('Name').fill(`E2E new activity ${runId}`)
     await page.locator('input[aria-label="Start date"]').fill('2026-09-06')
     await page.locator('input[aria-label="Start time"]').fill('14:00')
