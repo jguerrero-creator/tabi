@@ -43,6 +43,9 @@ import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
 import { VehicleRentalLegsSection } from './VehicleRentalLegsSection'
 
+// Mirrors AddReservationModal's own fallback (TABI-76 dependency) — only used if `trip` hasn't loaded yet.
+const DAY_START_TIME_FALLBACK = '08:00'
+
 const STAY_CHECKIN_DATE_FIELD_ID = 'reservation-checkin-date'
 const STAY_CHECKOUT_DATE_FIELD_ID = 'reservation-checkout-date'
 const TRANSPORT_START_DATE_FIELD_ID = 'reservation-transport-start-date'
@@ -208,6 +211,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       ? localTimeKey(reservation.start_at, reservation.start_timezone)
       : '',
   )
+  const initialActivityStartTimeRef = useRef(activityStartTime)
   const [durationHours, setDurationHours] = useState(() => {
     if (reservation.type !== 'activity' || !reservation.start_at || !reservation.end_at) return ''
     return String(durationHoursMinutes(reservation.start_at, reservation.end_at).hours)
@@ -394,7 +398,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     // TABI-182: same idea as stayDatePatch above, but Activity's start/end can legitimately be
     // null both before and after editing (unlike Stay, which always has both from creation) —
     // so this compares directly against the current start_at/end_at rather than an initial-value
-    // dirty-check, and requires start date+time together (an Activity is never date-only).
+    // dirty-check. A date with no time falls back to the trip's day-start time instead of
+    // erroring (TABI-76 dependency, Bugs — a date-only Activity used to be rejected here entirely,
+    // contradicting the Add form's own TABI-16 spec), flagged via start_time_is_default the same
+    // way Stay/Transport already do; an explicit time clears that flag.
     let activityDatePatch: Partial<Reservation> = {}
     if (reservation.type === 'activity') {
       const trimmedStartDate = activityStartDate.trim()
@@ -403,17 +410,26 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       const minutes = Number(durationMinutes) || 0
       const hasDuration = hours > 0 || minutes > 0
 
-      let newStartAt: string | null = null
-      if (trimmedStartDate && trimmedStartTime) {
-        newStartAt = zonedTimeToUtc(trimmedStartDate, trimmedStartTime, reservation.start_timezone ?? localTimeZone())
-      } else if (trimmedStartDate || trimmedStartTime) {
+      if (trimmedStartTime && !trimmedStartDate) {
         setFormError(strings.addReservation.errorStartRequired)
         return
       }
 
+      // Only a genuinely typed-in time counts as "confirmed" — a field still showing its
+      // untouched initial value (which may itself have been a previous default) must not
+      // suddenly read as the user having committed to that exact time.
+      const startTimeChanged = trimmedStartTime !== '' && trimmedStartTime !== initialActivityStartTimeRef.current
+      const effectiveStartTime =
+        trimmedStartTime || (trip?.day_start_time.slice(0, 5) ?? DAY_START_TIME_FALLBACK)
+
+      let newStartAt: string | null = null
+      if (trimmedStartDate && effectiveStartTime) {
+        newStartAt = zonedTimeToUtc(trimmedStartDate, effectiveStartTime, reservation.start_timezone ?? localTimeZone())
+      }
+
       let newEndAt: string | null = null
       if (newStartAt && hasDuration) {
-        const endTimeStr = addDurationToTime(trimmedStartTime, hours, minutes)
+        const endTimeStr = addDurationToTime(effectiveStartTime, hours, minutes)
         newEndAt = zonedTimeToUtc(
           trimmedStartDate,
           endTimeStr,
@@ -426,7 +442,17 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       }
 
       activityDatePatch = {
-        ...(newStartAt !== reservation.start_at ? { start_at: newStartAt } : {}),
+        ...(newStartAt !== reservation.start_at
+          ? {
+              start_at: newStartAt,
+              ...(newStartAt
+                ? {
+                    start_time_is_default:
+                      trimmedStartTime === '' ? true : startTimeChanged ? false : reservation.start_time_is_default,
+                  }
+                : {}),
+            }
+          : {}),
         ...(newEndAt !== reservation.end_at ? { end_at: newEndAt } : {}),
       }
     }

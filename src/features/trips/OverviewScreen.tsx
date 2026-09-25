@@ -48,6 +48,7 @@ export function OverviewScreen() {
     refetch: refetchReservations,
     updateReservationNote,
     updateReservationDates,
+    reorderActivities,
   } = useTripReservations(tripId ?? '')
   const { createReservation } = useCreateReservation(tripId ?? '')
   // TABI-54: "+" on a free-time timeline block opens the shared Add sheet
@@ -394,6 +395,8 @@ export function OverviewScreen() {
                   onAddAtFreeBlock={handleAddAtFreeBlock}
                   onSaveReservationNote={updateReservationNote}
                   onMoveReservation={updateReservationDates}
+                  onReorderActivities={reorderActivities}
+                  legModeState={legModeState}
                 />
               </div>
             )}

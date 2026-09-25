@@ -70,5 +70,35 @@ export function useTripReservations(tripId: string) {
     [],
   )
 
-  return { reservations, loading, error, refetch: fetchReservations, updateReservationNote, updateReservationDates }
+  /** TABI-76: applies an accepted reorder suggestion — each activity keeps every other column, only start/end move. */
+  const reorderActivities = useCallback(
+    async (updates: { id: string; start_at: string; end_at: string | null }[]): Promise<void> => {
+      const results = await Promise.all(
+        updates.map((update) =>
+          supabase
+            .from('reservations')
+            .update({ start_at: update.start_at, end_at: update.end_at })
+            .eq('id', update.id)
+            .select()
+            .single(),
+        ),
+      )
+      const failed = results.find((result) => result.error)
+      if (failed?.error) throw failed.error
+
+      const byId = new Map(results.map((result) => [result.data!.id, result.data!]))
+      setReservations((prev) => prev.map((r) => byId.get(r.id) ?? r))
+    },
+    [],
+  )
+
+  return {
+    reservations,
+    loading,
+    error,
+    refetch: fetchReservations,
+    updateReservationNote,
+    updateReservationDates,
+    reorderActivities,
+  }
 }

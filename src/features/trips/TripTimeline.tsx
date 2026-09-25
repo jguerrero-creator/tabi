@@ -17,11 +17,13 @@ import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
+import { ActivityReorderSuggestion } from './ActivityReorderSuggestion'
 import { DayColumn, type DayItem, type FreeBlockAddPayload } from './DayColumn'
 import { DayTabs, type DayTab } from './DayTabs'
 import { ReservationDragProvider } from './reservationDrag'
 import type { MoveCandidateDates } from '../../lib/reservationMove'
 import type { TripLeg } from './useTripLegs'
+import type { TripLegModeState } from './useTripLegTravelModes'
 import type { DayLocationInput } from './useTripDayLocations'
 
 interface TripTimelineProps {
@@ -61,6 +63,10 @@ interface TripTimelineProps {
   onSaveReservationNote?: (reservationId: string, note: string) => Promise<void>
   /** Drag-and-drop reschedule on a reservation card (TABI-195). */
   onMoveReservation: (reservationId: string, dates: MoveCandidateDates) => Promise<void>
+  /** TABI-76: applies an accepted "reorder these activities" suggestion. */
+  onReorderActivities: (updates: { id: string; start_at: string; end_at: string | null }[]) => Promise<void>
+  /** TABI-76: existing "Getting Around" leg results (TABI-200), reused where possible instead of an extra Routes API call. */
+  legModeState: Record<string, TripLegModeState>
 }
 
 type DayEdges = { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }
@@ -90,6 +96,8 @@ export function TripTimeline({
   onAddAtFreeBlock,
   onSaveReservationNote,
   onMoveReservation,
+  onReorderActivities,
+  legModeState,
 }: TripTimelineProps) {
   const dayOccurrences = buildDayOccurrences(reservations)
   const groups = groupByDate(
@@ -189,6 +197,23 @@ export function TripTimeline({
 
   return (
     <ReservationDragProvider reservations={reservations} onMove={onMoveReservation}>
+      {/*
+        TABI-76: rendered once here (not inside DayColumn) — mobile-day-view and
+        desktop-day-carousel below are both always mounted (CSS breakpoints toggle which
+        is visible, not which exists), so a per-DayColumn instance would double the
+        pairwise-travel-time API calls and stack two full-screen confirm dialogs for the
+        same day. `effectiveSelectedKey` also tracks the desktop carousel's own scroll
+        position (see the scroll-sync effect above), so "the day currently in focus" is a
+        meaningful single day even in the desktop multi-column layout.
+      */}
+      {effectiveSelectedKey !== UNSCHEDULED_KEY && (
+        <ActivityReorderSuggestion
+          items={groupsByKey.get(effectiveSelectedKey)?.items ?? []}
+          legModeState={legModeState}
+          onReorder={onReorderActivities}
+        />
+      )}
+
       <div data-testid="mobile-day-view" className="space-y-4 lg:hidden">
         <DayTabs days={days} selectedKey={effectiveSelectedKey} onSelect={onSelectDay} />
         <DayColumn

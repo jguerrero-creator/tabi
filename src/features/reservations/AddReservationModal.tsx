@@ -394,19 +394,22 @@ export function AddReservationModal({
   }, [option.dbType, manualEndDate, startDate, nights])
 
   // TABI-181: for Activity, derive end date/time from start + duration instead of asking for
-  // an end date directly — end always stays on the same calendar day as start.
+  // an end date directly — end always stays on the same calendar day as start. A blank start
+  // time still anchors off the trip's day-start time (same fallback `buildAndProceed` applies
+  // at submit) rather than dropping an entered duration just because time was left blank.
   useEffect(() => {
     if (option.dbType !== 'activity') return
     const hours = Number(durationHours) || 0
     const minutes = Number(durationMinutes) || 0
-    if (!startDate || !startTime || (hours === 0 && minutes === 0)) {
+    if (!startDate || (hours === 0 && minutes === 0)) {
       setEndDate('')
       setEndTime('')
       return
     }
+    const effectiveStart = startTime || trip?.day_start_time.slice(0, 5) || DAY_START_TIME_FALLBACK
     setEndDate(startDate)
-    setEndTime(addDurationToTime(startTime, hours, minutes))
-  }, [option.dbType, startDate, startTime, durationHours, durationMinutes])
+    setEndTime(addDurationToTime(effectiveStart, hours, minutes))
+  }, [option.dbType, startDate, startTime, durationHours, durationMinutes, trip])
 
   function handleStartAddressChange(text: string) {
     setStartAddress(text)
@@ -543,7 +546,13 @@ export function AddReservationModal({
     // A point-to-point Transport departure time is optional too — falls back to the trip's own
     // day-start time instead (same field TripLegsSection already anchors a leg quick-add to),
     // flagged the same way so it's never silent about feeding the travel-time calc.
-    const startTimeDefaulted = (option.dbType === 'stay' || isPointToPoint) && !startTime
+    // An Activity given a start DATE but no time falls back the same way (TABI-76 dependency,
+    // Bugs — a date-only Activity used to have its date silently discarded, landing in
+    // "Unscheduled" instead of its own day, contradicting TABI-16's original spec). A fully blank
+    // Activity (no date at all) stays fully unscheduled — this only fires once a date is chosen.
+    const startTimeDefaulted =
+      (option.dbType === 'stay' || isPointToPoint || (option.dbType === 'activity' && startDate !== '')) &&
+      !startTime
     const endTimeDefaulted = option.dbType === 'stay' && !endTime
     const tripDayStartTime = trip?.day_start_time.slice(0, 5) ?? DAY_START_TIME_FALLBACK
     const effectiveStartTime = isAtDisposal

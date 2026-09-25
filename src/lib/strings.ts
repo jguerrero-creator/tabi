@@ -265,6 +265,12 @@ export const strings = {
     stayCheckInBadge: 'in',
     stayCheckOutBadge: 'out',
   },
+  activityReorder: {
+    title: 'Reorder these activities?',
+    message: (savings: string) => `Reordering these activities could save ~${savings} of travel today. Apply the suggested order?`,
+    applyCta: 'Apply',
+    dismissCta: 'Dismiss',
+  },
   planningDrag: {
     handleLabel: 'Press and hold to move',
     doesNotFit: "Doesn't fit in this free time slot.",
