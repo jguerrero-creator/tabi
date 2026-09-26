@@ -51,6 +51,11 @@ interface ActivityPlaceSearchModalProps {
   tripId: string
   onSelect: (place: ResolvedPlace) => void
   onSkip: () => void
+  /** TABI checklist: a third exit alongside onSkip — the traveler doesn't have one fixed
+   * place in mind at all, and wants a time block with several candidate places instead
+   * (added individually on the detail screen once the block itself is created). Optional
+   * so every other caller of this modal (NearbyPlacesMapModal, SavePlaceModal) is unaffected. */
+  onChecklist?: () => void
   onCancel: () => void
 }
 
@@ -60,7 +65,7 @@ interface ActivityPlaceSearchModalProps {
 // the existing /api/geocode place-id lookup (the same call the plain-autocomplete path
 // already uses) before handing a fully-formed ResolvedPlace back to the caller.
 // "Enter manually instead" skips straight to the existing blank form.
-export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }: ActivityPlaceSearchModalProps) {
+export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onChecklist, onCancel }: ActivityPlaceSearchModalProps) {
   const { trip } = useTrip(tripId)
   const { locationsByDate } = useTripDayLocations(tripId)
   const { profile, can } = useProfile()
@@ -352,13 +357,24 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onCancel }:
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-4">
-          <button type="button" onClick={onSkip} className="text-sm font-medium text-teal-700 underline">
-            {strings.activityPlaceSearch.manualFallbackCta}
-          </button>
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            {strings.activityPlaceSearch.cancel}
-          </Button>
+        <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={onSkip} className="text-sm font-medium text-teal-700 underline">
+              {strings.activityPlaceSearch.manualFallbackCta}
+            </button>
+            <Button type="button" variant="secondary" onClick={onCancel}>
+              {strings.activityPlaceSearch.cancel}
+            </Button>
+          </div>
+          {onChecklist && (
+            <button
+              type="button"
+              onClick={onChecklist}
+              className="text-left text-xs font-medium text-teal-700 underline"
+            >
+              {strings.activityPlaceSearch.checklistInsteadCta}
+            </button>
+          )}
         </div>
       </div>
     </div>

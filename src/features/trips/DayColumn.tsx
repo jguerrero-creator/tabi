@@ -788,6 +788,14 @@ function dayHasTooLongTravel(items: Reservation[], freeTimeByFromId: Map<string,
 }
 
 function rowLabel(reservation: DayItem): string | null {
+  // TABI checklist: a checklist block has no single "Start · HH:MM" leg worth calling
+  // out (its position on the rail already conveys the time) — the item count is more
+  // useful at a glance, mirroring the menu row's own secondaryLabel (ActivitiesMenuScreen).
+  if (reservation.type === 'activity' && reservation.activity_subtype === 'checklist') {
+    return reservation.checklist_item_count === 0
+      ? strings.checklistItems.itemCountEmpty
+      : strings.checklistItems.itemCount(reservation.checklist_item_count)
+  }
   if (!reservation.start_at) return null
   const labels = strings.reservationLegLabels[reservation.type]
   const isEndOccurrence = reservation.isCheckoutOccurrence || reservation.isArrivalOccurrence

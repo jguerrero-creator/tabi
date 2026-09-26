@@ -1,4 +1,4 @@
-import type { ReservationType, StaySubtype, TransportMode, TransportSubtype } from '../../types/reservation'
+import type { ActivitySubtype, ReservationType, StaySubtype, TransportMode, TransportSubtype } from '../../types/reservation'
 
 /**
  * Type-identity colors (TABI-217) — distinct from the 3-state booking-status
@@ -119,6 +119,7 @@ interface ReservationIconInput {
   stay_subtype?: StaySubtype | null
   transport_subtype?: TransportSubtype | null
   transport_mode?: TransportMode | null
+  activity_subtype?: ActivitySubtype | null
 }
 
 /** Single place picking the right glyph for a reservation, sub-type included (TABI-130). */
@@ -138,7 +139,31 @@ export function ReservationIcon({
   if (reservation.type === 'transport' && reservation.transport_subtype === 'point_to_point') {
     return <TransportModeIcon mode={reservation.transport_mode} className={className} />
   }
+  if (reservation.type === 'activity' && reservation.activity_subtype === 'checklist') {
+    return <ChecklistIcon className={className} />
+  }
   return <ReservationTypeIcon type={reservation.type} className={className} />
+}
+
+/** Distinct from the generic `activity` (pin) icon — flags a checklist-subtype Activity (multiple candidate places, no single fixed location). */
+export function ChecklistIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="6" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="18" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M9 6h11M9 12h11M9 18h11" />
+    </svg>
+  )
 }
 
 /**

@@ -155,6 +155,10 @@ function getEligibleActivities(items: DayItem[]): EligibleActivity[] {
   return items.filter(
     (item): item is DayItem & EligibleActivity =>
       item.type === 'activity' &&
+      // TABI checklist: a checklist block is a single opaque time block with several
+      // candidate places, not one "stop" with one location — never a reorder candidate,
+      // even if a future change ever let it carry its own start_lat/start_lng.
+      item.activity_subtype !== 'checklist' &&
       item.start_time_is_default &&
       item.start_at !== null &&
       item.start_lat !== null &&

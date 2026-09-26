@@ -41,6 +41,7 @@ import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useReservation } from './useReservation'
+import { ChecklistItemsSection } from './ChecklistItemsSection'
 import { VehicleRentalLegsSection } from './VehicleRentalLegsSection'
 
 // Mirrors AddReservationModal's own fallback (TABI-76 dependency) — only used if `trip` hasn't loaded yet.
@@ -225,6 +226,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   // leg, with the same initial-snapshot dirty-check as Stay's checkInTime/checkOutTime so editing
   // something else (price, note…) without touching a defaulted time doesn't clear its "Default"
   // badge. A vehicle rental (at_disposal) only ever collects dates, same as at creation (TABI-123).
+  // TABI checklist: this subtype's own status doesn't apply (spec: inherently "decide on
+  // location", fixed at creation, never surfaced as an editable picker) and it has no single
+  // fixed place of its own — its candidate places live in ChecklistItemsSection instead.
+  const isChecklist = reservation.type === 'activity' && reservation.activity_subtype === 'checklist'
   const isTransportAtDisposal = reservation.type === 'transport' && reservation.transport_subtype === 'at_disposal'
   const transportLegLabels = isTransportAtDisposal
     ? strings.reservationLegLabelsAtDisposal
@@ -661,12 +666,14 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
           <MiniMap points={points} />
 
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {strings.reservationDetail.statusLabel}
-            </p>
-            <StatusPicker value={reservation.status} onChange={handleStatusChange} />
-          </div>
+          {!isChecklist && (
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {strings.reservationDetail.statusLabel}
+              </p>
+              <StatusPicker value={reservation.status} onChange={handleStatusChange} />
+            </div>
+          )}
 
           <TypeSpecificZone reservation={reservation} />
 
@@ -938,18 +945,20 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
               />
             </Field>
-            <PlaceAutocompleteField
-              id="reservation-start-address"
-              label={
-                reservation.transport_subtype === 'at_disposal'
-                  ? strings.reservationDetail.startAddressLabelAtDisposal
-                  : strings.reservationDetail.startAddressLabel
-              }
-              value={startAddress}
-              onTextChange={handleStartAddressChange}
-              onPlaceSelect={handleStartPlaceSelect}
-              citiesOnly={reservation.transport_subtype === 'at_disposal'}
-            />
+            {!isChecklist && (
+              <PlaceAutocompleteField
+                id="reservation-start-address"
+                label={
+                  reservation.transport_subtype === 'at_disposal'
+                    ? strings.reservationDetail.startAddressLabelAtDisposal
+                    : strings.reservationDetail.startAddressLabel
+                }
+                value={startAddress}
+                onTextChange={handleStartAddressChange}
+                onPlaceSelect={handleStartPlaceSelect}
+                citiesOnly={reservation.transport_subtype === 'at_disposal'}
+              />
+            )}
             {reservation.type === 'transport' && (
               <PlaceAutocompleteField
                 id="reservation-end-address"
@@ -974,6 +983,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           </form>
 
           {isTransportAtDisposal && <VehicleRentalLegsSection reservation={reservation} />}
+          {isChecklist && <ChecklistItemsSection reservation={reservation} />}
         </div>
         {candidates && (
           <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />

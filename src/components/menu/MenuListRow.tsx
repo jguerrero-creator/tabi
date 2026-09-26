@@ -2,7 +2,14 @@ import { Link } from 'react-router-dom'
 import { ReservationIcon, reservationTypeBadgeClasses } from '../ui/ReservationTypeIcon'
 import { statusDotClasses } from './statusDotClasses'
 import { strings } from '../../lib/strings'
-import type { ReservationStatus, ReservationType, StaySubtype, TransportMode, TransportSubtype } from '../../types/reservation'
+import type {
+  ActivitySubtype,
+  ReservationStatus,
+  ReservationType,
+  StaySubtype,
+  TransportMode,
+  TransportSubtype,
+} from '../../types/reservation'
 
 export interface MenuRowFlag {
   label: string
@@ -23,6 +30,7 @@ interface MenuListRowProps {
   staySubtype?: StaySubtype | null
   transportSubtype?: TransportSubtype | null
   transportMode?: TransportMode | null
+  activitySubtype?: ActivitySubtype | null
   /** Optional trailing content on the row's right edge, e.g. a cost (budget category detail list). */
   trailing?: React.ReactNode
 }
@@ -45,6 +53,7 @@ export function MenuListRow({
   staySubtype,
   transportSubtype,
   transportMode,
+  activitySubtype,
   trailing,
 }: MenuListRowProps) {
   return (
@@ -57,7 +66,13 @@ export function MenuListRow({
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[type]}`}
         >
           <ReservationIcon
-            reservation={{ type, stay_subtype: staySubtype, transport_subtype: transportSubtype, transport_mode: transportMode }}
+            reservation={{
+              type,
+              stay_subtype: staySubtype,
+              transport_subtype: transportSubtype,
+              transport_mode: transportMode,
+              activity_subtype: activitySubtype,
+            }}
             className="h-4 w-4"
           />
         </span>

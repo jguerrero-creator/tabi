@@ -337,6 +337,25 @@ export const strings = {
     travelTimeWarningConfirmCta: 'Save anyway',
     travelTimeWarningCancelCta: 'Go back',
   },
+  checklistItems: {
+    title: 'Places to explore',
+    empty: 'No places added yet.',
+    addCta: '+ Add place',
+    manualFallbackCta: 'Enter manually instead',
+    manualTitle: 'Add item',
+    manualNameLabel: 'Name',
+    manualNamePlaceholder: 'e.g. Toshogu Shrine',
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Remove',
+    deleteConfirm: 'Remove this item from the checklist?',
+    renameLabel: 'Rename',
+    loading: 'Loading places…',
+    errorLoading: 'Could not load this checklist.',
+    errorGeneric: 'Something went wrong. Please try again.',
+    itemCount: (count: number) => (count === 1 ? '1 place to explore' : `${count} places to explore`),
+    itemCountEmpty: 'No places added yet',
+  },
   stayMenu: {
     title: 'Stay',
     loading: 'Loading stays…',
@@ -440,6 +459,11 @@ export const strings = {
     transportSubtypes: {
       point_to_point: 'Flight / Train / Bus',
       at_disposal: 'Vehicle rental',
+    },
+    activitySubtypeLabel: 'Activity type',
+    activitySubtypes: {
+      place: 'Specific place',
+      checklist: 'Checklist (a few options to pick from)',
     },
     // Backlog: "Afficher le mode de transport en premier dans le titre + icône par mode" —
     // optional, point-to-point only; unset is a valid, common state (older bookings, or a
@@ -590,6 +614,7 @@ export const strings = {
     emptyResults: 'No places found — try a different search.',
     errorGeneric: 'Could not search places. Please try again.',
     manualFallbackCta: 'Enter manually instead',
+    checklistInsteadCta: "I don't want one specific place — make this a checklist",
     cancel: 'Cancel',
     ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
     closedOnDayFlag: (weekday: string) => `Closed on ${weekday}s`,

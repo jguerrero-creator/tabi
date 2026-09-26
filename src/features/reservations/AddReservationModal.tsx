@@ -27,6 +27,7 @@ import { strings } from '../../lib/strings'
 import type { Json } from '../../types/database.types'
 import { showSavedToast } from '../../lib/toast'
 import type {
+  ActivitySubtype,
   NewReservation,
   Reservation,
   ReservationStatus,
@@ -90,6 +91,7 @@ const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
 const transportSubtypeOptions: TransportSubtype[] = ['point_to_point', 'at_disposal']
 const transportModeOptions: TransportMode[] = ['flight', 'train', 'bus', 'ferry', 'car', 'other']
+const activitySubtypeOptions: ActivitySubtype[] = ['place', 'checklist']
 
 interface AddReservationModalProps {
   tripId: string
@@ -131,6 +133,8 @@ interface AddReservationModalProps {
   defaultStaySubtype?: StaySubtype
   /** Backlog: mode-specific icon + title prefix — null/omitted means unset, a valid state never guessed by extraction. */
   defaultTransportMode?: TransportMode | null
+  /** Checklist-subtype Activity: a time block with multiple candidate places instead of one fixed location — see ActivityPlaceSearchModal's "make this a checklist" exit. */
+  defaultActivitySubtype?: ActivitySubtype
   initialName?: string | null
   initialStartAddressText?: string | null
   initialEndAddressText?: string | null
@@ -169,6 +173,7 @@ export function AddReservationModal({
   defaultStaySubtype = 'hotel',
   defaultTransportSubtype = 'point_to_point',
   defaultTransportMode = null,
+  defaultActivitySubtype = 'place',
   requireTypeChoice = false,
   initialStartAt = null,
   initialTimezone = null,
@@ -205,6 +210,7 @@ export function AddReservationModal({
   // shown whenever the main type is Transport, not folded into the main type selector.
   const [transportSubtype, setTransportSubtype] = useState<TransportSubtype>(defaultTransportSubtype)
   const [transportMode, setTransportMode] = useState<TransportMode | null>(defaultTransportMode)
+  const [activitySubtype, setActivitySubtype] = useState<ActivitySubtype>(defaultActivitySubtype)
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
   const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState(initialName ?? '')
@@ -277,9 +283,11 @@ export function AddReservationModal({
   const isTransport = mainType === 'transport'
   const isPointToPoint = isTransport && transportSubtype === 'point_to_point'
   const isAtDisposal = isTransport && transportSubtype === 'at_disposal'
+  const isChecklist = mainType === 'activity' && activitySubtype === 'checklist'
   const option = {
     dbType: mainType,
     transportSubtype: isTransport ? transportSubtype : null,
+    activitySubtype: mainType === 'activity' ? activitySubtype : null,
     requiresEndAddress: isPointToPoint || isAtDisposal,
     requiresStart: mainType !== 'activity',
     // Departure time is never hard-required — a missing one now falls back to the trip's
@@ -585,8 +593,12 @@ export function AddReservationModal({
       stay_subtype: option.dbType === 'stay' ? staySubtype : null,
       stay_parking_included: option.dbType === 'stay' ? parkingIncluded : null,
       stay_check_in_deadline: option.dbType === 'stay' && checkInDeadline ? checkInDeadline : null,
+      activity_subtype: option.activitySubtype,
       name: resolvedName,
-      status,
+      // TABI checklist: the normal 3-state status doesn't apply — it's inherently
+      // "decide on location", fixed and never surfaced as an editable picker (see
+      // ReservationDetailScreen's own isChecklist gate).
+      status: isChecklist ? 'decide_later' : status,
       confirmation_number: confirmationNumber.trim() || null,
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
@@ -596,24 +608,24 @@ export function AddReservationModal({
       end_at: endAt,
       start_time_is_default: startTimeDefaulted,
       end_time_is_default: endTimeDefaulted,
-      start_address: startGeo?.formattedAddress ?? (startAddress.trim() || null),
-      start_lat: startGeo?.lat ?? null,
-      start_lng: startGeo?.lng ?? null,
-      start_place_name: startGeo?.placeName ?? null,
+      start_address: isChecklist ? null : (startGeo?.formattedAddress ?? (startAddress.trim() || null)),
+      start_lat: isChecklist ? null : (startGeo?.lat ?? null),
+      start_lng: isChecklist ? null : (startGeo?.lng ?? null),
+      start_place_name: isChecklist ? null : (startGeo?.placeName ?? null),
       start_timezone: startAt ? startTimezone : null,
-      start_city: startGeo?.city ?? null,
+      start_city: isChecklist ? null : (startGeo?.city ?? null),
       end_address: option.requiresEndAddress ? (endGeo?.formattedAddress ?? (endAddress.trim() || null)) : null,
       end_lat: option.requiresEndAddress ? (endGeo?.lat ?? null) : null,
       end_lng: option.requiresEndAddress ? (endGeo?.lng ?? null) : null,
       end_place_name: option.requiresEndAddress ? (endGeo?.placeName ?? null) : null,
       end_timezone: endAt ? endTimezone : null,
       end_city: option.requiresEndAddress ? (endGeo?.city ?? null) : null,
-      place_google_id: startGeo?.placeDetails?.googlePlaceId ?? null,
-      place_rating: startGeo?.placeDetails?.rating ?? null,
-      place_user_ratings_total: startGeo?.placeDetails?.userRatingsTotal ?? null,
-      place_photo_ref: startGeo?.placeDetails?.photoRef ?? null,
-      place_category: startGeo?.placeDetails?.category ?? null,
-      place_opening_hours: (startGeo?.placeDetails?.openingHours ?? null) as Json | null,
+      place_google_id: isChecklist ? null : (startGeo?.placeDetails?.googlePlaceId ?? null),
+      place_rating: isChecklist ? null : (startGeo?.placeDetails?.rating ?? null),
+      place_user_ratings_total: isChecklist ? null : (startGeo?.placeDetails?.userRatingsTotal ?? null),
+      place_photo_ref: isChecklist ? null : (startGeo?.placeDetails?.photoRef ?? null),
+      place_category: isChecklist ? null : (startGeo?.placeDetails?.category ?? null),
+      place_opening_hours: (isChecklist ? null : (startGeo?.placeDetails?.openingHours ?? null)) as Json | null,
     }
 
     if (startAt && endAt && option.dbType !== 'activity') {
@@ -823,6 +835,15 @@ export function AddReservationModal({
           </div>
         )}
 
+        {option.dbType === 'activity' && (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">
+              {strings.addReservation.activitySubtypeLabel}
+            </p>
+            <ActivitySubtypePicker value={activitySubtype} onChange={setActivitySubtype} />
+          </div>
+        )}
+
         {option.dbType === 'stay' && (
           <div className="flex gap-3">
             <div className="flex-1">
@@ -869,25 +890,32 @@ export function AddReservationModal({
           </Field>
         )}
 
-        <div>
-          <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
-          <StatusPicker value={status} onChange={setStatus} />
-        </div>
+        {!isChecklist && (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
+            <StatusPicker value={status} onChange={setStatus} />
+          </div>
+        )}
 
-        <PlaceAutocompleteField
-          id="start-address"
-          label={
-            isAtDisposal
-              ? strings.addReservation.startAddressLabelAtDisposal
-              : option.requiresEndAddress
-                ? strings.addReservation.startAddressLabelTransport
-                : strings.addReservation.startAddressLabel
-          }
-          value={startAddress}
-          onTextChange={handleStartAddressChange}
-          onPlaceSelect={handleStartPlaceSelect}
-          citiesOnly={isAtDisposal}
-        />
+        {/* TABI checklist: a checklist block has no single fixed location of its own — its
+            candidate places are added individually on the detail screen after creation
+            (ChecklistItemsSection), so the usual start-address field doesn't apply here. */}
+        {!isChecklist && (
+          <PlaceAutocompleteField
+            id="start-address"
+            label={
+              isAtDisposal
+                ? strings.addReservation.startAddressLabelAtDisposal
+                : option.requiresEndAddress
+                  ? strings.addReservation.startAddressLabelTransport
+                  : strings.addReservation.startAddressLabel
+            }
+            value={startAddress}
+            onTextChange={handleStartAddressChange}
+            onPlaceSelect={handleStartPlaceSelect}
+            citiesOnly={isAtDisposal}
+          />
+        )}
 
         {option.requiresEndAddress && (
           <PlaceAutocompleteField
@@ -1178,6 +1206,38 @@ function TransportSubtypePicker({
             }`}
           >
             {strings.addReservation.transportSubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ActivitySubtypePicker({
+  value,
+  onChange,
+}: {
+  value: ActivitySubtype
+  onChange: (subtype: ActivitySubtype) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      {activitySubtypeOptions.map((subtype) => {
+        const selected = subtype === value
+        return (
+          <button
+            key={subtype}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(subtype)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.activitySubtypes[subtype]}
           </button>
         )
       })}

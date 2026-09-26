@@ -14,7 +14,7 @@ import { useReservationsByType } from '../reservations/useReservationsByType'
 import { strings } from '../../lib/strings'
 import { formatDateHeader, localDateKey } from '../../lib/datetime'
 import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
-import type { Reservation } from '../../types/reservation'
+import type { ActivitySubtype, Reservation } from '../../types/reservation'
 
 // TABI-49: search box appears before the Activity form (Decision Log:
 // "search-first, prefill form") — a small step machine replaces the single
@@ -33,6 +33,7 @@ export function ActivitiesMenuScreen() {
   const { createReservation } = useCreateReservation(tripId ?? '')
   const [addStep, setAddStep] = useState<AddStep>(null)
   const [pendingPlace, setPendingPlace] = useState<ResolvedPlace | null>(null)
+  const [pendingActivitySubtype, setPendingActivitySubtype] = useState<ActivitySubtype>('place')
 
   const loading = tripLoading || reservationsLoading
   const error = tripError || reservationsError
@@ -50,6 +51,7 @@ export function ActivitiesMenuScreen() {
   function closeAddFlow() {
     setAddStep(null)
     setPendingPlace(null)
+    setPendingActivitySubtype('place')
   }
 
   return (
@@ -96,9 +98,14 @@ export function ActivitiesMenuScreen() {
                       key={reservation.id}
                       to={`/reservations/${reservation.id}`}
                       type={reservation.type}
+                      activitySubtype={reservation.activity_subtype}
                       title={reservation.name}
                       status={reservation.status}
-                      secondaryLabel={endLabel(reservation)}
+                      secondaryLabel={
+                        reservation.activity_subtype === 'checklist'
+                          ? checklistCountLabel(reservation.checklist_item_count)
+                          : endLabel(reservation)
+                      }
                       rating={
                         reservation.place_rating != null
                           ? { rating: reservation.place_rating, userRatingsTotal: reservation.place_user_ratings_total }
@@ -136,6 +143,10 @@ export function ActivitiesMenuScreen() {
             setPendingPlace(null)
             setAddStep('form')
           }}
+          onChecklist={() => {
+            setPendingActivitySubtype('checklist')
+            setAddStep('form')
+          }}
           onCancel={closeAddFlow}
         />
       )}
@@ -144,6 +155,7 @@ export function ActivitiesMenuScreen() {
         <AddReservationModal
           tripId={tripId ?? ''}
           defaultType="activity"
+          defaultActivitySubtype={pendingActivitySubtype}
           initialName={pendingPlace?.placeName ?? null}
           initialStartPlace={pendingPlace}
           onClose={closeAddFlow}
@@ -156,6 +168,10 @@ export function ActivitiesMenuScreen() {
       )}
     </>
   )
+}
+
+function checklistCountLabel(count: number): string {
+  return count === 0 ? strings.checklistItems.itemCountEmpty : strings.checklistItems.itemCount(count)
 }
 
 function endLabel(reservation: Reservation): string | null {

@@ -70,6 +70,75 @@ export type Database = {
           },
         ]
       }
+      checklist_items: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          place_category: string | null
+          place_google_id: string | null
+          place_photo_ref: string | null
+          place_rating: number | null
+          place_user_ratings_total: number | null
+          position: number
+          reservation_id: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          place_category?: string | null
+          place_google_id?: string | null
+          place_photo_ref?: string | null
+          place_rating?: number | null
+          place_user_ratings_total?: number | null
+          position?: number
+          reservation_id: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          place_category?: string | null
+          place_google_id?: string | null
+          place_photo_ref?: string | null
+          place_rating?: number | null
+          place_user_ratings_total?: number | null
+          position?: number
+          reservation_id?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_reservation_imports: {
         Row: {
           created_at: string
@@ -172,6 +241,10 @@ export type Database = {
       }
       reservations: {
         Row: {
+          activity_subtype:
+            | Database["public"]["Enums"]["activity_subtype"]
+            | null
+          checklist_item_count: number
           confirmation_number: string | null
           created_at: string
           end_address: string | null
@@ -214,6 +287,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          activity_subtype?:
+            | Database["public"]["Enums"]["activity_subtype"]
+            | null
+          checklist_item_count?: number
           confirmation_number?: string | null
           created_at?: string
           end_address?: string | null
@@ -256,6 +333,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          activity_subtype?:
+            | Database["public"]["Enums"]["activity_subtype"]
+            | null
+          checklist_item_count?: number
           confirmation_number?: string | null
           created_at?: string
           end_address?: string | null
@@ -670,6 +751,7 @@ export type Database = {
       }
     }
     Enums: {
+      activity_subtype: "place" | "checklist"
       reservation_status: "booked" | "to_book" | "decide_later"
       reservation_type: "stay" | "transport" | "activity"
       stay_subtype: "hotel" | "camping" | "airbnb" | "ryokan" | "other"
@@ -804,6 +886,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_subtype: ["place", "checklist"],
       reservation_status: ["booked", "to_book", "decide_later"],
       reservation_type: ["stay", "transport", "activity"],
       stay_subtype: ["hotel", "camping", "airbnb", "ryokan", "other"],

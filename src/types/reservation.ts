@@ -8,3 +8,4 @@ export type ReservationStatus = Database['public']['Enums']['reservation_status'
 export type TransportSubtype = Database['public']['Enums']['transport_subtype']
 export type TransportMode = Database['public']['Enums']['transport_mode']
 export type StaySubtype = Database['public']['Enums']['stay_subtype']
+export type ActivitySubtype = Database['public']['Enums']['activity_subtype']
