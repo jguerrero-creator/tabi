@@ -337,6 +337,15 @@ export const strings = {
     travelTimeWarningConfirmCta: 'Save anyway',
     travelTimeWarningCancelCta: 'Go back',
   },
+  activitySubtypeSwitch: {
+    convertToPlaceTitle: 'Switch to a specific place',
+    convertToPlaceBody: (itemCount: number) =>
+      `This checklist has ${itemCount} ${itemCount === 1 ? 'item' : 'items'} — only one place fits on a single-place Activity. Pick one to keep, or clear the location.`,
+    convertToPlaceDiscardOption: "Don't keep any — clear the location",
+    confirmCta: 'Switch',
+    cancelCta: 'Cancel',
+    errorGeneric: 'Could not switch this activity. Please try again.',
+  },
   checklistItems: {
     title: 'Places to explore',
     empty: 'No places added yet.',

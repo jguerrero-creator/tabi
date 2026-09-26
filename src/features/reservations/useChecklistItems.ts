@@ -99,5 +99,14 @@ export function useChecklistItems(reservationId: string, tripId: string) {
     setItems((prev) => prev.filter((item) => item.id !== itemId))
   }, [])
 
-  return { items, loading, error, addItem, renameItem, deleteItem, refetch: fetchItems }
+  // Converting a checklist Activity back to a single place: only one address can be kept
+  // on the reservation row, so the rest of the list is cleared rather than left orphaned
+  // (see ReservationDetailScreen's handleSubtypeChange).
+  const clearItems = useCallback(async () => {
+    const { error: deleteError } = await supabase.from('checklist_items').delete().eq('reservation_id', reservationId)
+    if (deleteError) throw deleteError
+    setItems([])
+  }, [reservationId])
+
+  return { items, loading, error, addItem, renameItem, deleteItem, clearItems, refetch: fetchItems }
 }

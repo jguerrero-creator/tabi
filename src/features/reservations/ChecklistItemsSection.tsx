@@ -9,12 +9,19 @@ import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import type { Reservation } from '../../types/reservation'
+import type { ChecklistItem } from '../../types/checklistItem'
 import type { ResolvedPlace } from './AddReservationModal'
 import { ActivityPlaceSearchModal } from './ActivityPlaceSearchModal'
-import { useChecklistItems, type NewChecklistItemInput } from './useChecklistItems'
+import type { NewChecklistItemInput } from './useChecklistItems'
 
 interface ChecklistItemsSectionProps {
   reservation: Reservation
+  items: ChecklistItem[]
+  loading: boolean
+  error: string | null
+  addItem: (input: NewChecklistItemInput) => Promise<ChecklistItem>
+  renameItem: (itemId: string, name: string) => Promise<ChecklistItem>
+  deleteItem: (itemId: string) => Promise<void>
 }
 
 type AddStep = 'search' | 'manual' | null
@@ -25,12 +32,21 @@ type AddStep = 'search' | 'manual' | null
  * sub-records, not full Reservations of their own, added via the same rich Places
  * search regular Activities already use. No per-item "done" state, per spec (reference
  * list only) — an item's only actions are rename and remove.
+ *
+ * items/loading/error/addItem/renameItem/deleteItem come from a single useChecklistItems
+ * instance owned by ReservationDetailScreen (not called here) — that screen also needs the
+ * current item list for its place↔checklist subtype-conversion flow, and a second
+ * independent hook instance here would drift out of sync with it.
  */
-export function ChecklistItemsSection({ reservation }: ChecklistItemsSectionProps) {
-  const { items, loading, error, addItem, renameItem, deleteItem } = useChecklistItems(
-    reservation.id,
-    reservation.trip_id,
-  )
+export function ChecklistItemsSection({
+  reservation,
+  items,
+  loading,
+  error,
+  addItem,
+  renameItem,
+  deleteItem,
+}: ChecklistItemsSectionProps) {
   const [addStep, setAddStep] = useState<AddStep>(null)
   const [manualName, setManualName] = useState('')
   const [saving, setSaving] = useState(false)

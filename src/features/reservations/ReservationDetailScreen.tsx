@@ -33,13 +33,15 @@ import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
-import type { Reservation, ReservationStatus, TransportMode } from '../../types/reservation'
+import type { ActivitySubtype, Reservation, ReservationStatus, TransportMode } from '../../types/reservation'
+import type { ChecklistItem } from '../../types/checklistItem'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
 import { checkClosedAtPlannedTime, WEEKDAY_NAMES } from './closedOnDay'
 import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
+import { useChecklistItems } from './useChecklistItems'
 import { useReservation } from './useReservation'
 import { ChecklistItemsSection } from './ChecklistItemsSection'
 import { VehicleRentalLegsSection } from './VehicleRentalLegsSection'
@@ -230,6 +232,21 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   // location", fixed at creation, never surfaced as an editable picker) and it has no single
   // fixed place of its own — its candidate places live in ChecklistItemsSection instead.
   const isChecklist = reservation.type === 'activity' && reservation.activity_subtype === 'checklist'
+  // Single useChecklistItems instance for this whole screen — called unconditionally (Rules of
+  // Hooks; harmless no-op query for non-Activity types) so both the picker below and
+  // ChecklistItemsSection share one source of truth instead of drifting out of sync.
+  const {
+    items: checklistItems,
+    loading: checklistItemsLoading,
+    error: checklistItemsError,
+    addItem: addChecklistItem,
+    renameItem: renameChecklistItem,
+    deleteItem: deleteChecklistItem,
+    clearItems: clearChecklistItems,
+  } = useChecklistItems(reservation.id, reservation.trip_id)
+  const [switchingSubtype, setSwitchingSubtype] = useState(false)
+  const [subtypeSwitchError, setSubtypeSwitchError] = useState<string | null>(null)
+  const [convertToPlaceChooserOpen, setConvertToPlaceChooserOpen] = useState(false)
   const isTransportAtDisposal = reservation.type === 'transport' && reservation.transport_subtype === 'at_disposal'
   const transportLegLabels = isTransportAtDisposal
     ? strings.reservationLegLabelsAtDisposal
@@ -301,6 +318,111 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
   async function handleStatusChange(status: ReservationStatus) {
     await onUpdate({ status })
+  }
+
+  // Backlog: "Permettre de convertir une Activité existante (place) en checklist... sans
+  // perdre les notes" — `note` is a generic field never touched by either branch below, so it
+  // survives automatically; only the location-specific fields (place ↔ checklist_items) move.
+  async function handleSubtypeChange(next: ActivitySubtype) {
+    if (next === reservation.activity_subtype) return
+    setSubtypeSwitchError(null)
+    if (next === 'checklist') {
+      await convertToChecklist()
+    } else if (checklistItems.length > 0) {
+      setConvertToPlaceChooserOpen(true)
+    } else {
+      await convertToPlace(null)
+    }
+  }
+
+  // place → checklist: the existing linked place (if any) is preserved as the checklist's
+  // first item rather than discarded — it's real work the traveler already did finding it.
+  async function convertToChecklist() {
+    setSwitchingSubtype(true)
+    try {
+      const hasExistingPlace = reservation.start_lat !== null || reservation.start_address !== null
+      if (hasExistingPlace) {
+        await addChecklistItem({
+          name: reservation.start_place_name ?? reservation.name,
+          place: {
+            address: reservation.start_address,
+            lat: reservation.start_lat,
+            lng: reservation.start_lng,
+            googlePlaceId: reservation.place_google_id,
+            category: reservation.place_category,
+            rating: reservation.place_rating,
+            userRatingsTotal: reservation.place_user_ratings_total,
+            photoRef: reservation.place_photo_ref,
+          },
+        })
+      }
+      await onUpdate({
+        activity_subtype: 'checklist',
+        // A checklist's status is fixed/hidden (see isChecklist gates below) — must actually
+        // be decide_later once the picker disappears, not just visually ignored.
+        status: 'decide_later',
+        start_address: null,
+        start_lat: null,
+        start_lng: null,
+        start_place_name: null,
+        start_city: null,
+        place_google_id: null,
+        place_rating: null,
+        place_user_ratings_total: null,
+        place_photo_ref: null,
+        place_category: null,
+        place_opening_hours: null,
+      })
+      // The "Start address" field below has its own local edit-buffer (startAddress/startPlace)
+      // independent of `reservation` — onUpdate alone won't refresh it, so it'd otherwise keep
+      // showing the just-cleared address until the user touches the field or reloads the page.
+      setStartAddress('')
+      setStartPlace(null)
+      showSavedToast(strings.common.saved)
+    } catch (err) {
+      logClientError('ReservationDetailScreen.convertToChecklist', err)
+      setSubtypeSwitchError(strings.activitySubtypeSwitch.errorGeneric)
+    } finally {
+      setSwitchingSubtype(false)
+    }
+  }
+
+  // checklist → place: only one address fits on a place-subtype Activity. `chosen` is the
+  // item to promote (its address/place metadata copied onto the reservation itself), or null
+  // to clear the location entirely — either way the whole checklist_items list is then cleared,
+  // since leaving items behind would let them silently reappear on a later switch back.
+  async function convertToPlace(chosen: ChecklistItem | null) {
+    setSwitchingSubtype(true)
+    try {
+      await onUpdate(
+        chosen
+          ? {
+              activity_subtype: 'place',
+              start_address: chosen.address,
+              start_lat: chosen.lat,
+              start_lng: chosen.lng,
+              start_place_name: chosen.name,
+              place_google_id: chosen.place_google_id,
+              place_rating: chosen.place_rating,
+              place_user_ratings_total: chosen.place_user_ratings_total,
+              place_photo_ref: chosen.place_photo_ref,
+              place_category: chosen.place_category,
+            }
+          : { activity_subtype: 'place' },
+      )
+      if (checklistItems.length > 0) await clearChecklistItems()
+      // Same local edit-buffer resync as convertToChecklist above — reflect the promoted
+      // item's address (or a cleared field, if discarding) immediately, not just in `reservation`.
+      setStartAddress(chosen?.address ?? '')
+      setStartPlace(null)
+      setConvertToPlaceChooserOpen(false)
+      showSavedToast(strings.common.saved)
+    } catch (err) {
+      logClientError('ReservationDetailScreen.convertToPlace', err)
+      setSubtypeSwitchError(strings.activitySubtypeSwitch.errorGeneric)
+    } finally {
+      setSwitchingSubtype(false)
+    }
   }
 
   // Preview-only: the resolved place name is only known once an address has been
@@ -666,6 +788,20 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
           <MiniMap points={points} />
 
+          {reservation.type === 'activity' && (
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {strings.addReservation.activitySubtypeLabel}
+              </p>
+              <ActivitySubtypePicker
+                value={reservation.activity_subtype ?? 'place'}
+                onChange={handleSubtypeChange}
+                disabled={switchingSubtype}
+              />
+              {subtypeSwitchError && <p className="mt-1 text-sm text-red-600">{subtypeSwitchError}</p>}
+            </div>
+          )}
+
           {!isChecklist && (
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -983,10 +1119,28 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           </form>
 
           {isTransportAtDisposal && <VehicleRentalLegsSection reservation={reservation} />}
-          {isChecklist && <ChecklistItemsSection reservation={reservation} />}
+          {isChecklist && (
+            <ChecklistItemsSection
+              reservation={reservation}
+              items={checklistItems}
+              loading={checklistItemsLoading}
+              error={checklistItemsError}
+              addItem={addChecklistItem}
+              renameItem={renameChecklistItem}
+              deleteItem={deleteChecklistItem}
+            />
+          )}
         </div>
         {candidates && (
           <AddressCandidatePicker candidates={candidates} onSelect={selectCandidate} onCancel={cancelPick} />
+        )}
+        {convertToPlaceChooserOpen && (
+          <ConvertToPlaceDialog
+            items={checklistItems}
+            onConfirm={convertToPlace}
+            onCancel={() => setConvertToPlaceChooserOpen(false)}
+            confirming={switchingSubtype}
+          />
         )}
         {outOfPeriodConfirm && (
           <ConfirmDialog
@@ -1340,6 +1494,113 @@ function ParkingPicker({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+function ActivitySubtypePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: ActivitySubtype
+  onChange: (subtype: ActivitySubtype) => void
+  disabled?: boolean
+}) {
+  const options: ActivitySubtype[] = ['place', 'checklist']
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      {options.map((subtype) => {
+        const selected = subtype === value
+        return (
+          <button
+            key={subtype}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            onClick={() => onChange(subtype)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.activitySubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// Backlog: converting checklist → place needs an explicit choice, not a silent pick — only
+// one address fits on a place-subtype Activity, so the traveler decides which (if any)
+// candidate becomes the kept place; the rest of the list is cleared either way.
+function ConvertToPlaceDialog({
+  items,
+  onConfirm,
+  onCancel,
+  confirming,
+}: {
+  items: ChecklistItem[]
+  onConfirm: (chosen: ChecklistItem | null) => void
+  onCancel: () => void
+  confirming: boolean
+}) {
+  const [selectedId, setSelectedId] = useState<string | 'none'>(items[0]?.id ?? 'none')
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-sm space-y-4 rounded-t-2xl bg-white p-6 sm:rounded-2xl">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">{strings.activitySubtypeSwitch.convertToPlaceTitle}</h2>
+          <p className="mt-1 text-sm text-slate-600">{strings.activitySubtypeSwitch.convertToPlaceBody(items.length)}</p>
+        </div>
+        <div role="radiogroup" className="space-y-2">
+          {items.map((item) => {
+            const selected = selectedId === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setSelectedId(item.id)}
+                className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                  selected ? 'border-teal-600 bg-teal-50' : 'border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
+                {item.address && <p className="truncate text-xs text-slate-500">{item.address}</p>}
+              </button>
+            )
+          })}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={selectedId === 'none'}
+            onClick={() => setSelectedId('none')}
+            className={`w-full rounded-lg border p-3 text-left text-sm font-medium transition-colors ${
+              selectedId === 'none' ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.activitySubtypeSwitch.convertToPlaceDiscardOption}
+          </button>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={confirming}>
+            {strings.activitySubtypeSwitch.cancelCta}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => onConfirm(selectedId === 'none' ? null : (items.find((item) => item.id === selectedId) ?? null))}
+            disabled={confirming}
+          >
+            {strings.activitySubtypeSwitch.confirmCta}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
