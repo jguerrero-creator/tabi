@@ -11,6 +11,7 @@ import { ActivityPlaceSearchModal } from '../reservations/ActivityPlaceSearchMod
 import { checkClosedAtPlannedTime, WEEKDAY_NAMES } from '../reservations/closedOnDay'
 import { useCreateReservation } from '../reservations/useCreateReservation'
 import { useReservationsByType } from '../reservations/useReservationsByType'
+import { useTripChecklistItemNames } from '../reservations/useTripChecklistItemNames'
 import { strings } from '../../lib/strings'
 import { formatDateHeader, localDateKey } from '../../lib/datetime'
 import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
@@ -30,6 +31,7 @@ export function ActivitiesMenuScreen() {
     error: reservationsError,
     refetch: refetchReservations,
   } = useReservationsByType(tripId ?? '', 'activity')
+  const { namesByReservationId: checklistItemNamesByReservationId } = useTripChecklistItemNames(tripId ?? '')
   const { createReservation } = useCreateReservation(tripId ?? '')
   const [addStep, setAddStep] = useState<AddStep>(null)
   const [pendingPlace, setPendingPlace] = useState<ResolvedPlace | null>(null)
@@ -103,7 +105,7 @@ export function ActivitiesMenuScreen() {
                       status={reservation.status}
                       secondaryLabel={
                         reservation.activity_subtype === 'checklist'
-                          ? checklistCountLabel(reservation.checklist_item_count)
+                          ? checklistNamesLabel(checklistItemNamesByReservationId.get(reservation.id) ?? [])
                           : endLabel(reservation)
                       }
                       rating={
@@ -170,8 +172,11 @@ export function ActivitiesMenuScreen() {
   )
 }
 
-function checklistCountLabel(count: number): string {
-  return count === 0 ? strings.checklistItems.itemCountEmpty : strings.checklistItems.itemCount(count)
+// Backlog: "Carte Planning checklist : afficher la liste complète des noms de lieux" —
+// same full-list treatment as the Planning card, just comma-joined since this row's
+// secondaryLabel is a single-line string, not a multi-line block like the card's.
+function checklistNamesLabel(items: { id: string; name: string }[]): string {
+  return items.length === 0 ? strings.checklistItems.itemCountEmpty : items.map((item) => item.name).join(', ')
 }
 
 function endLabel(reservation: Reservation): string | null {

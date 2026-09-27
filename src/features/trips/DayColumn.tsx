@@ -15,6 +15,7 @@ import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
+import type { ChecklistItemName } from '../reservations/useTripChecklistItemNames'
 import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
@@ -118,6 +119,12 @@ interface DayColumnProps {
    * free-time blocks to drop into — same callback DayTabs itself uses.
    */
   onHoverDaySwitch?: (dayKey: string) => void
+  /**
+   * Checklist-subtype Activities' item names, trip-wide, keyed by reservation id (Backlog:
+   * "Carte Planning checklist : afficher la liste complète des noms de lieux") — the card
+   * shows every name, not a count, so it needs the actual list, not just checklist_item_count.
+   */
+  checklistItemNamesByReservationId?: Map<string, ChecklistItemName[]>
   className?: string
 }
 
@@ -139,6 +146,7 @@ export function DayColumn({
   onAddAtFreeBlock,
   onSaveReservationNote,
   onHoverDaySwitch,
+  checklistItemNamesByReservationId,
   className,
 }: DayColumnProps) {
   const [noteReservation, setNoteReservation] = useState<Reservation | null>(null)
@@ -219,7 +227,14 @@ export function DayColumn({
                 {entry.time ? formatTimeInZone(entry.time, entry.timezone ?? dayTimezone) : ''}
               </span>
               <span className="absolute -left-[1.4rem] top-2 h-3 w-3 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
-              {renderEntry(entry, dayKey, handleAddAtFreeBlock, onSaveReservationNote && setNoteReservation, onHoverDaySwitch)}
+              {renderEntry(
+                entry,
+                dayKey,
+                handleAddAtFreeBlock,
+                onSaveReservationNote && setNoteReservation,
+                onHoverDaySwitch,
+                checklistItemNamesByReservationId,
+              )}
             </li>
           ))}
         </ul>
@@ -384,10 +399,18 @@ function renderEntry(
   onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void,
   onOpenNote?: (reservation: Reservation) => void,
   onHoverDaySwitch?: (dayKey: string) => void,
+  checklistItemNamesByReservationId?: Map<string, ChecklistItemName[]>,
 ) {
   switch (entry.kind) {
     case 'reservation':
-      return <ReservationCard reservation={entry.reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch} />
+      return (
+        <ReservationCard
+          reservation={entry.reservation}
+          onOpenNote={onOpenNote}
+          onHoverDaySwitch={onHoverDaySwitch}
+          checklistItemNames={checklistItemNamesByReservationId?.get(entry.reservation.id)}
+        />
+      )
     case 'stay':
       return <TonightStayCard reservation={entry.reservation} />
     case 'transit':
@@ -469,12 +492,16 @@ function ReservationCard({
   reservation,
   onOpenNote,
   onHoverDaySwitch,
+  checklistItemNames,
 }: {
   reservation: DayItem
   onOpenNote?: (reservation: Reservation) => void
   onHoverDaySwitch?: (dayKey: string) => void
+  /** Undefined while the trip-wide fetch hasn't resolved yet — treated the same as empty, never a loading flicker worth blocking the card render for. */
+  checklistItemNames?: ChecklistItemName[]
 }) {
   const stayBadge = stayOccurrenceBadge(reservation)
+  const isChecklist = reservation.type === 'activity' && reservation.activity_subtype === 'checklist'
   return (
     <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch}>
       <span
@@ -497,9 +524,34 @@ function ReservationCard({
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
           <span className="truncate">{reservation.name}</span>
         </p>
-        {rowLabel(reservation) && <p className="truncate text-xs text-slate-500">{rowLabel(reservation)}</p>}
+        {isChecklist ? (
+          <ChecklistItemNamesList names={checklistItemNames ?? []} />
+        ) : (
+          rowLabel(reservation) && <p className="truncate text-xs text-slate-500">{rowLabel(reservation)}</p>
+        )}
       </div>
     </SwipeableReservationCard>
+  )
+}
+
+/**
+ * Backlog: "Carte Planning checklist : afficher la liste complète des noms de lieux" — every
+ * item name, in full, growing the card's height as needed rather than a count/preview. Each
+ * name is still its own line (not truncated) since a candidate-places list is exactly the kind
+ * of content a traveler needs to actually read at a glance, not just know the size of.
+ */
+function ChecklistItemNamesList({ names }: { names: ChecklistItemName[] }) {
+  if (names.length === 0) {
+    return <p className="text-xs text-slate-500">{strings.checklistItems.itemCountEmpty}</p>
+  }
+  return (
+    <ul className="mt-0.5 space-y-0.5">
+      {names.map((item) => (
+        <li key={item.id} className="text-xs text-slate-500">
+          {item.name}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -788,14 +840,10 @@ function dayHasTooLongTravel(items: Reservation[], freeTimeByFromId: Map<string,
 }
 
 function rowLabel(reservation: DayItem): string | null {
-  // TABI checklist: a checklist block has no single "Start · HH:MM" leg worth calling
-  // out (its position on the rail already conveys the time) — the item count is more
-  // useful at a glance, mirroring the menu row's own secondaryLabel (ActivitiesMenuScreen).
-  if (reservation.type === 'activity' && reservation.activity_subtype === 'checklist') {
-    return reservation.checklist_item_count === 0
-      ? strings.checklistItems.itemCountEmpty
-      : strings.checklistItems.itemCount(reservation.checklist_item_count)
-  }
+  // TABI checklist: a checklist block has no single "Start · HH:MM" leg worth calling out
+  // (its position on the rail already conveys the time) — ReservationCard shows its item
+  // names instead, via checklistItemNamesByReservationId, not this generic row label.
+  if (reservation.type === 'activity' && reservation.activity_subtype === 'checklist') return null
   if (!reservation.start_at) return null
   const labels = strings.reservationLegLabels[reservation.type]
   const isEndOccurrence = reservation.isCheckoutOccurrence || reservation.isArrivalOccurrence

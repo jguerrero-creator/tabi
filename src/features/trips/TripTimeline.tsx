@@ -17,6 +17,7 @@ import type { Reservation } from '../../types/reservation'
 import type { Trip } from '../../types/trip'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
+import type { ChecklistItemName } from '../reservations/useTripChecklistItemNames'
 import { ActivityReorderSuggestion } from './ActivityReorderSuggestion'
 import { DayColumn, type DayItem, type FreeBlockAddPayload } from './DayColumn'
 import { DayTabs, type DayTab } from './DayTabs'
@@ -67,6 +68,8 @@ interface TripTimelineProps {
   onReorderActivities: (updates: { id: string; start_at: string; end_at: string | null }[]) => Promise<void>
   /** TABI-76: existing "Getting Around" leg results (TABI-200), reused where possible instead of an extra Routes API call. */
   legModeState: Record<string, TripLegModeState>
+  /** Checklist-subtype Activities' item names, trip-wide (Backlog: "Carte Planning checklist : afficher la liste complète des noms de lieux") — passed straight through to every DayColumn. */
+  checklistItemNamesByReservationId: Map<string, ChecklistItemName[]>
 }
 
 type DayEdges = { leading?: DayEdgeFreeBlock; trailing?: DayEdgeFreeBlock; fullDay?: DayEdgeFreeBlock }
@@ -98,6 +101,7 @@ export function TripTimeline({
   onMoveReservation,
   onReorderActivities,
   legModeState,
+  checklistItemNamesByReservationId,
 }: TripTimelineProps) {
   const dayOccurrences = buildDayOccurrences(reservations)
   const groups = groupByDate(
@@ -251,6 +255,7 @@ export function TripTimeline({
           onClearDayNote={
             effectiveSelectedKey === UNSCHEDULED_KEY ? undefined : () => onClearDayNote(effectiveSelectedKey)
           }
+          checklistItemNamesByReservationId={checklistItemNamesByReservationId}
         />
       </div>
 
@@ -283,6 +288,7 @@ export function TripTimeline({
             dayNote={dayNotesByKey.get(day.key)}
             onSaveDayNote={day.key === UNSCHEDULED_KEY ? undefined : (note) => onSaveDayNote(day.key, note)}
             onClearDayNote={day.key === UNSCHEDULED_KEY ? undefined : () => onClearDayNote(day.key)}
+            checklistItemNamesByReservationId={checklistItemNamesByReservationId}
             className="w-80 shrink-0 snap-start"
           />
         ))}

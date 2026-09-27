@@ -19,6 +19,7 @@ import { NearbyPlacesMapModal } from '../reservations/NearbyPlacesMapModal'
 import { QuickAddModal } from '../reservations/QuickAddModal'
 import { SavePlaceModal } from '../reservations/SavePlaceModal'
 import { useCreateReservation } from '../reservations/useCreateReservation'
+import { useTripChecklistItemNames } from '../reservations/useTripChecklistItemNames'
 import { InboundImportAddressCard } from './InboundImportAddressCard'
 import { OverviewMap } from './OverviewMap'
 import type { FreeBlockAddPayload } from './DayColumn'
@@ -50,6 +51,7 @@ export function OverviewScreen() {
     updateReservationDates,
     reorderActivities,
   } = useTripReservations(tripId ?? '')
+  const { namesByReservationId: checklistItemNamesByReservationId } = useTripChecklistItemNames(tripId ?? '')
   const { createReservation } = useCreateReservation(tripId ?? '')
   // TABI-54: "+" on a free-time timeline block opens the shared Add sheet
   // (defaulted to Activity, the one type with no required address/price)
@@ -397,6 +399,7 @@ export function OverviewScreen() {
                   onMoveReservation={updateReservationDates}
                   onReorderActivities={reorderActivities}
                   legModeState={legModeState}
+                  checklistItemNamesByReservationId={checklistItemNamesByReservationId}
                 />
               </div>
             )}

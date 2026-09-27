@@ -362,7 +362,6 @@ export const strings = {
     loading: 'Loading places…',
     errorLoading: 'Could not load this checklist.',
     errorGeneric: 'Something went wrong. Please try again.',
-    itemCount: (count: number) => (count === 1 ? '1 place to explore' : `${count} places to explore`),
     itemCountEmpty: 'No places added yet',
   },
   stayMenu: {
