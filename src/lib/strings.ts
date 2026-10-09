@@ -719,6 +719,8 @@ export const strings = {
       subject
         ? `We couldn't read an email we received (subject: ${subject}).`
         : "We couldn't read an email we received.",
+    outOfPeriodWarning: (dateLabel: string, rangeLabel: string) =>
+      `Dated ${dateLabel}, outside this trip (${rangeLabel})`,
   },
   privacyPolicy: {
     title: 'Privacy Policy',

@@ -37,6 +37,41 @@ export function outOfPeriodField(candidate: DatedCandidate, trip: TripPeriod): O
   return null
 }
 
+interface NaiveDatedCandidate {
+  startDateTime?: string | null
+  endDateTime?: string | null
+}
+
+/**
+ * Early-warning check for the "From your inbox" banner (pending_reservation_imports): which
+ * naive extracted date (if any) falls outside the trip's current range — same inclusive-bounds
+ * rule as `outOfPeriodField` above (a date exactly on `trip.end_date` is in range, not outside;
+ * this is the same boundary that caused the 08-27 bug). Deliberately never routed through
+ * `localDateKey`/timezone resolution: the extraction has no resolved timezone until the user
+ * opens the review form and geocodes an address (same reasoning as
+ * `mapExtractedReservation`'s `splitNaiveIsoDateTime`) — so this reads the YYYY-MM-DD digits
+ * as printed, a plain string comparison against the trip's own plain date strings. Returns the
+ * offending date key to display, or null when both are in range or either side's date is
+ * missing (no trip dates yet, or extraction didn't find a date) — start takes priority when
+ * both are out, same as `outOfPeriodField`.
+ */
+export function extractedDateOutOfPeriod(candidate: NaiveDatedCandidate, trip: TripPeriod): string | null {
+  if (!trip.start_date || !trip.end_date) return null
+
+  const startKey = naiveDateKey(candidate.startDateTime)
+  const endKey = naiveDateKey(candidate.endDateTime)
+
+  if (startKey && (startKey < trip.start_date || startKey > trip.end_date)) return startKey
+  if (endKey && (endKey < trip.start_date || endKey > trip.end_date)) return endKey
+  return null
+}
+
+function naiveDateKey(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const match = iso.match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
 /** The smallest [start_date, end_date) that extends the trip to cover the candidate. */
 export function extendedTripRange(
   candidate: DatedCandidate,

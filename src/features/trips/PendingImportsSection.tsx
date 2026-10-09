@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatDayPillLabel } from '../../lib/datetime'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
@@ -6,14 +7,35 @@ import type { ExtractedReservation } from '../../types/extractedReservation'
 import type { NewReservation, Reservation } from '../../types/reservation'
 import { AddReservationModal } from '../reservations/AddReservationModal'
 import { mapExtractedReservation } from '../reservations/mapExtractedReservation'
+import { extractedDateOutOfPeriod } from '../reservations/tripPeriod'
 import type { PendingReservationImport } from './usePendingReservationImports'
 
 interface PendingImportsSectionProps {
   tripId: string
   tripCurrency: string | null
+  // Backlog: "Bannière From your inbox : avertir qu'une réservation reçue par email est datée
+  // hors des dates du voyage" — lets each row warn before the user even opens Review, using
+  // data already fetched (usePendingReservationImports' `select('*')` already includes
+  // `extracted`). Null trip dates (still loading) just suppress the warning, same as a missing
+  // extracted date — never an error state.
+  tripStartDate: string | null
+  tripEndDate: string | null
   pendingImports: PendingReservationImport[]
   onResolve: (id: string, outcome: 'confirmed' | 'dismissed') => Promise<void>
   onCreate: (input: Omit<NewReservation, 'trip_id'>) => Promise<Reservation>
+}
+
+/** "Dated Oct 28, outside this trip (Dec 26 – Jan 9)" or null — see `extractedDateOutOfPeriod`. */
+function outOfPeriodWarning(
+  item: PendingReservationImport,
+  trip: { start_date: string | null; end_date: string | null },
+): string | null {
+  if (!trip.start_date || !trip.end_date) return null
+  const extracted = item.extracted as unknown as ExtractedReservation
+  const outOfPeriodDate = extractedDateOutOfPeriod(extracted, trip)
+  if (!outOfPeriodDate) return null
+  const rangeLabel = `${formatDayPillLabel(trip.start_date)} – ${formatDayPillLabel(trip.end_date)}`
+  return strings.pendingImports.outOfPeriodWarning(formatDayPillLabel(outOfPeriodDate), rangeLabel)
 }
 
 // TABI: review UI for the async import channel — a forwarded booking confirmation
@@ -27,6 +49,8 @@ interface PendingImportsSectionProps {
 export function PendingImportsSection({
   tripId,
   tripCurrency,
+  tripStartDate,
+  tripEndDate,
   pendingImports,
   onResolve,
   onCreate,
@@ -70,6 +94,12 @@ export function PendingImportsSection({
                     <p className="truncate text-xs text-slate-500">
                       {strings.pendingImports.fromLabel(item.sender_email)}
                     </p>
+                    {(() => {
+                      const warning = outOfPeriodWarning(item, { start_date: tripStartDate, end_date: tripEndDate })
+                      return warning ? (
+                        <p className="truncate text-xs font-medium text-amber-700">{warning}</p>
+                      ) : null
+                    })()}
                   </>
                 )}
               </div>

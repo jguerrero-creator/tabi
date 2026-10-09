@@ -311,6 +311,8 @@ export function OverviewScreen() {
                   <PendingImportsSection
                     tripId={tripId ?? ''}
                     tripCurrency={trip?.currency ?? null}
+                    tripStartDate={trip?.start_date ?? null}
+                    tripEndDate={trip?.end_date ?? null}
                     pendingImports={pendingImports}
                     onResolve={resolvePendingImport}
                     onCreate={async (input) => {
