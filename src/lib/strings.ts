@@ -715,6 +715,10 @@ export const strings = {
     fromLabel: (senderEmail: string) => `Forwarded by ${senderEmail}`,
     reviewCta: 'Review',
     dismissCta: 'Dismiss',
+    failedMessage: (subject: string | null) =>
+      subject
+        ? `We couldn't read an email we received (subject: ${subject}).`
+        : "We couldn't read an email we received.",
   },
   privacyPolicy: {
     title: 'Privacy Policy',

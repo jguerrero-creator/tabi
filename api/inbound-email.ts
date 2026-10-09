@@ -18,7 +18,7 @@
 // any additional trust to a forwarded email over a pasted/uploaded one.
 import { createClient } from '@supabase/supabase-js'
 import { requireEntitlementForOrganizer } from './_lib/entitlements.js'
-import type { ContentBlockParam, ExtractResult } from './_lib/extraction.js'
+import type { ContentBlockParam, ExtractedReservation, ExtractResult } from './_lib/extraction.js'
 import { runExtractionStreaming } from './_lib/extraction.js'
 import { checkTripRateLimit } from './_lib/tripRateLimit.js'
 import { verifySvixSignature } from './_lib/svixVerify.js'
@@ -36,18 +36,9 @@ const MAX_ATTACHMENT_SIZE_BYTES = 15 * 1024 * 1024
 // A real photo of a ticket/receipt, even compressed, is essentially always well above
 // this — a genuinely tiny image attachment is a template logo/icon, not booking
 // content. Second layer of defense behind the content_disposition filter in
-// buildContentBlock below, for a sender/client that omits that header. Not applied to
-// PDFs, since a real single-page e-ticket PDF can legitimately be a few KB.
+// selectFallbackAttachment below, for a sender/client that omits that header. Not
+// applied to PDFs, since a real single-page e-ticket PDF can legitimately be a few KB.
 const MIN_IMAGE_ATTACHMENT_SIZE_BYTES = 15 * 1024
-
-// Cheap pre-filter before ever calling Claude: only applies when there's no supported
-// attachment (an attachment is already a strong positive signal worth extracting on its
-// own). A near-empty body — an auto-reply, a bounce notice, a bare forward with the
-// real content only in an attachment we don't support — isn't worth the extraction
-// call. Deliberately conservative (length only, no keyword matching) since a false
-// negative here means a real booking is silently never reviewed; a wasted Claude call
-// on a genuinely too-short email is the safer failure mode.
-const MIN_TEXT_BODY_LENGTH = 30
 
 interface ResendWebhookEvent {
   type: string
@@ -61,7 +52,7 @@ interface ResendWebhookEvent {
   }
 }
 
-interface ResendReceivedEmail {
+export interface ResendReceivedEmail {
   html: string | null
   text: string | null
   attachments: Array<{
@@ -72,6 +63,8 @@ interface ResendReceivedEmail {
     size: number
   }>
 }
+
+type ResendAttachment = ResendReceivedEmail['attachments'][number]
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
@@ -165,8 +158,16 @@ export default async function handler(request: Request): Promise<Response> {
   }
   const email: ResendReceivedEmail = await emailResponse.json()
 
-  const contentBlock = await buildContentBlock(email, resendApiKey, event.data.email_id)
-  if (!contentBlock) {
+  // Body-first (see the "Import par email" bug — a GetYourGuide activity confirmation's
+  // real booking facts were sitting in the text body, but a genuinely-attached, non-inline
+  // Terms & Conditions PDF was picked instead, because the old buildContentBlock() treated
+  // *any* non-inline PDF/image as reason enough to skip the body entirely, with no check
+  // that the attachment itself held anything useful). The body is virtually always the
+  // richest source for a forwarded confirmation; an attachment is only reached for when
+  // there's no body at all, or (below, after extraction) the body turned out empty.
+  const bodyBlock = buildBodyContentBlock(email)
+  const primaryBlock = bodyBlock ?? (await buildAttachmentFallbackBlock(email, resendApiKey, event.data.email_id))
+  if (!primaryBlock) {
     console.log('inbound-email: no usable content, skipping extraction', event.data.email_id)
     return new Response('No usable content', { status: 200 })
   }
@@ -183,7 +184,7 @@ export default async function handler(request: Request): Promise<Response> {
   // accumulation, so a genuine mid-stream failure no longer gets a retry — only a
   // stream-open failure (returned synchronously below) still does.
   const opened = await runExtractionStreaming(
-    contentBlock,
+    primaryBlock,
     'Extract this reservation from the forwarded email above.',
     anthropicApiKey,
     'inbound-email',
@@ -217,18 +218,63 @@ export default async function handler(request: Request): Promise<Response> {
         return
       }
 
+      // One fallback retry against a supported attachment — only when the body is what we
+      // actually sent as the primary attempt (if there was no body at all, the attachment
+      // fallback above already *was* the primary attempt, so there's nothing left to retry
+      // with) and only when the body came back with nothing usable. Runs here, inside the
+      // already-committed background stream, specifically so a second sequential Claude call
+      // never risks the TTFB cap Resend's response is judged against.
+      if (bodyBlock && isEmptyExtraction(result.result)) {
+        console.log('inbound-email: body extraction came back empty, retrying once against an attachment', trip.id)
+        const fallbackBlock = await buildAttachmentFallbackBlock(email, resendApiKey, event.data.email_id)
+        if (fallbackBlock) {
+          const fallbackOpened = await runExtractionStreaming(
+            fallbackBlock,
+            'Extract this reservation from the forwarded email above.',
+            anthropicApiKey,
+            'inbound-email-fallback',
+          )
+          if (fallbackOpened.status === 'error') {
+            console.error('inbound-email: failed to open fallback extraction stream', trip.id, fallbackOpened.error)
+          } else {
+            try {
+              const fallbackResult = await fallbackOpened.consume()
+              if (fallbackResult.status === 'ok') {
+                result = fallbackResult
+              } else {
+                console.error('inbound-email: fallback attachment extraction failed', trip.id, fallbackResult.error)
+              }
+            } catch (error) {
+              console.error('inbound-email: fallback attachment extraction failed unexpectedly', trip.id, error)
+            }
+          }
+        }
+      }
+
+      // An all-null (or name/date-less) result — including after the fallback above — is a
+      // failure to surface, never a normal import to confirm: opening AddReservationModal
+      // with nothing pre-filled is indistinguishable from this channel being silently broken.
+      // Stored with outcome: 'failed' rather than skipped outright, so Overview can still tell
+      // the organizer an email came in and let them dismiss it, and so there's a record to
+      // investigate rather than a silently dropped webhook event.
+      const empty = isEmptyExtraction(result.result)
+      if (empty) {
+        console.log('inbound-email: extraction produced nothing usable, storing as a failed import', trip.id)
+      }
+
       const { error: insertError } = await supabase.from('pending_reservation_imports').insert({
         trip_id: trip.id,
         sender_email: event.data.from,
         subject: event.data.subject ?? null,
         extracted: result.result,
+        outcome: empty ? 'failed' : null,
       })
 
       if (insertError) {
         console.error('inbound-email: failed to store pending import', trip.id, insertError)
       }
 
-      controller.enqueue(encoder.encode('OK'))
+      controller.enqueue(encoder.encode(empty ? 'Extraction empty' : 'OK'))
       controller.close()
     },
   })
@@ -242,62 +288,97 @@ function extractLocalPart(address: string): string | null {
   return address.slice(0, at).trim().toLowerCase()
 }
 
-async function buildContentBlock(
+// The body is virtually always the richest source for a forwarded confirmation — no
+// minimum-length gate here (that used to decide whether the body was "worth" an
+// extraction call at all; now the decision is made on the *result*, see
+// isEmptyExtraction below, never on how short the input looked going in). Only a
+// genuinely empty body (no text, no HTML to fall back to) returns null.
+export function buildBodyContentBlock(email: ResendReceivedEmail): ContentBlockParam | null {
+  const text = (email.text ?? stripHtml(email.html ?? '')).trim()
+  if (!text) return null
+  return { type: 'text', text }
+}
+
+// 2026-09-21/22 fix, unchanged: a real forwarded Booking.com confirmation carried 13
+// attachments, all tiny (< 8KB) PNG/GIF template logos/icons — Outlook/Hotmail
+// re-serializes an HTML email's inline `cid:`-referenced images as numbered attachment
+// parts (ATT00001.png, ...) when forwarding. `content_disposition === 'inline'` is the
+// real, direct signal for this (a genuinely user-attached ticket/photo is never marked
+// inline); the size floor below is a second layer for a sender/client that omits that
+// header rather than the primary defense. This only selects which attachment is worth
+// falling back to — it no longer decides whether the body gets looked at first.
+export function selectFallbackAttachment(attachments: ResendAttachment[] | undefined): ResendAttachment | null {
+  return (
+    attachments?.find((attachment) => {
+      if (attachment.content_disposition === 'inline') return false
+      if (attachment.content_type === 'application/pdf') return true
+      if (ALLOWED_IMAGE_TYPES.includes(attachment.content_type)) {
+        return attachment.size >= MIN_IMAGE_ATTACHMENT_SIZE_BYTES
+      }
+      return false
+    }) ?? null
+  )
+}
+
+async function fetchAttachmentContentBlock(
+  attachment: ResendAttachment,
+  resendApiKey: string,
+  emailId: string,
+): Promise<ContentBlockParam | null> {
+  if (attachment.size > MAX_ATTACHMENT_SIZE_BYTES) {
+    console.log('inbound-email: attachment too large, skipping', emailId, attachment.size)
+    return null
+  }
+
+  const attachmentResponse = await fetch(
+    `${RESEND_API_BASE}/emails/receiving/${emailId}/attachments/${attachment.id}`,
+    { headers: { Authorization: `Bearer ${resendApiKey}` } },
+  )
+  if (!attachmentResponse.ok) {
+    console.error('inbound-email: failed to fetch attachment metadata', await attachmentResponse.text())
+    return null
+  }
+  const { download_url: downloadUrl } = (await attachmentResponse.json()) as { download_url?: string }
+  if (!downloadUrl) return null
+
+  const fileResponse = await fetch(downloadUrl)
+  if (!fileResponse.ok) {
+    console.error('inbound-email: failed to download attachment content', fileResponse.status)
+    return null
+  }
+  const base64 = bytesToBase64(new Uint8Array(await fileResponse.arrayBuffer()))
+
+  return attachment.content_type === 'application/pdf'
+    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+    : { type: 'image', source: { type: 'base64', media_type: attachment.content_type, data: base64 } }
+}
+
+export async function buildAttachmentFallbackBlock(
   email: ResendReceivedEmail,
   resendApiKey: string,
   emailId: string,
 ): Promise<ContentBlockParam | null> {
-  // Incident (2026-09-22): a real forwarded Booking.com confirmation carried 13
-  // attachments, all tiny (< 8KB) PNG/GIF template logos/icons — Outlook/Hotmail
-  // re-serializes an HTML email's inline `cid:`-referenced images as numbered
-  // attachment parts (ATT00001.png, ...) when forwarding. The original `.find()` had
-  // no concept of inline-vs-attached and grabbed the first one, sending Claude a
-  // logo instead of the actual booking text (which was sitting right there in the
-  // body) — extraction correctly returned all-null for a logo. `content_disposition
-  // === 'inline'` is the real, direct signal for this (a genuinely user-attached
-  // ticket/photo is never marked inline); the size floor below is a second layer for
-  // a sender/client that omits that header rather than the primary defense.
-  const supportedAttachment = email.attachments?.find((attachment) => {
-    if (attachment.content_disposition === 'inline') return false
-    if (attachment.content_type === 'application/pdf') return true
-    if (ALLOWED_IMAGE_TYPES.includes(attachment.content_type)) {
-      return attachment.size >= MIN_IMAGE_ATTACHMENT_SIZE_BYTES
-    }
-    return false
-  })
+  const attachment = selectFallbackAttachment(email.attachments)
+  if (!attachment) return null
+  return fetchAttachmentContentBlock(attachment, resendApiKey, emailId)
+}
 
-  if (supportedAttachment) {
-    if (supportedAttachment.size > MAX_ATTACHMENT_SIZE_BYTES) {
-      console.log('inbound-email: attachment too large, skipping', emailId, supportedAttachment.size)
-      return null
-    }
-
-    const attachmentResponse = await fetch(
-      `${RESEND_API_BASE}/emails/receiving/${emailId}/attachments/${supportedAttachment.id}`,
-      { headers: { Authorization: `Bearer ${resendApiKey}` } },
-    )
-    if (!attachmentResponse.ok) {
-      console.error('inbound-email: failed to fetch attachment metadata', await attachmentResponse.text())
-      return null
-    }
-    const { download_url: downloadUrl } = (await attachmentResponse.json()) as { download_url?: string }
-    if (!downloadUrl) return null
-
-    const fileResponse = await fetch(downloadUrl)
-    if (!fileResponse.ok) {
-      console.error('inbound-email: failed to download attachment content', fileResponse.status)
-      return null
-    }
-    const base64 = bytesToBase64(new Uint8Array(await fileResponse.arrayBuffer()))
-
-    return supportedAttachment.content_type === 'application/pdf'
-      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-      : { type: 'image', source: { type: 'base64', media_type: supportedAttachment.content_type, data: base64 } }
-  }
-
-  const text = (email.text ?? stripHtml(email.html ?? '')).trim()
-  if (text.length < MIN_TEXT_BODY_LENGTH) return null
-  return { type: 'text', text }
+// A result with nothing a confirmation screen could usefully show — every field null, or
+// (a looser but still useless case) some weak type/subtype guess with neither a name nor a
+// date to anchor it. Used both to decide whether the attachment fallback is worth trying and,
+// after it, whether to store the import as outcome: 'failed' instead of a normal pending one.
+export function isEmptyExtraction(result: ExtractedReservation): boolean {
+  const allNull =
+    result.type === null &&
+    result.name === null &&
+    result.startAddress === null &&
+    result.endAddress === null &&
+    result.startDateTime === null &&
+    result.endDateTime === null &&
+    result.confirmationNumber === null &&
+    result.price === null
+  if (allNull) return true
+  return !result.name && !result.startDateTime
 }
 
 function stripHtml(html: string): string {

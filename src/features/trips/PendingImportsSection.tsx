@@ -53,32 +53,47 @@ export function PendingImportsSection({
         {strings.pendingImports.title}
       </h2>
       <ul className="divide-y divide-amber-200 overflow-hidden rounded-xl border border-amber-200 bg-amber-50">
-        {pendingImports.map((item) => (
-          <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">
-                {item.subject || strings.pendingImports.noSubject}
-              </p>
-              <p className="truncate text-xs text-slate-500">{strings.pendingImports.fromLabel(item.sender_email)}</p>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDismiss(item.id)}
-                className="rounded-full px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
-              >
-                {strings.pendingImports.dismissCta}
-              </button>
-              <button
-                type="button"
-                onClick={() => setReviewing(item)}
-                className="rounded-full bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800"
-              >
-                {strings.pendingImports.reviewCta}
-              </button>
-            </div>
-          </li>
-        ))}
+        {pendingImports.map((item) => {
+          const failed = item.outcome === 'failed'
+          return (
+            <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                {failed ? (
+                  <p className="truncate text-sm font-medium text-slate-700">
+                    {strings.pendingImports.failedMessage(item.subject)}
+                  </p>
+                ) : (
+                  <>
+                    <p className="truncate text-sm font-medium text-slate-900">
+                      {item.subject || strings.pendingImports.noSubject}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {strings.pendingImports.fromLabel(item.sender_email)}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDismiss(item.id)}
+                  className="rounded-full px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                >
+                  {strings.pendingImports.dismissCta}
+                </button>
+                {!failed && (
+                  <button
+                    type="button"
+                    onClick={() => setReviewing(item)}
+                    className="rounded-full bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800"
+                  >
+                    {strings.pendingImports.reviewCta}
+                  </button>
+                )}
+              </div>
+            </li>
+          )
+        })}
       </ul>
 
       {reviewing && prefill && (
