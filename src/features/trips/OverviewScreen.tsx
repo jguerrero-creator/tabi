@@ -8,6 +8,7 @@ import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import { useProfile } from '../../lib/useProfile'
+import { bookByBadgeInfo } from '../reservations/bookByBadge'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { Reminder } from '../../types/reminder'
@@ -335,6 +336,7 @@ export function OverviewScreen() {
                                   ? formatInZone(item.reservation.start_at, item.reservation.start_timezone)
                                   : null
                               }
+                              bookByBadge={bookByBadgeInfo(item.reservation)}
                             />
                           ) : (
                             <li

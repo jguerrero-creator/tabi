@@ -161,6 +161,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(reservation.stay_parking_included)
   const [transportMode, setTransportMode] = useState<TransportMode | null>(reservation.transport_mode)
   const [checkInDeadline, setCheckInDeadline] = useState(reservation.stay_check_in_deadline?.slice(0, 5) ?? '')
+  const [bookByDate, setBookByDate] = useState(reservation.book_by_date ?? '')
   // TABI-144: check-in/check-out time may be a standard default (see AddReservationModal) —
   // editable here, with the original snapshot kept to detect an actual edit before clearing
   // the "default" flag (mirrors the address dirty-check in geocodeIfChanged below).
@@ -318,6 +319,16 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
   async function handleStatusChange(status: ReservationStatus) {
     await onUpdate({ status })
+  }
+
+  // New feature, 2026-09-30: autosaves immediately, mirroring handleStatusChange right
+  // above — it lives outside the main form for the same reason status does (it's an
+  // always-visible control next to it, not part of the Save/Cancel-gated field set).
+  // Preserved across a status toggle rather than cleared (decided behavior): this only
+  // ever writes book_by_date, never touches status itself.
+  async function handleBookByDateChange(value: string) {
+    setBookByDate(value)
+    await onUpdate({ book_by_date: value || null })
   }
 
   // Backlog: "Permettre de convertir une Activité existante (place) en checklist... sans
@@ -809,6 +820,17 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               </p>
               <StatusPicker value={reservation.status} onChange={handleStatusChange} />
             </div>
+          )}
+
+          {!isChecklist && reservation.status === 'to_book' && (
+            <Field label={strings.reservationDetail.bookByDateLabel} className="w-40">
+              <input
+                type="date"
+                value={bookByDate}
+                onChange={(e) => handleBookByDateChange(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+              />
+            </Field>
           )}
 
           <TypeSpecificZone reservation={reservation} />

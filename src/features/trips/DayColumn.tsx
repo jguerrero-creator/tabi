@@ -1,5 +1,6 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { BookByBadge } from '../../components/ui/BookByBadge'
 import { ReservationIcon, reservationTypeTextClasses } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
 import { statusDotClasses, statusTextClasses } from '../../components/menu/statusDotClasses'
@@ -15,6 +16,7 @@ import type { TravelMode } from '../../lib/travelTime'
 import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
+import { bookByBadgeInfo } from '../reservations/bookByBadge'
 import type { ChecklistItemName } from '../reservations/useTripChecklistItemNames'
 import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
@@ -502,6 +504,7 @@ function ReservationCard({
 }) {
   const stayBadge = stayOccurrenceBadge(reservation)
   const isChecklist = reservation.type === 'activity' && reservation.activity_subtype === 'checklist'
+  const bookByBadge = bookByBadgeInfo(reservation)
   return (
     <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch}>
       <span
@@ -523,6 +526,7 @@ function ReservationCard({
         <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
           <span className="truncate">{reservation.name}</span>
+          {bookByBadge && <BookByBadge info={bookByBadge} />}
         </p>
         {isChecklist ? (
           <ChecklistItemNamesList names={checklistItemNames ?? []} />
@@ -784,6 +788,7 @@ function GripIcon({ className }: { className?: string }) {
  */
 function TonightStayCard({ reservation }: { reservation: Reservation }) {
   const location = reservation.start_place_name ?? reservation.start_city ?? reservation.start_address
+  const bookByBadge = bookByBadgeInfo(reservation)
   return (
     <Link
       to={`/reservations/${reservation.id}`}
@@ -797,6 +802,7 @@ function TonightStayCard({ reservation }: { reservation: Reservation }) {
         <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
           <span className="truncate">{reservation.name}</span>
+          {bookByBadge && <BookByBadge info={bookByBadge} />}
         </p>
         {location && <p className="truncate text-xs text-slate-500">{location}</p>}
       </div>
@@ -811,6 +817,7 @@ function TonightStayCard({ reservation }: { reservation: Reservation }) {
  * particular day, just a state the traveler is already in.
  */
 function InTransitCard({ reservation }: { reservation: Reservation }) {
+  const bookByBadge = bookByBadgeInfo(reservation)
   return (
     <Link
       to={`/reservations/${reservation.id}`}
@@ -828,6 +835,7 @@ function InTransitCard({ reservation }: { reservation: Reservation }) {
         <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
           <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
           <span className="truncate">{reservation.name}</span>
+          {bookByBadge && <BookByBadge info={bookByBadge} />}
         </p>
       </div>
     </Link>

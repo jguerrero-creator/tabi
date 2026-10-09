@@ -219,6 +219,7 @@ export function AddReservationModal({
   // used for the start-date/location prefills below.
   const [nameManuallyEdited, setNameManuallyEdited] = useState(Boolean(initialName))
   const [status, setStatus] = useState<ReservationStatus>('to_book')
+  const [bookByDate, setBookByDate] = useState('')
   const [startAddress, setStartAddress] = useState(
     () => initialStartPlace?.formattedAddress ?? initialStartAddressText ?? '',
   )
@@ -599,6 +600,9 @@ export function AddReservationModal({
       // "decide on location", fixed and never surfaced as an editable picker (see
       // ReservationDetailScreen's own isChecklist gate).
       status: isChecklist ? 'decide_later' : status,
+      // New feature, 2026-09-30: preserved regardless of the field's current visibility
+      // (e.g. the user set it, then toggled status away) rather than discarded on submit.
+      book_by_date: isChecklist ? null : bookByDate || null,
       confirmation_number: confirmationNumber.trim() || null,
       note: note.trim() || null,
       price_amount: priceAmount.trim() === '' ? null : Number(priceAmount),
@@ -895,6 +899,22 @@ export function AddReservationModal({
             <p className="mb-1 text-sm font-medium text-slate-700">{strings.addReservation.statusLabel}</p>
             <StatusPicker value={status} onChange={setStatus} />
           </div>
+        )}
+
+        {/* New feature, 2026-09-30: an optional "book by" target date, only relevant while
+            the reservation is still "To book" — hidden the rest of the time rather than
+            disabled, same pattern as the other sub-type-conditional fields on this form.
+            Not reset on a status toggle: switching away and back preserves whatever was
+            typed, per the decided behavior. */}
+        {!isChecklist && status === 'to_book' && (
+          <Field label={strings.addReservation.bookByDateLabel} className="w-40">
+            <input
+              type="date"
+              value={bookByDate}
+              onChange={(event) => setBookByDate(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+            />
+          </Field>
         )}
 
         {/* TABI checklist: a checklist block has no single fixed location of its own — its

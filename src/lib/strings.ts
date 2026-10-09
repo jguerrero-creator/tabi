@@ -161,6 +161,17 @@ export const strings = {
     to_book: 'To book',
     decide_later: 'On location',
   },
+  /** New feature request, 2026-09-30: an optional target date for booking a "To book"
+   * reservation, surfaced as a small days-remaining/overdue badge next to its status pill
+   * wherever that pill already appears (Overview's "Needs attention" list, Planning cards).
+   * Purely visual — no notifications, no email integration (that's deferred to V2). */
+  bookBy: {
+    fieldLabel: 'Book by',
+    badgeDaysLeft: (days: number) => `+${days}`,
+    badgeOverdue: (days: number) => `-${days}`,
+    badgeTitleDaysLeft: (days: number) => `${days} day${days === 1 ? '' : 's'} left to book by target date`,
+    badgeTitleOverdue: (days: number) => `${days} day${days === 1 ? '' : 's'} past book-by target date`,
+  },
   reservationType: {
     stay: 'Stay',
     transport: 'Transport',
@@ -174,6 +185,7 @@ export const strings = {
   reservationLegLabelsAtDisposal: { start: 'Pick-up', end: 'Drop-off' },
   reservationDetail: {
     statusLabel: 'Status',
+    bookByDateLabel: 'Book by',
     save: 'Save',
     delete: 'Delete',
     deleteConfirm: 'Delete this reservation? This cannot be undone.',
@@ -493,6 +505,7 @@ export const strings = {
     // (e.g. "New Hotel") — stays editable, never a validation requirement of its own.
     suggestedName: (subtypeLabel: string) => `New ${subtypeLabel}`,
     statusLabel: 'Status',
+    bookByDateLabel: 'Book by',
     startAddressLabel: 'Address',
     startAddressLabelTransport: 'Departure address',
     endAddressLabel: 'Arrival address',

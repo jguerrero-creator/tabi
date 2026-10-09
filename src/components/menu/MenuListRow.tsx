@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
+import { BookByBadge } from '../ui/BookByBadge'
 import { ReservationIcon, reservationTypeBadgeClasses } from '../ui/ReservationTypeIcon'
 import { statusDotClasses } from './statusDotClasses'
 import { strings } from '../../lib/strings'
+import type { BookByBadgeInfo } from '../../features/reservations/bookByBadge'
 import type {
   ActivitySubtype,
   ReservationStatus,
@@ -33,6 +35,9 @@ interface MenuListRowProps {
   activitySubtype?: ActivitySubtype | null
   /** Optional trailing content on the row's right edge, e.g. a cost (budget category detail list). */
   trailing?: React.ReactNode
+  /** Book-by days-remaining/overdue badge (new feature, 2026-09-30) — null/undefined
+   * renders nothing, same as the other optional badges on this row. */
+  bookByBadge?: BookByBadgeInfo | null
 }
 
 const flagToneClasses: Record<MenuRowFlag['tone'], string> = {
@@ -55,6 +60,7 @@ export function MenuListRow({
   transportMode,
   activitySubtype,
   trailing,
+  bookByBadge,
 }: MenuListRowProps) {
   return (
     <li>
@@ -80,6 +86,7 @@ export function MenuListRow({
           <p className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-900">
             <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[status]}`} />
             <span className="truncate">{title}</span>
+            {bookByBadge && <BookByBadge info={bookByBadge} />}
           </p>
           {secondaryLabel && <p className="text-xs text-slate-500">{secondaryLabel}</p>}
           {overlapBadge && <p className="text-[11px] text-slate-400">{overlapBadge}</p>}

@@ -244,6 +244,7 @@ export type Database = {
           activity_subtype:
             | Database["public"]["Enums"]["activity_subtype"]
             | null
+          book_by_date: string | null
           checklist_item_count: number
           confirmation_number: string | null
           created_at: string
@@ -290,6 +291,7 @@ export type Database = {
           activity_subtype?:
             | Database["public"]["Enums"]["activity_subtype"]
             | null
+          book_by_date?: string | null
           checklist_item_count?: number
           confirmation_number?: string | null
           created_at?: string
@@ -336,6 +338,7 @@ export type Database = {
           activity_subtype?:
             | Database["public"]["Enums"]["activity_subtype"]
             | null
+          book_by_date?: string | null
           checklist_item_count?: number
           confirmation_number?: string | null
           created_at?: string
