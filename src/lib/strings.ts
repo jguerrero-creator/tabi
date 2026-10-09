@@ -167,10 +167,10 @@ export const strings = {
    * Purely visual — no notifications, no email integration (that's deferred to V2). */
   bookBy: {
     fieldLabel: 'Book by',
-    badgeDaysLeft: (days: number) => `+${days}`,
-    badgeOverdue: (days: number) => `-${days}`,
-    badgeTitleDaysLeft: (days: number) => `${days} day${days === 1 ? '' : 's'} left to book by target date`,
-    badgeTitleOverdue: (days: number) => `${days} day${days === 1 ? '' : 's'} past book-by target date`,
+    badgeDaysLeft: (days: number) => `${days} day${days === 1 ? '' : 's'}`,
+    badgeOverdue: (days: number) => `${days} day${days === 1 ? '' : 's'} late`,
+    badgeTitleDaysLeft: (days: number) => `${days} day${days === 1 ? '' : 's'} left to book`,
+    badgeTitleOverdue: (days: number) => `${days} day${days === 1 ? '' : 's'} overdue to book`,
   },
   reservationType: {
     stay: 'Stay',

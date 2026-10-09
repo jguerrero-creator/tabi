@@ -2,8 +2,9 @@ import { localDateKey, localTimeZone } from '../../lib/datetime'
 import type { Reservation } from '../../types/reservation'
 
 export interface BookByBadgeInfo {
-  /** Signed days from today to the book-by date (book_by_date minus today). Zero or
-   * positive means there's still time (green); negative means overdue (red). */
+  /** Signed days from today to the book-by date (book_by_date minus today). Positive
+   * means there's still time (green); zero or negative means overdue (red) — the
+   * deadline day itself counts as overdue, per 2026-10-09 decided behavior. */
   days: number
   overdue: boolean
 }
@@ -30,7 +31,7 @@ export function bookByBadgeInfo(reservation: Reservation): BookByBadgeInfo | nul
   }
 
   const days = daysBetween(todayKey, reservation.book_by_date)
-  return { days, overdue: days < 0 }
+  return { days, overdue: days <= 0 }
 }
 
 /** Signed day count from `fromDateKey` to `toDateKey` (both YYYY-MM-DD), diffed at UTC
