@@ -59,6 +59,12 @@ export function SavePlaceModal({ tripId, onClose, onCreate }: SavePlaceModalProp
     try {
       await onCreate({
         type: 'activity',
+        // Bugs DB: this direct insert (skipping AddReservationModal's own form, which
+        // always defaults this) never set activity_subtype, so every save here has
+        // violated the activity_subtype CHECK constraint (added 2026-09-26, TABI
+        // checklist feature) ever since — a hard failure with no fallback, unlike
+        // OverviewScreen's sibling shortcut below, which at least degrades to the form.
+        activity_subtype: 'place',
         status: 'to_book',
         name: place.placeName ?? place.formattedAddress,
         start_address: place.formattedAddress,
