@@ -508,7 +508,7 @@ function ReservationCard({
   return (
     <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch}>
       <span
-        className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ${
+        className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white ${
           reservation.type === 'stay' ? statusTextClasses[reservation.status] : reservationTypeTextClasses[reservation.type]
         }`}
       >
@@ -629,7 +629,7 @@ function SwipeableReservationCard({
     }
   }
 
-  const cardClasses = `flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-3 hover:bg-slate-200 ${isBeingDragged ? 'opacity-40' : ''}`
+  const cardClasses = `flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-slate-100 px-3 py-3 hover:bg-slate-200 ${isBeingDragged ? 'opacity-40' : ''}`
 
   if (!onOpenNote) {
     return (
@@ -679,7 +679,7 @@ function SwipeableReservationCard({
             onOpenNote(reservation)
           }}
           aria-label={strings.reservationNote.openLabel}
-          className="hidden w-8 shrink-0 items-center justify-center rounded-r-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-teal-700 pointer-fine:flex"
+          className="hidden w-7 shrink-0 items-center justify-center rounded-r-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-teal-700 pointer-fine:flex"
         >
           📝
         </button>
@@ -758,7 +758,7 @@ function DragHandle({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
-      className="flex w-6 shrink-0 touch-none items-center justify-center self-stretch rounded-l-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing"
+      className="flex w-[22px] shrink-0 touch-none items-center justify-center self-stretch rounded-l-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing"
     >
       <GripIcon className="h-4 w-4" />
     </button>
