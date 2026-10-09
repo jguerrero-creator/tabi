@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AddressCandidatePicker } from '../../components/ui/AddressCandidatePicker'
 import { Button } from '../../components/ui/Button'
@@ -57,6 +57,14 @@ const ACTIVITY_START_DATE_FIELD_ID = 'reservation-activity-start-date'
 
 type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
+// Collapsing to 'auto' first keeps the scrollHeight read below accurate when text shrinks
+// (e.g. a paste gets undone) — the textarea's CSS min-height floor still clamps the
+// rendered box throughout, so this never flashes down to a tiny box in between.
+function autosizeNoteTextarea(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
 type DatedCandidate = {
   start_at: string | null
   end_at: string | null
@@ -111,18 +119,30 @@ export function ReservationDetailScreen() {
   )
 }
 
-function ScreenShell({ onBack, children }: { onBack: () => void; children: React.ReactNode }) {
+// Sticky (not FormSheet's bounded-height/overflow-auto modal trick) since this is a full
+// page with document-level scroll — same "Save always reachable" intent as FormSheet's
+// floating header (TABI-145), just the full-page equivalent of it.
+function ScreenShell({
+  onBack,
+  headerActions,
+  children,
+}: {
+  onBack: () => void
+  headerActions?: ReactNode
+  children: ReactNode
+}) {
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-4xl">
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-4">
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4">
         <button
           type="button"
           onClick={onBack}
           aria-label={strings.common.back}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
         >
           ←
         </button>
+        {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
       </header>
       <main className="px-4 py-4">{children}</main>
     </div>
@@ -140,6 +160,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   // TABI-16: currency is inherited from the trip, never picked per reservation — this screen
   // needs the trip to fill in a reservation saved without a price (price_currency still null).
   const { trip, updateDates: updateTripDates } = useTrip(reservation.trip_id)
+  // Save moves to the sticky header (outside this screen's <form>) but must stay the same
+  // submit — the form attribute wires a header button back to this id.
+  const formId = useId()
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -317,6 +341,12 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     if (!checkInDate || nights.trim() === '' || !Number.isFinite(n) || n < 1) return
     setCheckOutDate(addDays(checkInDate, Math.trunc(n)))
   }, [reservation.type, manualEndDate, checkInDate, nights])
+
+  // Sizes Notes for any pre-existing note on load, same as the onChange call below does
+  // while typing.
+  useEffect(() => {
+    if (noteTextareaRef.current) autosizeNoteTextarea(noteTextareaRef.current)
+  }, [])
 
   async function handleStatusChange(status: ReservationStatus) {
     await onUpdate({ status })
@@ -792,71 +822,90 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   }
 
   return (
-    <ScreenShell onBack={onBack}>
+    <ScreenShell
+      onBack={onBack}
+      headerActions={
+        <>
+          <Button variant="secondary" onClick={handleDelete} disabled={deleting}>
+            {strings.reservationDetail.delete}
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            disabled={saving || geocoding || (!isAutoNamedTransport && !name.trim())}
+          >
+            {strings.reservationDetail.save}
+          </Button>
+        </>
+      }
+    >
         <div className="space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[reservation.type]}`}
-              >
-                <ReservationIcon reservation={reservation} className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
-                  {strings.reservationType[reservation.type]}
-                </p>
-                <h1 className="text-lg font-semibold text-slate-900">{reservation.name}</h1>
-              </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button variant="secondary" onClick={handleDelete} disabled={deleting}>
-                {strings.reservationDetail.delete}
-              </Button>
+          <div className="flex items-start gap-3">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${reservationTypeBadgeClasses[reservation.type]}`}
+            >
+              <ReservationIcon reservation={reservation} className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
+                {strings.reservationType[reservation.type]}
+              </p>
+              <h1 className="text-lg font-semibold text-slate-900">{reservation.name}</h1>
             </div>
           </div>
 
-          <MiniMap points={points} />
-
-          {reservation.type === 'activity' && (
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {strings.addReservation.activitySubtypeLabel}
-              </p>
-              <ActivitySubtypePicker
-                value={reservation.activity_subtype ?? 'place'}
-                onChange={handleSubtypeChange}
-                disabled={switchingSubtype}
-              />
-              {subtypeSwitchError && <p className="mt-1 text-sm text-red-600">{subtypeSwitchError}</p>}
+          {/* Desktop (lg): map left, type/status/Book-by column right, one row. Mobile:
+              unchanged stacked order (unprefixed classes only reorder nothing). */}
+          <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+            <div className="lg:col-start-1">
+              <MiniMap points={points} heightClassName="h-40 lg:h-64" />
             </div>
-          )}
+            <div className="space-y-4 lg:col-start-2 lg:mt-0">
+              {reservation.type === 'activity' && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {strings.addReservation.activitySubtypeLabel}
+                  </p>
+                  <ActivitySubtypePicker
+                    value={reservation.activity_subtype ?? 'place'}
+                    onChange={handleSubtypeChange}
+                    disabled={switchingSubtype}
+                  />
+                  {subtypeSwitchError && <p className="mt-1 text-sm text-red-600">{subtypeSwitchError}</p>}
+                </div>
+              )}
 
-          {!isChecklist && (
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {strings.reservationDetail.statusLabel}
-              </p>
-              <StatusPicker value={reservation.status} onChange={handleStatusChange} />
+              {!isChecklist && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {strings.reservationDetail.statusLabel}
+                  </p>
+                  <StatusPicker value={reservation.status} onChange={handleStatusChange} />
+                </div>
+              )}
+
+              {!isChecklist && reservation.status === 'to_book' && (
+                <Field label={strings.reservationDetail.bookByDateLabel} className="w-40">
+                  <input
+                    type="date"
+                    value={bookByDate}
+                    onChange={(e) => handleBookByDateChange(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                  />
+                </Field>
+              )}
             </div>
-          )}
+          </div>
 
-          {!isChecklist && reservation.status === 'to_book' && (
-            <Field label={strings.reservationDetail.bookByDateLabel} className="w-40">
-              <input
-                type="date"
-                value={bookByDate}
-                onChange={(e) => handleBookByDateChange(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
-              />
-            </Field>
-          )}
-
+          {/* Recap card: read-only leg/time + stay/place summary, same block on mobile and
+              desktop (TypeSpecificZone already renders its own card chrome). */}
           <TypeSpecificZone reservation={reservation} />
 
           <form
+            id={formId}
             onSubmit={handleSave}
             noValidate
-            className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:items-start"
+            className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 lg:grid lg:grid-cols-2 lg:gap-x-6"
           >
             {/* Desktop (lg): this wrapper is the LEFT "properties" column — everything up to
                 and including the confirmation number. Notes (below) becomes the RIGHT column
@@ -919,7 +968,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     type="date"
                     value={checkInDate}
                     onChange={(e) => setCheckInDate(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    className="w-full scroll-mt-20 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>
                 <Field label={strings.reservationDetail.checkInTimeLabel} className="flex-1">
@@ -943,7 +992,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                         value={checkOutDate}
                         onChange={(e) => setCheckOutDate(e.target.value)}
                         min={checkInDate || undefined}
-                        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                        className="w-full scroll-mt-20 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                       />
                     </Field>
                     <Field label={strings.reservationDetail.checkOutTimeLabel} className="flex-1">
@@ -1010,7 +1059,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     type="date"
                     value={activityStartDate}
                     onChange={(e) => setActivityStartDate(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    className="w-full scroll-mt-20 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>
                 <Field label={strings.reservationDetail.startTimeLabel} className="flex-1">
@@ -1043,7 +1092,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     type="date"
                     value={transportStartDate}
                     onChange={(e) => setTransportStartDate(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    className="w-full scroll-mt-20 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>
                 {!isTransportAtDisposal && (
@@ -1073,7 +1122,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     value={transportEndDate}
                     onChange={(e) => setTransportEndDate(e.target.value)}
                     min={transportStartDate || undefined}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    className="w-full scroll-mt-20 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:border-teal-600 focus:outline-none"
                   />
                 </Field>
                 {!isTransportAtDisposal && (
@@ -1120,13 +1169,16 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             </Field>
             </div>
             <div className="lg:col-start-2 lg:row-start-1 lg:mt-0">
-            <Field label={strings.reservationDetail.notesLabel}>
+            <Field label={strings.reservationDetail.notesLabel} className="lg:flex lg:flex-col lg:min-h-full">
               <textarea
+                ref={noteTextareaRef}
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  setNote(e.target.value)
+                  autosizeNoteTextarea(e.target)
+                }}
                 placeholder={strings.reservationDetail.notesPlaceholder}
-                rows={3}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                className="min-h-56 w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none lg:flex-1"
               />
             </Field>
             </div>
@@ -1163,15 +1215,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               />
             )}
             </div>
-            {/* Full-width footer row, spanning both desktop columns. */}
+            {/* Full-width footer row, spanning both desktop columns. Save now lives in the
+                sticky header via form={formId} (ScreenShell's headerActions), not here. */}
             <div className="space-y-3 lg:col-span-2">
             {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
             {formError && <p className="text-sm text-red-600">{formError}</p>}
-            <div className="flex justify-end gap-2 pt-1">
-              <Button type="submit" disabled={saving || geocoding || (!isAutoNamedTransport && !name.trim())}>
-                {strings.reservationDetail.save}
-              </Button>
-            </div>
             </div>
           </form>
 
