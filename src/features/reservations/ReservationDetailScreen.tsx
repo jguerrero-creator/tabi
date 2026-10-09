@@ -113,7 +113,7 @@ export function ReservationDetailScreen() {
 
 function ScreenShell({ onBack, children }: { onBack: () => void; children: React.ReactNode }) {
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50">
+    <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-4xl">
       <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-4">
         <button
           type="button"
@@ -856,8 +856,13 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
           <form
             onSubmit={handleSave}
             noValidate
-            className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"
+            className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:items-start"
           >
+            {/* Desktop (lg): this wrapper is the LEFT "properties" column — everything up to
+                and including the confirmation number. Notes (below) becomes the RIGHT column
+                via lg:col-start-2, while staying in its original DOM position so the mobile
+                layout (unprefixed classes) is untouched. */}
+            <div className="space-y-3 lg:col-start-1">
             {isAutoNamedTransport ? (
               <div>
                 <p className="mb-1 text-sm font-medium text-slate-700">{strings.reservationDetail.nameLabel}</p>
@@ -1113,6 +1118,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
               />
             </Field>
+            </div>
+            <div className="lg:col-start-2 lg:row-start-1 lg:mt-0">
             <Field label={strings.reservationDetail.notesLabel}>
               <textarea
                 value={note}
@@ -1122,6 +1129,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
               />
             </Field>
+            </div>
+            {/* Back to the LEFT column for the address fields — same lg:col-start-1 target as
+                the wrapper above; kept as a separate div only because Notes sits between them
+                in the DOM (see note above). */}
+            <div className="space-y-3 lg:col-start-1">
             {!isChecklist && (
               <PlaceAutocompleteField
                 id="reservation-start-address"
@@ -1150,12 +1162,16 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 citiesOnly={reservation.transport_subtype === 'at_disposal'}
               />
             )}
+            </div>
+            {/* Full-width footer row, spanning both desktop columns. */}
+            <div className="space-y-3 lg:col-span-2">
             {geocoding && <p className="text-sm text-slate-500">{strings.reservationDetail.geocoding}</p>}
             {formError && <p className="text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <Button type="submit" disabled={saving || geocoding || (!isAutoNamedTransport && !name.trim())}>
                 {strings.reservationDetail.save}
               </Button>
+            </div>
             </div>
           </form>
 
