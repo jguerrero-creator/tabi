@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-172 — the "Planning" nav button is lg:hidden on the desktop layout
 // (TABI-149), so it's only reachable at a mobile viewport.
@@ -40,28 +41,32 @@ test('Planning rail shows each entry in its own local timezone, not one day-wide
     const chicagoName = `E2E TZ rail Chicago ${runId}`
 
     // 9:00–11:00 AM in New York (America/New_York, EDT = UTC-4 in September).
-    const { error: nyError } = await client.from('reservations').insert({
-      trip_id: trip.id,
-      type: 'activity',
-      status: 'booked',
-      name: nyName,
-      start_at: '2026-09-10T13:00:00.000Z',
-      start_timezone: 'America/New_York',
-      end_at: '2026-09-10T15:00:00.000Z',
-      end_timezone: 'America/New_York',
-    })
+    const { error: nyError } = await client.from('reservations').insert(
+      activitySeed({
+        trip_id: trip.id,
+        type: 'activity',
+        status: 'booked',
+        name: nyName,
+        start_at: '2026-09-10T13:00:00.000Z',
+        start_timezone: 'America/New_York',
+        end_at: '2026-09-10T15:00:00.000Z',
+        end_timezone: 'America/New_York',
+      }),
+    )
     if (nyError) throw nyError
 
     // Same calendar day, but in Chicago (America/Chicago, CDT = UTC-5 in
     // September) — one dateKey ("2026-09-10") merges both under one day-tab.
-    const { error: chicagoError } = await client.from('reservations').insert({
-      trip_id: trip.id,
-      type: 'activity',
-      status: 'booked',
-      name: chicagoName,
-      start_at: '2026-09-10T21:00:00.000Z',
-      start_timezone: 'America/Chicago',
-    })
+    const { error: chicagoError } = await client.from('reservations').insert(
+      activitySeed({
+        trip_id: trip.id,
+        type: 'activity',
+        status: 'booked',
+        name: chicagoName,
+        start_at: '2026-09-10T21:00:00.000Z',
+        start_timezone: 'America/Chicago',
+      }),
+    )
     if (chicagoError) throw chicagoError
 
     await page.goto(`/trips/${trip.id}`)

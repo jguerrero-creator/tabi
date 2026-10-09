@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-27 — "Édition / suppression d'une réservation". Verifies both halves
 // on the shared detail screen: editing a field persists to the DB and is
@@ -36,12 +37,14 @@ test('a reservation can be edited and deleted from the detail screen', async ({ 
   try {
     const { data: reservation, error: reservationError } = await client
       .from('reservations')
-      .insert({
-        trip_id: trip.id,
-        type: 'activity',
-        name: `E2E activity ${runId}`,
-        start_at: '2026-09-01T10:00:00.000Z',
-      })
+      .insert(
+        activitySeed({
+          trip_id: trip.id,
+          type: 'activity',
+          name: `E2E activity ${runId}`,
+          start_at: '2026-09-01T10:00:00.000Z',
+        }),
+      )
       .select()
       .single()
     if (reservationError || !reservation) throw reservationError ?? new Error('Reservation insert returned no row')

@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // Mobile viewport: renders a single day's rail directly (no desktop multi-column
 // carousel to disambiguate against), matching this suite's existing convention for
@@ -76,21 +77,23 @@ test('suggests reordering untimed activities, dismiss leaves order untouched, ap
     for (const stop of stops) {
       const { data, error } = await client
         .from('reservations')
-        .insert({
-          trip_id: trip.id,
-          type: 'activity',
-          name: `E2E Activity ${stop.label}`,
-          status: 'to_book',
-          start_at: stop.startAt,
-          end_at: null,
-          start_time_is_default: true,
-          start_address: `Stop ${stop.label}, Test City`,
-          start_lat: STOP_LAT[stop.label],
-          start_lng: STOP_LNG,
-          start_place_name: `Stop ${stop.label}`,
-          start_city: 'Test City',
-          start_timezone: 'UTC',
-        })
+        .insert(
+          activitySeed({
+            trip_id: trip.id,
+            type: 'activity',
+            name: `E2E Activity ${stop.label}`,
+            status: 'to_book',
+            start_at: stop.startAt,
+            end_at: null,
+            start_time_is_default: true,
+            start_address: `Stop ${stop.label}, Test City`,
+            start_lat: STOP_LAT[stop.label],
+            start_lng: STOP_LNG,
+            start_place_name: `Stop ${stop.label}`,
+            start_city: 'Test City',
+            start_timezone: 'UTC',
+          }),
+        )
         .select()
         .single()
       if (error || !data) throw error ?? new Error(`Activity ${stop.label} insert returned no row`)
@@ -187,21 +190,23 @@ test('does not suggest anything for fewer than 3 untimed activities', async ({ p
       { label: 'A', startAt: '2026-09-10T00:00:00.000Z' },
       { label: 'D', startAt: '2026-09-10T00:01:00.000Z' },
     ] as const) {
-      const { error } = await client.from('reservations').insert({
-        trip_id: trip.id,
-        type: 'activity',
-        name: `E2E Activity ${stop.label}`,
-        status: 'to_book',
-        start_at: stop.startAt,
-        end_at: null,
-        start_time_is_default: true,
-        start_address: `Stop ${stop.label}, Test City`,
-        start_lat: STOP_LAT[stop.label],
-        start_lng: STOP_LNG,
-        start_place_name: `Stop ${stop.label}`,
-        start_city: 'Test City',
-        start_timezone: 'UTC',
-      })
+      const { error } = await client.from('reservations').insert(
+        activitySeed({
+          trip_id: trip.id,
+          type: 'activity',
+          name: `E2E Activity ${stop.label}`,
+          status: 'to_book',
+          start_at: stop.startAt,
+          end_at: null,
+          start_time_is_default: true,
+          start_address: `Stop ${stop.label}, Test City`,
+          start_lat: STOP_LAT[stop.label],
+          start_lng: STOP_LNG,
+          start_place_name: `Stop ${stop.label}`,
+          start_city: 'Test City',
+          start_timezone: 'UTC',
+        }),
+      )
       if (error) throw error
     }
 

@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // Desktop reproduction of the reported TABI-131 regression (Bugs DB:
 // "Régression TABI-131 : le retour depuis la fiche détail vers Planning ne
@@ -57,15 +58,17 @@ test('desktop: back from a reservation detail screen restores horizontal scroll 
     for (let i = 0; i < DAY_COUNT; i++) {
       const date = new Date(Date.UTC(2026, 8, 10 + i, 6, 0, 0)).toISOString()
       const name = `E2E desktop day-persist activity${i} ${runId}`
-      const { error } = await client.from('reservations').insert({
-        trip_id: trip.id,
-        type: 'activity',
-        status: 'booked',
-        name,
-        start_at: date,
-        start_timezone: 'Asia/Tokyo',
-        end_at: null,
-      })
+      const { error } = await client.from('reservations').insert(
+        activitySeed({
+          trip_id: trip.id,
+          type: 'activity',
+          status: 'booked',
+          name,
+          start_at: date,
+          start_timezone: 'Asia/Tokyo',
+          end_at: null,
+        }),
+      )
       if (error) throw error
     }
 

@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-5 — "Support de plusieurs types de réservation". Spec: "Le type de
 // réservation détermine l'icône et les champs affichés (ex: vol = numéro de
@@ -60,7 +61,7 @@ test('reservation type determines the icon and the fields shown on the detail sc
           end_at: END_AT,
           end_timezone: 'Europe/Paris',
         },
-        { trip_id: trip.id, type: 'activity', name: `E2E activity ${runId}`, start_at: START_AT, end_at: null },
+        activitySeed({ trip_id: trip.id, type: 'activity', name: `E2E activity ${runId}`, start_at: START_AT, end_at: null }),
       ])
       .select()
     if (reservationsError || !reservations) throw reservationsError ?? new Error('Reservation insert returned no rows')
@@ -74,8 +75,12 @@ test('reservation type determines the icon and the fields shown on the detail sc
     await page.goto(`/reservations/${byType.stay.id}`)
     await expect(page.getByRole('heading', { name: `E2E stay ${runId}` })).toBeVisible()
     await expect(page.getByText('Stay', { exact: true })).toBeVisible()
-    await expect(page.getByText('Check-in')).toBeVisible()
-    await expect(page.getByText('Check-out')).toBeVisible()
+    // Bugs DB: TABI-70/TABI-144 later added "Check-in deadline"/"Check-in date"/"Check-in
+    // time" field labels on this same screen — a plain substring match now resolves to
+    // multiple elements, so this needs `exact: true` to keep targeting the leg-label row
+    // (reservationLegLabels.stay) rather than one of those newer fields.
+    await expect(page.getByText('Check-in', { exact: true })).toBeVisible()
+    await expect(page.getByText('Check-out', { exact: true })).toBeVisible()
     await expect(page.getByText('End address')).toHaveCount(0)
     const stayIcon = await page.locator('svg[aria-hidden="true"]').first().innerHTML()
 
@@ -83,8 +88,15 @@ test('reservation type determines the icon and the fields shown on the detail sc
     await page.goto(`/reservations/${byType.transport.id}`)
     await expect(page.getByRole('heading', { name: `E2E transport ${runId}` })).toBeVisible()
     await expect(page.getByText('Transport', { exact: true })).toBeVisible()
-    await expect(page.getByText('Departure')).toBeVisible()
-    await expect(page.getByText('Arrival')).toBeVisible()
+    // Bugs DB: TABI-85 removed the read-only Departure/Arrival summary block for
+    // Transport specifically (TypeSpecificZone returns null for it — the date/time/
+    // address fields below are directly editable, so a static copy would just
+    // duplicate them). The bare "Departure"/"Arrival" leg label this test originally
+    // checked no longer exists in the DOM for Transport; the editable field labels
+    // (still Departure/Arrival-worded, not Start/End) are the current proof this
+    // type shows the right leg terminology.
+    await expect(page.getByText('Departure date', { exact: true })).toBeVisible()
+    await expect(page.getByText('Arrival date', { exact: true })).toBeVisible()
     await expect(page.getByText('End address')).toBeVisible()
     const transportIcon = await page.locator('svg[aria-hidden="true"]').first().innerHTML()
 

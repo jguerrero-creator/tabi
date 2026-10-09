@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-172 — the "Planning" nav button is lg:hidden on the desktop layout
 // (TABI-149), so it's only reachable at a mobile viewport.
@@ -48,15 +49,17 @@ test('back from a reservation detail screen returns to Planning on the same day 
       [day2Name, '2026-09-11T06:00:00.000Z'],
       [day3Name, '2026-09-12T06:00:00.000Z'],
     ] as const) {
-      const { error: insertError } = await client.from('reservations').insert({
-        trip_id: trip.id,
-        type: 'activity',
-        status: 'booked',
-        name,
-        start_at: startAt,
-        start_timezone: 'Asia/Tokyo',
-        end_at: null,
-      })
+      const { error: insertError } = await client.from('reservations').insert(
+        activitySeed({
+          trip_id: trip.id,
+          type: 'activity',
+          status: 'booked',
+          name,
+          start_at: startAt,
+          start_timezone: 'Asia/Tokyo',
+          end_at: null,
+        }),
+      )
       if (insertError) throw insertError
     }
 

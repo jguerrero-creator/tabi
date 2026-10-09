@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-124 — "Location de véhicule: jours couverts suivent les lieux
 // planifiés/hébergement". Spec: during days covered by an at-disposal vehicle
@@ -63,7 +64,7 @@ test('an at-disposal rental leg to a mid-rental activity uses the day planned lo
         end_lat: OSAKA_STATION.lat,
         end_lng: OSAKA_STATION.lng,
       },
-      {
+      activitySeed({
         trip_id: trip.id,
         type: 'activity',
         name: activityName,
@@ -72,7 +73,7 @@ test('an at-disposal rental leg to a mid-rental activity uses the day planned lo
         start_lat: NARA_PARK.lat,
         start_lng: NARA_PARK.lng,
         end_at: null,
-      },
+      }),
     ])
     if (reservationsError) throw reservationsError
 

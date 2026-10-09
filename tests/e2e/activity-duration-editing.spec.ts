@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-181 — Add Reservation: Activity replaces the end date/time fields with a duration
 // (hours + minutes), always resolving to the same calendar day as start.
@@ -36,14 +37,16 @@ test('Activity duration is entered on add and editable on the detail screen', as
     // --- TABI-182: an Activity that already exists with a start but no end/duration ---
     const { data: reservation, error: reservationError } = await client
       .from('reservations')
-      .insert({
-        trip_id: trip.id,
-        type: 'activity',
-        name: `E2E activity ${runId}`,
-        start_at: '2026-09-05T10:00:00.000Z',
-        start_timezone: 'UTC',
-        end_at: null,
-      })
+      .insert(
+        activitySeed({
+          trip_id: trip.id,
+          type: 'activity',
+          name: `E2E activity ${runId}`,
+          start_at: '2026-09-05T10:00:00.000Z',
+          start_timezone: 'UTC',
+          end_at: null,
+        }),
+      )
       .select()
       .single()
     if (reservationError || !reservation) throw reservationError ?? new Error('Reservation insert returned no row')

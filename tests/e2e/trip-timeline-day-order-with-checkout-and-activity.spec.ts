@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // Forces the mobile layout — see trip-timeline-day-edge-arrival-timezone.spec.ts
 // for why (Planning toggle button is lg:hidden on desktop).
@@ -73,16 +74,18 @@ test('a day with an Activity, a Stay check-out, and a Transport departure render
 
     // Feb 10, 08:00-09:00 JST — starts on the check-out day, before the
     // 10:00 JST check-out.
-    const { error: activityError } = await client.from('reservations').insert({
-      trip_id: trip.id,
-      type: 'activity',
-      status: 'booked',
-      name: activityName,
-      start_at: '2026-02-09T23:00:00.000Z',
-      start_timezone: 'Asia/Tokyo',
-      end_at: '2026-02-10T00:00:00.000Z',
-      end_timezone: 'Asia/Tokyo',
-    })
+    const { error: activityError } = await client.from('reservations').insert(
+      activitySeed({
+        trip_id: trip.id,
+        type: 'activity',
+        status: 'booked',
+        name: activityName,
+        start_at: '2026-02-09T23:00:00.000Z',
+        start_timezone: 'Asia/Tokyo',
+        end_at: '2026-02-10T00:00:00.000Z',
+        end_timezone: 'Asia/Tokyo',
+      }),
+    )
     if (activityError) throw activityError
 
     // Departs Feb 10, 18:09 JST — after the check-out.

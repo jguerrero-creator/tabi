@@ -1,5 +1,6 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
+import { activitySeed } from './support/reservationSeeds'
 
 // TABI-55 — "Vue Budget agrégée automatiquement depuis les réservations". Spec:
 // "Somme automatique des prix renseignés sur les réservations et activités
@@ -64,7 +65,7 @@ test('budget screen sums prices by category and flags partially-priced trips', a
       },
       // Deliberately unpriced — exercises the "N of M reservations have a price
       // entered" partial hint rather than being silently dropped from the count.
-      { trip_id: trip.id, type: 'activity', name: `E2E budget activity ${runId}`, start_at: START_AT, end_at: null },
+      activitySeed({ trip_id: trip.id, type: 'activity', name: `E2E budget activity ${runId}`, start_at: START_AT, end_at: null }),
     ])
     if (reservationsError) throw reservationsError
 
