@@ -53,6 +53,7 @@ const STAY_CHECKIN_DATE_FIELD_ID = 'reservation-checkin-date'
 const STAY_CHECKOUT_DATE_FIELD_ID = 'reservation-checkout-date'
 const TRANSPORT_START_DATE_FIELD_ID = 'reservation-transport-start-date'
 const TRANSPORT_END_DATE_FIELD_ID = 'reservation-transport-end-date'
+const ACTIVITY_START_DATE_FIELD_ID = 'reservation-activity-start-date'
 
 type ResolvedPlace = GeocodeResult & { placeName: string | null }
 
@@ -689,11 +690,23 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setGeocoding(false)
 
     // Bug fix: parity with AddReservationModal's TABI-113 out-of-period check, which the
-    // create flow already enforces — only Stay/Transport have a full start/end pair whose
-    // edit (checkout date, transport leg dates — the same fields TABI-210 wired a `min` to)
-    // can land outside the trip's current dates; never blocking, just an explicit confirm.
-    if ((reservation.type === 'stay' || reservation.type === 'transport') && trip?.start_date && trip?.end_date) {
-      const datePatch = reservation.type === 'stay' ? stayDatePatch : transportDatePatch
+    // create flow already enforces for every type. This edit-side gate originally covered
+    // only Stay/Transport (e8e48a3) on the mistaken premise that only they have an editable
+    // start/end pair — Activity's own start/duration edit (activityDatePatch, TABI-181/182)
+    // already existed in this same function a month before that fix landed and was simply
+    // missed. Covers both Activity subtypes (place and checklist share these same date/
+    // duration fields) — never blocking, just an explicit confirm.
+    if (
+      (reservation.type === 'stay' || reservation.type === 'transport' || reservation.type === 'activity') &&
+      trip?.start_date &&
+      trip?.end_date
+    ) {
+      const datePatch =
+        reservation.type === 'stay'
+          ? stayDatePatch
+          : reservation.type === 'transport'
+            ? transportDatePatch
+            : activityDatePatch
       const candidate: DatedCandidate = {
         start_at: 'start_at' in datePatch ? (datePatch.start_at ?? null) : reservation.start_at,
         end_at: 'end_at' in datePatch ? (datePatch.end_at ?? null) : reservation.end_at,
@@ -752,9 +765,14 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         ? field === 'end' && manualEndDate
           ? STAY_CHECKOUT_DATE_FIELD_ID
           : STAY_CHECKIN_DATE_FIELD_ID
-        : field === 'end'
-          ? TRANSPORT_END_DATE_FIELD_ID
-          : TRANSPORT_START_DATE_FIELD_ID
+        : reservation.type === 'transport'
+          ? field === 'end'
+            ? TRANSPORT_END_DATE_FIELD_ID
+            : TRANSPORT_START_DATE_FIELD_ID
+          // Activity has a single date input (duration derives the end) — 'end' here means
+          // the duration pushed past the trip's range, and the date field is still the most
+          // direct fix (the duration fields sit right below it).
+          : ACTIVITY_START_DATE_FIELD_ID
     // Wait a tick for the dialog to unmount before moving focus.
     requestAnimationFrame(() => {
       document.getElementById(targetId)?.focus()
@@ -983,6 +1001,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               <div className="flex gap-3">
                 <Field label={strings.reservationDetail.startDateLabel} className="flex-1">
                   <input
+                    id={ACTIVITY_START_DATE_FIELD_ID}
                     type="date"
                     value={activityStartDate}
                     onChange={(e) => setActivityStartDate(e.target.value)}
