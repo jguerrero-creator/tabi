@@ -318,6 +318,7 @@ export const strings = {
     selectMode: 'Select a travel mode to see travel time',
     addAsReservation: '+ Add reservation',
     directTransferBadge: 'Direct transfer',
+    attentionCount: (count: number) => (count === 1 ? '1 needs attention' : `${count} need attention`),
   },
   vehicleRentalLegs: {
     title: 'Daily legs',

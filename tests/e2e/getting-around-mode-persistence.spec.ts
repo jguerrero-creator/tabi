@@ -99,6 +99,9 @@ test('a leg travel mode and its computed/failed result persist across a reload',
     if (stayBError || !stayB) throw stayBError ?? new Error('Stay B insert returned no row')
 
     await page.goto(`/trips/${trip.id}`)
+    // Getting Around is collapsed by default on a trip's first Overview visit — expand it once;
+    // the choice persists (localStorage, per trip) across this test's reloads below.
+    await page.getByRole('button', { name: /Getting around/ }).click()
     await expect(page.getByText('E2E Stay Tokyo → E2E Stay Osaka')).toBeVisible()
 
     // 1. Pick Drive — a real Routes API call resolves it, and the "+ Add reservation" button

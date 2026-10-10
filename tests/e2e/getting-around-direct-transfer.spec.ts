@@ -95,6 +95,8 @@ test('a same-station transfer shows the Direct transfer badge', async ({ page, r
     if (stayBError || !stayB) throw stayBError ?? new Error('Stay B insert returned no row')
 
     await page.goto(`/trips/${trip.id}`)
+    // Getting Around is collapsed by default on a trip's first Overview visit — expand it once.
+    await page.getByRole('button', { name: /Getting around/ }).click()
     await expect(page.getByText('E2E Stay Tokyo → E2E Stay Osaka')).toBeVisible()
 
     const legRow = page.getByRole('listitem').filter({ hasText: 'E2E Stay Tokyo → E2E Stay Osaka' })

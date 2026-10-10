@@ -92,6 +92,8 @@ test('"+ Add" on a computed Getting Around leg opens the Add sheet prefilled as 
     if (stayBError || !stayB) throw stayBError ?? new Error('Stay B insert returned no row')
 
     await page.goto(`/trips/${trip.id}`)
+    // Getting Around is collapsed by default on a trip's first Overview visit — expand it once.
+    await page.getByRole('button', { name: /Getting around/ }).click()
     await expect(page.getByText('E2E Stay Tokyo → E2E Stay Osaka')).toBeVisible()
 
     // No mode chosen yet — the quick-add button isn't shown.

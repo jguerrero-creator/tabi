@@ -109,6 +109,9 @@ test('failed-mode legs collapse to a compact line and needs-attention legs sort 
     // Leg C-D: no mode picked at all — left untouched, no trip_leg_travel_modes row.
 
     await page.goto(`/trips/${trip.id}`)
+    // Getting Around is collapsed by default on a trip's first Overview visit — expand it to
+    // see the per-leg collapse/reorder behavior this spec is actually about.
+    await page.getByRole('button', { name: /Getting around/ }).click()
     await expect(page.getByText('E2E Stay Osaka → E2E Stay Kyoto')).toBeVisible()
 
     const legItems = page.getByRole('listitem')
