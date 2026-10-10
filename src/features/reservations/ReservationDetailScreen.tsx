@@ -132,7 +132,11 @@ function ScreenShell({
   children: ReactNode
 }) {
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-4xl">
+    // lg:max-w-[1600px] (not a stepped lg/xl/2xl max-w-*) so the page genuinely grows
+    // with the window between the lg breakpoint and the cap, instead of jumping between
+    // flat plateaus — 1600px keeps the widest grid columns (Notes, the properties
+    // column) comfortably readable rather than stretching into absurdly long lines.
+    <div className="mx-auto min-h-screen max-w-lg bg-slate-50 lg:max-w-[1600px]">
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4">
         <button
           type="button"
@@ -144,7 +148,7 @@ function ScreenShell({
         </button>
         {headerActions && <div className="flex shrink-0 items-center gap-2">{headerActions}</div>}
       </header>
-      <main className="px-4 py-4">{children}</main>
+      <main className="px-4 py-4 lg:px-8">{children}</main>
     </div>
   )
 }
@@ -854,11 +858,22 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             </div>
           </div>
 
-          {/* Desktop (lg): map left, type/status/Book-by column right, one row. Mobile:
-              unchanged stacked order (unprefixed classes only reorder nothing). */}
-          <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+          {/* Desktop (lg): map left, type/status/Book-by/recap column right, one row — no
+              lg:items-start override, so the grid's default item-stretch makes both
+              columns match the row's tallest content (CSS grid "stretch" behaviour).
+              Mobile: unchanged stacked order (unprefixed classes only reorder nothing;
+              this is one plain block per column, so moving the recap card inside the
+              second one doesn't change mobile's reading order at all). */}
+          <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-6">
             <div className="lg:col-start-1">
-              <MiniMap points={points} heightClassName="h-40 lg:h-64" />
+              {/* lg:h-full fills whatever height the grid row ends up being — driven by
+                  the status column's content (recap card and all) rather than a fixed
+                  h-64, so e.g. Transport's much shorter column (status + Book-by, no
+                  recap card at all) doesn't leave a tall map towering over a mostly-empty
+                  column. lg:min-h-48 is just a floor so a very short column (Transport,
+                  or a checklist Activity with its status picker hidden) never squashes
+                  the map down to something unusably small. */}
+              <MiniMap points={points} heightClassName="h-40 lg:h-full lg:min-h-48" />
             </div>
             <div className="space-y-4 lg:col-start-2 lg:mt-0">
               {reservation.type === 'activity' && (
@@ -894,12 +909,16 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   />
                 </Field>
               )}
+
+              {/* Recap card: read-only leg/time + stay/place summary (TypeSpecificZone
+                  renders its own card chrome, and null for Transport — see its own
+                  comment). Lives under Status/Book-by in this same column so it fills
+                  the space next to the map instead of spanning full width below the
+                  whole row (Backlog: "carte Check-in / Check-out placée sous le
+                  statut"). */}
+              <TypeSpecificZone reservation={reservation} />
             </div>
           </div>
-
-          {/* Recap card: read-only leg/time + stay/place summary, same block on mobile and
-              desktop (TypeSpecificZone already renders its own card chrome). */}
-          <TypeSpecificZone reservation={reservation} />
 
           <form
             id={formId}
