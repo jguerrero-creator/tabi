@@ -689,10 +689,13 @@ export const strings = {
   },
   reservationNote: {
     openLabel: 'Note',
+    openLabelEmpty: 'Note (empty)',
+    openLabelHasNote: 'Note (has note)',
     title: (reservationName: string) => `Note — ${reservationName}`,
     save: 'Save',
     cancel: 'Cancel',
     errorGeneric: 'Could not save this note. Please try again.',
+    discardChangesConfirm: 'Discard your changes to this note?',
   },
   reminders: {
     title: 'Reminders',

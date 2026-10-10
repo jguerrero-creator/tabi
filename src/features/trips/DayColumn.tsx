@@ -21,6 +21,7 @@ import type { ChecklistItemName } from '../reservations/useTripChecklistItemName
 import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
 import { DayPlannedLocation } from './DayPlannedLocation'
+import { ReservationNoteModal } from './ReservationNoteModal'
 import { ReservationNotePopup } from './ReservationNotePopup'
 import { dropTargetProps, hitTestDayTab, hitTestDropTarget, type FreeDropTarget } from '../../lib/reservationMove'
 import { useReservationDrag } from './reservationDrag'
@@ -151,7 +152,7 @@ export function DayColumn({
   checklistItemNamesByReservationId,
   className,
 }: DayColumnProps) {
-  const [noteReservation, setNoteReservation] = useState<Reservation | null>(null)
+  const [noteTarget, setNoteTarget] = useState<{ reservation: Reservation; variant: 'popup' | 'modal' } | null>(null)
   const dayTimezone = items[0]?.start_timezone ?? localTimeZone()
   const anchorInstant = items[0]?.start_at
 
@@ -233,7 +234,9 @@ export function DayColumn({
                 entry,
                 dayKey,
                 handleAddAtFreeBlock,
-                onSaveReservationNote && setNoteReservation,
+                onSaveReservationNote
+                  ? (reservation, variant) => setNoteTarget({ reservation, variant })
+                  : undefined,
                 onHoverDaySwitch,
                 checklistItemNamesByReservationId,
               )}
@@ -242,11 +245,18 @@ export function DayColumn({
         </ul>
       )}
 
-      {noteReservation && onSaveReservationNote && (
+      {noteTarget && onSaveReservationNote && noteTarget.variant === 'popup' && (
         <ReservationNotePopup
-          reservation={noteReservation}
+          reservation={noteTarget.reservation}
           onSave={onSaveReservationNote}
-          onClose={() => setNoteReservation(null)}
+          onClose={() => setNoteTarget(null)}
+        />
+      )}
+      {noteTarget && onSaveReservationNote && noteTarget.variant === 'modal' && (
+        <ReservationNoteModal
+          reservation={noteTarget.reservation}
+          onSave={onSaveReservationNote}
+          onClose={() => setNoteTarget(null)}
         />
       )}
     </div>
@@ -399,7 +409,7 @@ function renderEntry(
   entry: RailEntry,
   dayKey: string,
   onAddAtFreeBlock?: (input: { startAt: string; timezone: string | null }) => void,
-  onOpenNote?: (reservation: Reservation) => void,
+  onOpenNote?: (reservation: Reservation, variant: 'popup' | 'modal') => void,
   onHoverDaySwitch?: (dayKey: string) => void,
   checklistItemNamesByReservationId?: Map<string, ChecklistItemName[]>,
 ) {
@@ -497,7 +507,7 @@ function ReservationCard({
   checklistItemNames,
 }: {
   reservation: DayItem
-  onOpenNote?: (reservation: Reservation) => void
+  onOpenNote?: (reservation: Reservation, variant: 'popup' | 'modal') => void
   onHoverDaySwitch?: (dayKey: string) => void
   /** Undefined while the trip-wide fetch hasn't resolved yet — treated the same as empty, never a loading flicker worth blocking the card render for. */
   checklistItemNames?: ChecklistItemName[]
@@ -575,15 +585,23 @@ function transportModeCaption(reservation: Reservation): string | null {
 /** How far (px) the card slides to reveal the note action on a touch swipe. */
 const NOTE_REVEAL_WIDTH = 72
 
+/** A note made only of whitespace counts as empty (Backlog: icône colorée quand une note existe). */
+function reservationHasNote(reservation: Reservation): boolean {
+  return (reservation.note ?? '').trim().length > 0
+}
+
 /**
  * Wraps a reservation card's Link with quick note access (Backlog: Planning
  * slide-to-reveal / icon-strip). Touch devices swipe the card left to reveal
- * a "Note" button underneath; non-touch pointers (mouse/trackpad) instead get
- * a persistent icon strip on the card's right edge — Tailwind's `pointer-fine`/
- * `pointer-coarse` variants pick between the two (no touch/device-detection JS
- * needed, and no swipe library exists yet in this codebase to reuse). Tapping
- * the card while the swipe reveal is open closes it instead of navigating,
- * matching the standard swipe-to-reveal pattern.
+ * a "Note" button underneath — opens the small popup, unchanged; non-touch
+ * pointers (mouse/trackpad) instead get a persistent icon strip on the card's
+ * right edge, which opens the large desktop modal instead (Backlog: grande
+ * fenêtre sur desktop) — Tailwind's `pointer-fine`/`pointer-coarse` variants
+ * pick between the two (no touch/device-detection JS needed, and no swipe
+ * library exists yet in this codebase to reuse), and since they're already
+ * two distinct buttons this also doubles as the mobile/desktop split for
+ * which window opens. Tapping the card while the swipe reveal is open closes
+ * it instead of navigating, matching the standard swipe-to-reveal pattern.
  */
 function SwipeableReservationCard({
   reservation,
@@ -592,7 +610,7 @@ function SwipeableReservationCard({
   children,
 }: {
   reservation: DayItem
-  onOpenNote?: (reservation: Reservation) => void
+  onOpenNote?: (reservation: Reservation, variant: 'popup' | 'modal') => void
   onHoverDaySwitch?: (dayKey: string) => void
   children: ReactNode
 }) {
@@ -640,19 +658,25 @@ function SwipeableReservationCard({
   }
 
   const offset = dragX ?? (open ? -NOTE_REVEAL_WIDTH : 0)
+  const hasNote = reservationHasNote(reservation)
+  const noteAriaLabel = hasNote ? strings.reservationNote.openLabelHasNote : strings.reservationNote.openLabelEmpty
+  // Colour when a note exists, greyscale ("visibly empty") otherwise — same emoji glyph either way.
+  const noteIconClasses = hasNote ? '' : 'grayscale opacity-60'
 
   return (
     <div className="relative overflow-hidden rounded-xl">
       <button
         type="button"
         onClick={() => {
-          onOpenNote(reservation)
+          onOpenNote(reservation, 'popup')
           setOpen(false)
         }}
-        aria-label={strings.reservationNote.openLabel}
+        aria-label={noteAriaLabel}
+        title={noteAriaLabel}
+        data-has-note={hasNote}
         className="absolute inset-y-0 right-0 flex w-[72px] items-center justify-center gap-1 bg-teal-600 text-sm font-medium text-white pointer-fine:hidden"
       >
-        📝 {strings.reservationNote.openLabel}
+        <span className={noteIconClasses}>📝</span> {strings.reservationNote.openLabel}
       </button>
       <div
         className="relative flex touch-pan-y items-stretch"
@@ -676,12 +700,14 @@ function SwipeableReservationCard({
           type="button"
           onClick={(event) => {
             event.preventDefault()
-            onOpenNote(reservation)
+            onOpenNote(reservation, 'modal')
           }}
-          aria-label={strings.reservationNote.openLabel}
+          aria-label={noteAriaLabel}
+          title={noteAriaLabel}
+          data-has-note={hasNote}
           className="hidden w-7 shrink-0 items-center justify-center rounded-r-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-teal-700 pointer-fine:flex"
         >
-          📝
+          <span className={noteIconClasses}>📝</span>
         </button>
       </div>
     </div>
