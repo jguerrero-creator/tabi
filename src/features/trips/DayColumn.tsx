@@ -533,9 +533,9 @@ function ReservationCard({
         {transportModeCaption(reservation) && (
           <p className="truncate text-xs font-medium text-slate-500">{transportModeCaption(reservation)}</p>
         )}
-        <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
-          <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
-          <span className="truncate">{reservation.name}</span>
+        <p className="flex items-start gap-1.5 text-sm font-semibold text-slate-900">
+          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${statusDotClasses[reservation.status]}`} />
+          <span className="line-clamp-2 break-words">{reservation.name}</span>
           {bookByBadge && <BookByBadge info={bookByBadge} />}
         </p>
         {isChecklist ? (
