@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AccountModal } from '../account/AccountModal'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { PlusIcon } from '../../components/ui/PlusIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { countryName } from '../../lib/countries'
 import { formatDateRangeLabel, formatDayPillLabel } from '../../lib/datetime'
@@ -67,9 +68,9 @@ export function TripsListScreen() {
             disabled={atTripLimit}
             aria-label={strings.home.createCta}
             title={atTripLimit ? strings.home.tripLimitReached : undefined}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-300"
           >
-            +
+            <PlusIcon className="h-5 w-5" />
           </button>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { BookByBadge } from '../../components/ui/BookByBadge'
+import { PlusIcon } from '../../components/ui/PlusIcon'
 import { ReservationIcon, reservationTypeTextClasses } from '../../components/ui/ReservationTypeIcon'
 import { TravelModeIcon } from '../../components/ui/TravelModeIcon'
 import { statusDotClasses, statusTextClasses } from '../../components/menu/statusDotClasses'
@@ -493,7 +494,7 @@ function FreeTimeBlockRow({
           title={strings.planning.addAtFreeTime}
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 hover:bg-teal-200"
         >
-          +
+          <PlusIcon className="h-3.5 w-3.5" />
         </button>
       )}
     </div>

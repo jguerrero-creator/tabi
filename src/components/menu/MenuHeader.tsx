@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { PlusIcon } from '../ui/PlusIcon'
 import { strings } from '../../lib/strings'
 
 interface MenuHeaderProps {
@@ -37,9 +38,9 @@ export function MenuHeader({ title, subtitle, count, addLabel, onAdd }: MenuHead
           type="button"
           onClick={onAdd}
           aria-label={addLabel}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xl leading-none text-white hover:bg-teal-700"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-600 text-white hover:bg-teal-700"
         >
-          +
+          <PlusIcon className="h-5 w-5" />
         </button>
       )}
     </header>
