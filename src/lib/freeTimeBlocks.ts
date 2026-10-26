@@ -1,12 +1,31 @@
 import type { Reservation } from '../types/reservation'
 import { buildDayOccurrences } from './dayOccurrences'
 import { localDateKey, zonedTimeToUtc } from './datetime'
+import { buildOccupiedClusters, pickLatestEnding } from './occupiedIntervals'
 import { legKey } from './tripLegs'
 import type { TravelMode } from './travelTime'
 
 export interface FreeTimeBlock {
+  /**
+   * The reservation the traveler is actually leaving from — the one whose
+   * OWN occupancy ends latest among any that overlapped it (see
+   * `buildOccupiedClusters`'s `owner`), used for the travel-time leg lookup
+   * and by "Getting Around" to show the real physical departure point.
+   * NOT necessarily the reservation this block renders after on the
+   * Planning rail — see `railAnchorReservationId` for that.
+   */
   fromReservationId: string
   toReservationId: string
+  /**
+   * The reservation whose card this block should render directly after on
+   * the Planning rail (`DayColumn.buildRailEntries`, keyed via
+   * `TripTimeline`'s `freeTimeByFromId` map) — the latest-STARTING member of
+   * the "from" cluster (`buildOccupiedClusters`'s `tail`), so a nested,
+   * earlier-ending reservation (e.g. a Meal inside a longer Activity) never
+   * has this block attached to its own, earlier card position. Equal to
+   * `fromReservationId` whenever the "from" cluster is just one reservation.
+   */
+  railAnchorReservationId: string
   /** UTC ISO string — when free time starts (the earlier reservation's end). */
   start: string
   /** UTC ISO string — when free time ends (next reservation's start, minus travel time). */
@@ -60,8 +79,17 @@ export const DEFAULT_MAX_TRAVEL_SECONDS = 4 * 60 * 60
  * instant — and its real gap — entirely (Bugs: "Ordre chronologique cassé
  * dans la timeline d'un jour"). The check-in/checkout (and departure/arrival)
  * split shares one reservation id per pair, so the two occurrences always
- * sort adjacent to each other with a zero-length gap between them, which the
- * `gapMs <= 0` guard below already skips — no extra self-pair handling needed.
+ * sort adjacent to each other with a zero-length gap between them, which
+ * `buildOccupiedClusters`'s touching-interval merge already absorbs — no
+ * extra self-pair handling needed.
+ *
+ * Occurrences are merged into occupied clusters (`buildOccupiedClusters`)
+ * before computing gaps — not simply paired by adjacent start time — so a
+ * longer-running occurrence that contains a later-starting, earlier-ending
+ * one (e.g. a Meal inside a full-day Activity) keeps "owning" the occupied
+ * time until its OWN end (Bugs: "Faux temps libre quand une réservation est
+ * imbriquée dans une plage plus longue"), instead of a false gap opening up
+ * the moment the nested occurrence's own end passes.
  */
 export function computeFreeTimeBlocks(
   reservations: Reservation[],
@@ -74,13 +102,16 @@ export function computeFreeTimeBlocks(
     (reservation): reservation is Reservation & { start_at: string } => reservation.start_at !== null,
   )
   const sorted = [...scheduled].sort((a, b) => a.start_at.localeCompare(b.start_at))
+  const clusters = buildOccupiedClusters(sorted)
 
   const blocks: FreeTimeBlock[] = []
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const from = sorted[i]
-    const to = sorted[i + 1]
-    const fromEnd = from.end_at ?? from.start_at
+  for (let i = 0; i < clusters.length - 1; i++) {
+    const from = clusters[i].owner
+    const to = clusters[i + 1].entry
+    const fromEnd = clusters[i].end
     const gapMs = Date.parse(to.start_at) - Date.parse(fromEnd)
+    // Defensive, not expected to trigger: consecutive clusters are built so
+    // the next one's entry always starts strictly after this one's end.
     if (gapMs <= 0) continue
 
     const leg = legByPair.get(legKey(from.id, to.id))
@@ -99,6 +130,7 @@ export function computeFreeTimeBlocks(
     blocks.push({
       fromReservationId: from.id,
       toReservationId: to.id,
+      railAnchorReservationId: clusters[i].tail.id,
       start: fromEnd,
       end: new Date(Date.parse(to.start_at) - travelSeconds * 1000).toISOString(),
       durationSeconds: gapMs / 1000 - travelSeconds,
@@ -168,7 +200,13 @@ export function computeDayEdgeFreeBlocks(
 
     const sorted = [...day.items].sort((a, b) => a.start_at.localeCompare(b.start_at))
     const first = sorted[0]
-    const last = sorted[sorted.length - 1]
+    // The real last-to-finish item of the day, not simply the last-by-start
+    // one — once two reservations overlap (e.g. a Meal inside a longer
+    // Activity), the later-starting one can still end earlier, and anchoring
+    // the trailing edge to it would open a false gap before the actual
+    // enclosing reservation's own end (Bugs: "Faux temps libre quand une
+    // réservation est imbriquée dans une plage plus longue").
+    const last = pickLatestEnding(sorted)
 
     // A Transport arrival occurrence (`buildDayOccurrences`) sets this: the
     // traveler was already occupied (in transit) before this day's window

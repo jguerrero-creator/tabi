@@ -80,6 +80,25 @@ export function resolveLegEndpointPlace(reservation: Reservation, latLng: LatLng
  * sandwiched between check-in and checkout gets a leg computed straight
  * through to whatever comes after checkout, instead of to/from the checkout
  * itself.
+ *
+ * Tracks a running `dominant` occurrence while sweeping the sorted list — the
+ * longest-reaching non-rental occurrence still "in effect" (ties: whichever
+ * started latest, same rule `buildOccupiedClusters` uses) — and substitutes
+ * it in as the real departure point whenever the next occurrence chronologically
+ * is still nested inside it (Bugs: "Faux temps libre quand une réservation
+ * est imbriquée dans une plage plus longue" — the traveler hasn't actually
+ * left the longer-running reservation just because a nested, earlier-ending
+ * one has ended). This is deliberately NOT simplified to the same
+ * cluster-boundary pairing `computeFreeTimeBlocks` uses: an at-disposal
+ * rental's own nested stops must keep generating their own individual,
+ * sequential point-to-point legs (TABI-124) rather than collapsing onto one
+ * leg per merged interval — a rental is therefore never tracked as
+ * `dominant`, and a leg into a reservation still nested inside *it*
+ * specifically keeps using the existing `isCoveredByRental` anchor instead.
+ * Whenever this substitution DOES produce a cluster-boundary-crossing leg,
+ * its `fromReservationId` is proven to match `buildOccupiedClusters`' own
+ * `owner` choice for that same boundary — `computeFreeTimeBlocks`'s
+ * `legByPair` lookup depends on this staying true.
  */
 export function buildTripLegs(
   reservations: Reservation[],
@@ -93,9 +112,34 @@ export function buildTripLegs(
   const sorted = [...scheduled].sort((a, b) => a.start_at.localeCompare(b.start_at))
   const legs: TripLegInput[] = []
 
+  let dominant: (DayOccurrence & { start_at: string }) | null = null
+
   for (let i = 0; i < sorted.length - 1; i++) {
-    const from = sorted[i]
+    const rawFrom = sorted[i]
     const to = sorted[i + 1]
+    const rawFromEnd = rawFrom.end_at ?? rawFrom.start_at
+    const isRentalFrom = rawFrom.type === 'transport' && rawFrom.transport_subtype === 'at_disposal'
+
+    // Update `dominant` unconditionally, before any `continue` below — later
+    // iterations need it even for a pair this one doesn't itself emit a leg
+    // for (e.g. a Stay's check-in occurrence, skipped just below).
+    const dominantEnd = dominant ? (dominant.end_at ?? dominant.start_at) : null
+    if (!(dominant && dominantEnd !== null && rawFrom.start_at < dominantEnd)) {
+      // Not nested inside the previous dominant — start fresh. A rental is
+      // never tracked as dominant (see doc comment above).
+      dominant = isRentalFrom ? null : rawFrom
+    } else if (!isRentalFrom && (dominant.suppressTrailingFreeBlock || rawFromEnd >= dominantEnd)) {
+      // Still nested inside the previous dominant. A Stay check-in /
+      // Transport departure's `end_at` is only an artificial placeholder
+      // reaching to its real checkout/arrival, never a genuine
+      // continuous-occupancy span — it must always cede to a real
+      // occurrence nested before that real end, or that occurrence's own
+      // leg to whatever follows it would wrongly collapse behind the
+      // placeholder instead (same bug class, mirrored in
+      // `buildOccupiedClusters`). Two real occurrences still tie-break on
+      // whichever reaches at least as far, same rule as there.
+      dominant = rawFrom
+    }
 
     // A Stay check-in / Transport departure occurrence's real trailing gap
     // belongs to its check-out/arrival occurrence's own slot instead (same
@@ -103,18 +147,27 @@ export function buildTripLegs(
     // it here too, or this pairing would compute a leg "from" an occurrence
     // whose own occupancy hasn't actually ended yet at this point in the
     // sequence (e.g. into a reservation that starts before the real checkout).
-    if (from.suppressTrailingFreeBlock) continue
+    if (rawFrom.suppressTrailingFreeBlock) continue
+
+    const from = dominant && !isRentalFrom ? dominant : rawFrom
+    const fromEnd = from.end_at ?? from.start_at
 
     const isCoveredByRental =
-      from.type === 'transport' &&
-      from.transport_subtype === 'at_disposal' &&
-      from.end_at !== null &&
-      to.start_at < from.end_at
+      rawFrom.type === 'transport' &&
+      rawFrom.transport_subtype === 'at_disposal' &&
+      rawFrom.end_at !== null &&
+      to.start_at < rawFrom.end_at
+
+    // `to` is still nested inside the real departure point's span — nothing
+    // to travel to yet, the enclosing reservation remains "in progress"
+    // until its own end (unless that span is an at-disposal rental, where
+    // being covered by it is the whole point, handled below instead).
+    if (!isCoveredByRental && to.start_at < fromEnd) continue
 
     const origin = isCoveredByRental
       ? (resolveCoveredDayAnchor?.(localDateKey(to.start_at, to.start_timezone)) ?? null)
       : (pointOf(from, 'end') ?? pointOf(from, 'start'))
-    const departureTime = isCoveredByRental ? to.start_at : (from.end_at ?? from.start_at)
+    const departureTime = isCoveredByRental ? to.start_at : fromEnd
 
     const destination = pointOf(to, 'start')
     if (!destination) continue

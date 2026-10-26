@@ -111,15 +111,21 @@ export function TripTimeline({
   )
   const groupsByKey = new Map(groups.map((group) => [group.dateKey, group]))
 
-  // Keyed by fromReservationId, not by (from, to) pair: a gap is rendered right
-  // after the reservation it follows regardless of which day-group that
-  // reservation's chronological successor happens to start in — a day-grouped
-  // list otherwise silently drops any gap that crosses a day boundary (e.g. a
-  // multi-night Stay's checkout followed by a Transport that starts a later day).
+  // Keyed by railAnchorReservationId, not by (from, to) pair: a gap is
+  // rendered right after the reservation it follows regardless of which
+  // day-group that reservation's chronological successor happens to start in
+  // — a day-grouped list otherwise silently drops any gap that crosses a day
+  // boundary (e.g. a multi-night Stay's checkout followed by a Transport
+  // that starts a later day). The anchor is deliberately NOT always the same
+  // as the block's `fromReservationId`: when the "from" side is a merged
+  // cluster of overlapping reservations (e.g. a Meal nested inside a longer
+  // Activity), the block's travel/location data comes from whichever member
+  // ends latest (`fromReservationId`), but it must still render after the
+  // LAST-rendered card of that cluster, not the earlier, nested one's card.
   const freeTimeByFromId = new Map<string, FreeTimeBlock>(
     legsLoading || legsError
       ? []
-      : computeFreeTimeBlocks(reservations, legs).map((block) => [block.fromReservationId, block]),
+      : computeFreeTimeBlocks(reservations, legs).map((block) => [block.railAnchorReservationId, block]),
   )
 
   const days = buildDayTabs(trip, groups, groupsByKey, reservations)
