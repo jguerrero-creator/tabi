@@ -43,6 +43,8 @@ import { useTripReservations } from '../trips/useTripReservations'
 import { lastKnownTripLocation } from './lastKnownTripLocation'
 import { findLocationMismatch, type LocationMismatch } from './locationMismatch'
 import { findOverlappingReservation } from './reservationOverlap'
+import { fieldRequirementsByType } from './reservationFieldRequirements'
+import { buildTypeSpecificColumns } from './reservationTypeSpecificFields'
 import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
@@ -280,24 +282,17 @@ export function AddReservationModal({
   const { candidates, requestPick, selectCandidate, cancelPick } = useAddressPicker()
 
   // Field requirements derive from the main type + (for Transport) its subtype, rather than
-  // a flat list of pre-baked combinations — see TABI-121.
+  // a flat list of pre-baked combinations — see TABI-121. The actual values live in the
+  // exhaustive fieldRequirementsByType table (reservationFieldRequirements.ts) so a type added
+  // to the ReservationType union without an entry there is a compile error, not a silent
+  // fallback.
   const isTransport = mainType === 'transport'
   const isPointToPoint = isTransport && transportSubtype === 'point_to_point'
   const isAtDisposal = isTransport && transportSubtype === 'at_disposal'
   const isChecklist = mainType === 'activity' && activitySubtype === 'checklist'
   const option = {
     dbType: mainType,
-    transportSubtype: isTransport ? transportSubtype : null,
-    activitySubtype: mainType === 'activity' ? activitySubtype : null,
-    requiresEndAddress: isPointToPoint || isAtDisposal,
-    requiresStart: mainType !== 'activity',
-    // Departure time is never hard-required — a missing one now falls back to the trip's
-    // day-start time (see buildAndProceed) instead of blocking submission, mirroring how Stay's
-    // check-in time already works. Kept as its own field (rather than deleted) since it still
-    // governs the start time input's (inert, noValidate-bypassed) `required` attribute.
-    requiresStartTime: false,
-    requiresEnd: mainType !== 'activity',
-    requiresEndTime: isPointToPoint,
+    ...fieldRequirementsByType[mainType]({ transportSubtype }),
   }
   // TABI-122: point-to-point transport has no free-text name — it's derived from the route.
   const isAutoNamedTransport = isPointToPoint
@@ -589,12 +584,15 @@ export function AddReservationModal({
 
     const input: Omit<NewReservation, 'trip_id'> = {
       type: option.dbType,
-      transport_subtype: option.transportSubtype,
-      transport_mode: isPointToPoint ? transportMode : null,
-      stay_subtype: option.dbType === 'stay' ? staySubtype : null,
-      stay_parking_included: option.dbType === 'stay' ? parkingIncluded : null,
-      stay_check_in_deadline: option.dbType === 'stay' && checkInDeadline ? checkInDeadline : null,
-      activity_subtype: option.activitySubtype,
+      ...buildTypeSpecificColumns(option.dbType, {
+        staySubtype,
+        parkingIncluded,
+        checkInDeadline,
+        transportSubtype,
+        transportMode,
+        isPointToPoint,
+        activitySubtype,
+      }),
       name: resolvedName,
       // TABI checklist: the normal 3-state status doesn't apply — it's inherently
       // "decide on location", fixed and never surfaced as an editable picker (see
@@ -632,7 +630,7 @@ export function AddReservationModal({
       place_opening_hours: (isChecklist ? null : (startGeo?.placeDetails?.openingHours ?? null)) as Json | null,
     }
 
-    if (startAt && endAt && option.dbType !== 'activity') {
+    if (startAt && endAt && option.checksOverlap) {
       const overlapping = findOverlappingReservation({ start_at: startAt, end_at: endAt }, sameTypeReservations)
       if (overlapping) {
         setOverlapConfirm({ reservation: overlapping, input })

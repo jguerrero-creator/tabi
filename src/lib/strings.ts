@@ -1,5 +1,5 @@
 import type { TravelMode } from './travelTime'
-import type { ReservationStatus } from '../types/reservation'
+import type { ReservationStatus, ReservationType } from '../types/reservation'
 
 const travelModeVerb: Record<TravelMode, string> = {
   WALK: 'walk',
@@ -172,16 +172,20 @@ export const strings = {
     badgeTitleDaysLeft: (days: number) => `${days} day${days === 1 ? '' : 's'} left to book`,
     badgeTitleOverdue: (days: number) => `${days} day${days === 1 ? '' : 's'} overdue to book`,
   },
+  // Step 3b (Meal-type plan): `satisfies Record<ReservationType, ...>` rather than a plain
+  // object literal — a type added to the ReservationType union without a matching key here is
+  // now a compile error instead of reading as `undefined` at render time (reservationLegLabels
+  // specifically fed an `undefined.start` crash in ReservationDetailScreen before this).
   reservationType: {
     stay: 'Stay',
     transport: 'Transport',
     activity: 'Activity',
-  },
+  } satisfies Record<ReservationType, string>,
   reservationLegLabels: {
     stay: { start: 'Check-in', end: 'Check-out' },
     transport: { start: 'Departure', end: 'Arrival' },
     activity: { start: 'Start', end: 'End' },
-  },
+  } satisfies Record<ReservationType, { start: string; end: string }>,
   reservationLegLabelsAtDisposal: { start: 'Pick-up', end: 'Drop-off' },
   reservationDetail: {
     statusLabel: 'Status',
@@ -290,14 +294,22 @@ export const strings = {
     overlapRejected: (name: string) => `Would overlap with "${name}".`,
     saveError: 'Could not move this reservation. Please try again.',
   },
+  // Type-agnostic nav destinations only — the per-ReservationType tab labels live in
+  // reservationTypeMenuLabel below (Step 3b: split so the type-keyed part can be exhaustive).
   menus: {
     overview: 'Overview',
-    stay: 'Stay',
-    transport: 'Transport',
-    activities: 'Activities',
     budget: 'Budget',
     souvenirs: 'Souvenirs',
   },
+  // Nav-tab wording for each reservation type — deliberately separate from `reservationType`
+  // above: this is the plural tab label ("Activities"), that's the singular type name shown
+  // elsewhere ("Activity"). `satisfies Record<ReservationType, string>` makes a missing type's
+  // tab label a compile error.
+  reservationTypeMenuLabel: {
+    stay: 'Stay',
+    transport: 'Transport',
+    activity: 'Activities',
+  } satisfies Record<ReservationType, string>,
   travelMode: {
     DRIVE: 'Drive',
     WALK: 'Walk',

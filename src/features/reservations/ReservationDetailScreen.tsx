@@ -33,7 +33,7 @@ import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
-import type { ActivitySubtype, Reservation, ReservationStatus, TransportMode } from '../../types/reservation'
+import type { ActivitySubtype, Reservation, ReservationStatus, ReservationType, TransportMode } from '../../types/reservation'
 import type { ChecklistItem } from '../../types/checklistItem'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
@@ -730,17 +730,19 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     // already existed in this same function a month before that fix landed and was simply
     // missed. Covers both Activity subtypes (place and checklist share these same date/
     // duration fields) — never blocking, just an explicit confirm.
-    if (
-      (reservation.type === 'stay' || reservation.type === 'transport' || reservation.type === 'activity') &&
-      trip?.start_date &&
-      trip?.end_date
-    ) {
-      const datePatch =
-        reservation.type === 'stay'
-          ? stayDatePatch
-          : reservation.type === 'transport'
-            ? transportDatePatch
-            : activityDatePatch
+    // Step 3b (Meal-type plan): dropped the former `(reservation.type === 'stay' ||
+    // 'transport' || 'activity')` guard — every ReservationType that exists today satisfies
+    // it, so it was a tautology, and a `Record<ReservationType, true>` would be pure noise. A
+    // future type gets this confirmation by default now, which is the right default (silently
+    // skipping the out-of-period check for a new type is exactly the kind of gap TABI-113 was
+    // fixing); datePatchByType below is exhaustive, so there's no type this can crash on.
+    if (trip?.start_date && trip?.end_date) {
+      const datePatchByType: Record<ReservationType, Partial<Reservation>> = {
+        stay: stayDatePatch,
+        transport: transportDatePatch,
+        activity: activityDatePatch,
+      }
+      const datePatch = datePatchByType[reservation.type]
       const candidate: DatedCandidate = {
         start_at: 'start_at' in datePatch ? (datePatch.start_at ?? null) : reservation.start_at,
         end_at: 'end_at' in datePatch ? (datePatch.end_at ?? null) : reservation.end_at,
@@ -790,23 +792,22 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
 
   // Same "Go back" behavior as AddReservationModal (Bugs DB, 25/08 fix) — pure cancel,
   // discards the edit and refocuses the field the user most likely needs to fix.
+  // Step 3b: same category as datePatchByType above — a Record<ReservationType, ...> instead
+  // of a 3-way type ternary, so a new type with no entry here is a compile error. Defined
+  // inside the function (not module-level) since the Stay case needs `manualEndDate`.
   function handleGoBackFromOutOfPeriod() {
     if (!outOfPeriodConfirm) return
     const { field } = outOfPeriodConfirm
     setOutOfPeriodConfirm(null)
-    const targetId =
-      reservation.type === 'stay'
-        ? field === 'end' && manualEndDate
-          ? STAY_CHECKOUT_DATE_FIELD_ID
-          : STAY_CHECKIN_DATE_FIELD_ID
-        : reservation.type === 'transport'
-          ? field === 'end'
-            ? TRANSPORT_END_DATE_FIELD_ID
-            : TRANSPORT_START_DATE_FIELD_ID
-          // Activity has a single date input (duration derives the end) — 'end' here means
-          // the duration pushed past the trip's range, and the date field is still the most
-          // direct fix (the duration fields sit right below it).
-          : ACTIVITY_START_DATE_FIELD_ID
+    const outOfPeriodFocusTargetIdByType: Record<ReservationType, (field: OutOfPeriodField) => string> = {
+      stay: (field) => (field === 'end' && manualEndDate ? STAY_CHECKOUT_DATE_FIELD_ID : STAY_CHECKIN_DATE_FIELD_ID),
+      transport: (field) => (field === 'end' ? TRANSPORT_END_DATE_FIELD_ID : TRANSPORT_START_DATE_FIELD_ID),
+      // Activity has a single date input (duration derives the end) — 'end' here means the
+      // duration pushed past the trip's range, and the date field is still the most direct
+      // fix (the duration fields sit right below it).
+      activity: () => ACTIVITY_START_DATE_FIELD_ID,
+    }
+    const targetId = outOfPeriodFocusTargetIdByType[reservation.type](field)
     // Wait a tick for the dialog to unmount before moving focus.
     requestAnimationFrame(() => {
       document.getElementById(targetId)?.focus()
