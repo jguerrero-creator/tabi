@@ -276,6 +276,9 @@ export function BudgetMenuScreen() {
                         autoFocus
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                       />
+                      {newLabel.trim().toLowerCase() === 'souvenirs' && (
+                        <p className="text-xs text-amber-700">{strings.budgetMenu.manualCategorySouvenirsWarning}</p>
+                      )}
                       <input
                         id={newAmountFieldId}
                         name={newAmountFieldId}

@@ -425,7 +425,9 @@ export const strings = {
     noPriceEntered: 'No price entered',
     manualCategoriesLabel: 'Manual categories',
     addCta: 'Add category',
-    labelPlaceholder: 'e.g. Food/day, Souvenirs',
+    labelPlaceholder: 'e.g. Food/day, Gifts',
+    manualCategorySouvenirsWarning:
+      'Souvenirs already has its own category above: amounts entered here would be added on top.',
     amountPlaceholder: 'Estimated amount',
     save: 'Save',
     cancel: 'Cancel',

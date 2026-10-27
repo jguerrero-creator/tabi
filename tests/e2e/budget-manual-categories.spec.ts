@@ -66,21 +66,24 @@ test('budget screen folds manual categories into the grand total', async ({ page
     await expect(page.getByText('Food/day')).toBeVisible()
     await expect(page.getByText('$40.00')).toBeVisible()
 
-    // Add a second category through the UI and confirm it joins the total.
+    // Add a second category through the UI and confirm it joins the total. Deliberately
+    // named "Souvenirs" — the exact real-world double-counting scenario (Backlog: Budget
+    // merge) — but scoped via listitem rather than a bare getByText, since "Souvenirs" is
+    // also a nav label elsewhere on the page.
     await page.getByRole('button', { name: 'Add category' }).click()
-    await page.getByPlaceholder('e.g. Food/day, Souvenirs').fill('Souvenirs')
+    await page.getByPlaceholder('e.g. Food/day, Gifts').fill('Souvenirs')
     await page.getByPlaceholder('Estimated amount').fill('25')
     await page.getByRole('button', { name: 'Save' }).click()
 
-    await expect(page.getByText('Souvenirs')).toBeVisible()
+    const souvenirsRow = page.getByRole('listitem').filter({ hasText: 'Souvenirs' })
+    await expect(souvenirsRow).toBeVisible()
     // 150 + 40 + 25 = 215
     await expect(page.getByText('$215.00')).toBeVisible()
 
     // Delete the newly-added category and confirm the total drops back down.
-    const souvenirsRow = page.getByRole('listitem').filter({ hasText: 'Souvenirs' })
     await souvenirsRow.getByRole('button', { name: 'Delete' }).click()
 
-    await expect(page.getByText('Souvenirs')).toHaveCount(0)
+    await expect(souvenirsRow).toHaveCount(0)
     await expect(page.getByText('$190.00')).toBeVisible()
   } finally {
     const { error: deleteCategoriesError } = await client.from('budget_categories').delete().eq('trip_id', trip.id)
@@ -135,6 +138,68 @@ test('a trip with only a manual category shows its total instead of the empty st
     await expect(page.getByText('$60.00')).toHaveCount(2) // total banner + the single category row
     // No reservations, so the reservation-derived "By category" section stays hidden.
     await expect(page.getByText('By category')).toHaveCount(0)
+  } finally {
+    const { error: deleteCategoriesError } = await client.from('budget_categories').delete().eq('trip_id', trip.id)
+    if (deleteCategoriesError) throw deleteCategoriesError
+    const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
+    if (deleteTripError) throw deleteTripError
+  }
+})
+
+// Budget/Souvenirs merge (Backlog): Souvenirs is now its own built-in category in the
+// accordion, built from souvenir_items — a manual category also named "Souvenirs" would
+// have its amount added on top of that, double-counting the same word. Non-blocking
+// inline warning only, matched case-insensitively and trimmed; it must not fire for an
+// unrelated category name.
+test('a manual category named "Souvenirs" shows a non-blocking double-counting note', async ({
+  page,
+  registerTrip,
+}) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({
+      organizer_id: user.id,
+      name: `E2E souvenirs warning trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'USD',
+    })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
+
+  const warningText = 'Souvenirs already has its own category above'
+
+  try {
+    await page.goto(`/trips/${trip.id}/budget`)
+    await expect(page.getByRole('heading', { name: 'Budget' })).toBeVisible()
+    await page.getByRole('button', { name: 'Add category' }).click()
+
+    const labelInput = page.getByPlaceholder('e.g. Food/day, Gifts')
+
+    // An unrelated name: no warning.
+    await labelInput.fill('Gifts')
+    await expect(page.getByText(warningText)).toHaveCount(0)
+
+    // Matches case-insensitively and with incidental whitespace, but doesn't block saving.
+    await labelInput.fill('  souvenirs  ')
+    await expect(page.getByText(warningText)).toBeVisible()
+
+    await page.getByPlaceholder('Estimated amount').fill('15')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('listitem').filter({ hasText: 'souvenirs' })).toBeVisible()
   } finally {
     const { error: deleteCategoriesError } = await client.from('budget_categories').delete().eq('trip_id', trip.id)
     if (deleteCategoriesError) throw deleteCategoriesError

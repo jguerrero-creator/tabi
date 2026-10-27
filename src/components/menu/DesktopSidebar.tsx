@@ -3,7 +3,7 @@ import { useTrip } from '../../features/trips/useTrip'
 import { formatTripDateRange } from '../../lib/datetime'
 import { strings } from '../../lib/strings'
 import { ReservationTypeIcon } from '../ui/ReservationTypeIcon'
-import { BudgetIcon, OverviewIcon, SouvenirsIcon } from './BottomNav'
+import { BudgetIcon, OverviewIcon } from './BottomNav'
 import { tripNavTabs } from './tripNavTabs'
 
 interface DesktopSidebarProps {
@@ -78,8 +78,6 @@ export function DesktopSidebar({ tripId }: DesktopSidebarProps) {
                 <OverviewIcon className="h-5 w-5" />
               ) : tab === 'budget' ? (
                 <BudgetIcon className="h-5 w-5" />
-              ) : tab === 'souvenirs' ? (
-                <SouvenirsIcon className="h-5 w-5" />
               ) : (
                 <ReservationTypeIcon type={tab} className="h-5 w-5" />
               )}

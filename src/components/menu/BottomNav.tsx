@@ -28,8 +28,6 @@ export function BottomNav({ tripId }: BottomNavProps) {
                 <OverviewIcon className="h-5 w-5" />
               ) : tab === 'budget' ? (
                 <BudgetIcon className="h-5 w-5" />
-              ) : tab === 'souvenirs' ? (
-                <SouvenirsIcon className="h-5 w-5" />
               ) : (
                 <ReservationTypeIcon type={tab} className="h-5 w-5" />
               )}

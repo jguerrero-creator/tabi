@@ -1,6 +1,6 @@
 import { APIProvider } from '@vis.gl/react-google-maps'
 import { useEffect, useState } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { TripLayout } from './components/menu/TripLayout'
 import { ReportWidget } from './components/ui/ReportWidget'
 import { SavedToast } from './components/ui/SavedToast'
@@ -9,7 +9,6 @@ import { PasswordRecoveryModal } from './features/account/PasswordRecoveryModal'
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
 import { ReservationDetailScreen } from './features/reservations/ReservationDetailScreen'
-import { SouvenirsMenuScreen } from './features/souvenirs/SouvenirsMenuScreen'
 import { StayMenuScreen } from './features/stay/StayMenuScreen'
 import { TransportMenuScreen } from './features/transport/TransportMenuScreen'
 import { OverviewScreen } from './features/trips/OverviewScreen'
@@ -55,7 +54,10 @@ export function App() {
           <Route path="transport" element={<TransportMenuScreen />} />
           <Route path="activities" element={<ActivitiesMenuScreen />} />
           <Route path="budget" element={<BudgetMenuScreen />} />
-          <Route path="souvenirs" element={<SouvenirsMenuScreen />} />
+          {/* Souvenirs merged into Budget as its own category — redirect old
+              links/bookmarks there instead of 404ing (`replace` so Back
+              doesn't bounce between the two routes). */}
+          <Route path="souvenirs" element={<SouvenirsRedirect />} />
         </Route>
         <Route path="/reservations/:reservationId" element={<ReservationDetailScreen />} />
         <Route path="/privacy" element={<PrivacyPolicyScreen />} />
@@ -65,4 +67,10 @@ export function App() {
       {showPasswordRecovery && <PasswordRecoveryModal onClose={() => setShowPasswordRecovery(false)} />}
     </APIProvider>
   )
+}
+
+/** Old `/trips/:tripId/souvenirs` route (Souvenirs merged into Budget) — keeps existing links/bookmarks working. */
+function SouvenirsRedirect() {
+  const { tripId } = useParams<{ tripId: string }>()
+  return <Navigate to={`/trips/${tripId}/budget`} replace />
 }
