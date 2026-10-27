@@ -1,6 +1,7 @@
 import { logClientError } from '../../lib/logError'
 import type { BudgetCategory } from '../../types/budgetCategory'
 import type { Reservation, ReservationType } from '../../types/reservation'
+import type { SouvenirItem } from '../../types/souvenirItem'
 
 export interface BudgetCategoryTotal {
   type: ReservationType
@@ -11,11 +12,19 @@ export interface BudgetCategoryTotal {
   perPersonTotal: number | null
 }
 
+export interface BudgetSouvenirsTotal {
+  total: number
+  count: number
+  checkedCount: number
+}
+
 export interface BudgetSummary {
   categories: BudgetCategoryTotal[]
   manualTotal: number
+  /** Souvenirs checklist folded into the budget as its own category (TABI merge) — every item counts toward `total`, checked or not, and is never divided by traveler count. */
+  souvenirs: BudgetSouvenirsTotal
   total: number
-  /** Grand total with Stay divided by traveler count (Transport/Activity/manual stay full price). Null unless there's more than 1 traveler. */
+  /** Grand total with Stay divided by traveler count (Transport/Activity/manual/Souvenirs stay full price). Null unless there's more than 1 traveler. */
   totalPerPerson: number | null
   count: number
   pricedCount: number
@@ -28,6 +37,7 @@ export function computeBudgetSummary(
   budgetCategories: BudgetCategory[] = [],
   travelerCount = 1,
   tripCurrency?: string,
+  souvenirItems: SouvenirItem[] = [],
 ): BudgetSummary {
   const categories = categoryOrder.map((type): BudgetCategoryTotal => {
     const items = reservations.filter((reservation) => reservation.type === type)
@@ -64,11 +74,23 @@ export function computeBudgetSummary(
     0,
   )
 
+  // Every souvenir counts toward the budget regardless of checked state — it's a
+  // planned budget, not a spent-so-far ledger — and an empty amount counts as
+  // nothing rather than being coerced to 0 by a default (decisions #4/#6).
+  const souvenirsTotal = souvenirItems.reduce((sum, item) => sum + (item.amount ?? 0), 0)
+  const souvenirs: BudgetSouvenirsTotal = {
+    total: souvenirsTotal,
+    count: souvenirItems.length,
+    checkedCount: souvenirItems.filter((item) => item.is_checked).length,
+  }
+
   return {
     categories,
     manualTotal,
-    total: reservationsTotal + manualTotal,
-    totalPerPerson: travelerCount > 1 ? reservationsTotalPerPerson + manualTotal : null,
+    souvenirs,
+    total: reservationsTotal + manualTotal + souvenirsTotal,
+    // Souvenirs are never split by traveler count (decision #5), unlike Stay.
+    totalPerPerson: travelerCount > 1 ? reservationsTotalPerPerson + manualTotal + souvenirsTotal : null,
     count: reservations.length,
     pricedCount: categories.reduce((sum, category) => sum + category.pricedCount, 0),
   }

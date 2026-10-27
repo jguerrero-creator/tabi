@@ -6,6 +6,7 @@ import type { SouvenirItem } from '../../types/souvenirItem'
 export interface SouvenirItemInput {
   label: string
   is_checked: boolean
+  amount: number | null
 }
 
 /**
@@ -41,10 +42,10 @@ export function useTripSouvenirItems(tripId: string) {
   }, [fetchItems])
 
   const createItem = useCallback(
-    async (input: Pick<SouvenirItemInput, 'label'>): Promise<SouvenirItem> => {
+    async (input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount'>>): Promise<SouvenirItem> => {
       const { data, error: createError } = await supabase
         .from('souvenir_items')
-        .insert({ trip_id: tripId, label: input.label })
+        .insert({ trip_id: tripId, label: input.label, amount: input.amount ?? null })
         .select()
         .single()
 

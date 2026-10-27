@@ -9,6 +9,9 @@ import { formatCurrency } from '../../lib/currency'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
+import { SouvenirsIcon } from '../../components/menu/BottomNav'
+import { SouvenirChecklist } from '../souvenirs/SouvenirChecklist'
+import { useTripSouvenirItems } from '../souvenirs/useTripSouvenirItems'
 import { useTrip } from '../trips/useTrip'
 import { useTripReservations } from '../trips/useTripReservations'
 import { BudgetCategoryItemList } from './BudgetCategoryItemList'
@@ -17,6 +20,8 @@ import { BudgetConverter } from './BudgetConverter'
 import { computeBudgetSummary } from './computeBudgetSummary'
 import { useTripBudgetCategories } from './useTripBudgetCategories'
 import type { ReservationType } from '../../types/reservation'
+
+type ExpandedCategory = ReservationType | 'souvenirs'
 
 export function BudgetMenuScreen() {
   const newLabelFieldId = useId()
@@ -36,23 +41,38 @@ export function BudgetMenuScreen() {
     updateCategory,
     deleteCategory,
   } = useTripBudgetCategories(tripId ?? '')
+  const {
+    items: souvenirItems,
+    loading: souvenirItemsLoading,
+    error: souvenirItemsError,
+    createItem: createSouvenirItem,
+    updateItem: updateSouvenirItem,
+    deleteItem: deleteSouvenirItem,
+  } = useTripSouvenirItems(tripId ?? '')
 
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newAmount, setNewAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
-  const [expandedType, setExpandedType] = useState<ReservationType | null>(null)
+  const [expandedType, setExpandedType] = useState<ExpandedCategory | null>(null)
 
-  const loading = tripLoading || reservationsLoading || categoriesLoading
-  const error = tripError || reservationsError || categoriesError
+  const loading = tripLoading || reservationsLoading || categoriesLoading || souvenirItemsLoading
+  const error = tripError || reservationsError || categoriesError || souvenirItemsError
   const summary = useMemo(
-    () => computeBudgetSummary(reservations, budgetCategories, trip?.traveler_count ?? 1, trip?.currency),
-    [reservations, budgetCategories, trip?.traveler_count, trip?.currency],
+    () =>
+      computeBudgetSummary(
+        reservations,
+        budgetCategories,
+        trip?.traveler_count ?? 1,
+        trip?.currency,
+        souvenirItems,
+      ),
+    [reservations, budgetCategories, trip?.traveler_count, trip?.currency, souvenirItems],
   )
   const currency = trip?.currency ?? ''
   const travelerCount = trip?.traveler_count ?? 1
-  const isEmpty = summary.count === 0 && budgetCategories.length === 0
+  const isEmpty = summary.count === 0 && budgetCategories.length === 0 && souvenirItems.length === 0
 
   async function handleAddCategory(event: FormEvent) {
     event.preventDefault()
@@ -124,7 +144,7 @@ export function BudgetMenuScreen() {
               </section>
             )}
 
-            {summary.count > 0 && (
+            {(summary.count > 0 || summary.souvenirs.count > 0) && (
               <MenuSection label={strings.budgetMenu.byCategoryLabel}>
                 {summary.categories
                   .filter((category) => category.count > 0)
@@ -183,6 +203,59 @@ export function BudgetMenuScreen() {
                       </li>
                     )
                   })}
+                {summary.souvenirs.count > 0 &&
+                  (() => {
+                    const isExpanded = expandedType === 'souvenirs'
+                    return (
+                      <li key="souvenirs">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedType(isExpanded ? null : 'souvenirs')}
+                          aria-expanded={isExpanded}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+                            <SouvenirsIcon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-900">{strings.menus.souvenirs}</p>
+                            <p className="text-xs text-slate-500">
+                              {strings.budgetMenu.itemCount(summary.souvenirs.count)}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold text-slate-900">
+                              {formatCurrency(summary.souvenirs.total, currency)}
+                            </p>
+                          </div>
+                          <svg
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                        {isExpanded && (
+                          <div className="bg-slate-50 px-2 py-3">
+                            <SouvenirChecklist
+                              items={souvenirItems}
+                              currency={currency}
+                              loading={souvenirItemsLoading}
+                              error={souvenirItemsError}
+                              onCreate={createSouvenirItem}
+                              onUpdate={updateSouvenirItem}
+                              onDelete={deleteSouvenirItem}
+                            />
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })()}
               </MenuSection>
             )}
 

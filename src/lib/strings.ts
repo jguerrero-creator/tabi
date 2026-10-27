@@ -457,6 +457,8 @@ export const strings = {
     emptyBody: 'Add souvenirs or things to buy — check them off as you go.',
     addCta: 'Add item',
     labelPlaceholder: 'e.g. Matcha, gifts for family',
+    amountPlaceholder: 'Amount (optional)',
+    noAmountEntered: 'No amount entered',
     save: 'Save',
     cancel: 'Cancel',
     edit: 'Edit',

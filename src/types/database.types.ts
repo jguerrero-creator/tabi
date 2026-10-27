@@ -393,6 +393,7 @@ export type Database = {
       }
       souvenir_items: {
         Row: {
+          amount: number | null
           created_at: string
           id: string
           is_checked: boolean
@@ -401,6 +402,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          amount?: number | null
           created_at?: string
           id?: string
           is_checked?: boolean
@@ -409,6 +411,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          amount?: number | null
           created_at?: string
           id?: string
           is_checked?: boolean
