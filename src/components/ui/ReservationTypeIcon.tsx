@@ -15,6 +15,10 @@ export const reservationTypeBadgeClasses: Record<ReservationType, string> = {
   transport: 'bg-yellow-50 text-yellow-700',
   stay: 'bg-rose-50 text-rose-600',
   activity: 'bg-blue-50 text-blue-600',
+  // violet-600, not a warmer purple/pink: clearly distinct from rose (Stay), blue
+  // (Activity), yellow-700 (Transport), and from the emerald/amber/slate status-dot
+  // palette — no hue in that six-color set sits anywhere near violet.
+  meal: 'bg-violet-50 text-violet-600',
 }
 
 /** Same per-type palette as `reservationTypeBadgeClasses`, as a bare icon/text color for un-badged icons. */
@@ -22,6 +26,7 @@ export const reservationTypeTextClasses: Record<ReservationType, string> = {
   transport: 'text-yellow-700',
   stay: 'text-rose-600',
   activity: 'text-blue-600',
+  meal: 'text-violet-600',
 }
 
 const paths: Record<ReservationType, React.ReactNode> = {
@@ -40,6 +45,16 @@ const paths: Record<ReservationType, React.ReactNode> = {
     <>
       <path d="M20 10c0 5.5-8 12-8 12s-8-6.5-8-12a8 8 0 0 1 16 0Z" />
       <circle cx="12" cy="10" r="3" />
+    </>
+  ),
+  // Fork + knife (utensils) — the fork's three tines merge into one shaft, the
+  // knife's blade curves into its own straight shaft, both run the full icon height.
+  meal: (
+    <>
+      <path d="M5 2v6a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V2" />
+      <path d="M7 2v20" />
+      <path d="M19 2a4 4 0 0 0-4 4v6c0 1.1.9 2 2 2h2" />
+      <path d="M19 2v20" />
     </>
   ),
 }

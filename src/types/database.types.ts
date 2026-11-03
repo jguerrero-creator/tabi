@@ -257,6 +257,7 @@ export type Database = {
           end_time_is_default: boolean
           end_timezone: string | null
           id: string
+          meal_subtype: Database["public"]["Enums"]["meal_subtype"] | null
           name: string
           note: string | null
           place_category: string | null
@@ -304,6 +305,7 @@ export type Database = {
           end_time_is_default?: boolean
           end_timezone?: string | null
           id?: string
+          meal_subtype?: Database["public"]["Enums"]["meal_subtype"] | null
           name: string
           note?: string | null
           place_category?: string | null
@@ -351,6 +353,7 @@ export type Database = {
           end_time_is_default?: boolean
           end_timezone?: string | null
           id?: string
+          meal_subtype?: Database["public"]["Enums"]["meal_subtype"] | null
           name?: string
           note?: string | null
           place_category?: string | null
@@ -758,8 +761,9 @@ export type Database = {
     }
     Enums: {
       activity_subtype: "place" | "checklist"
+      meal_subtype: "place" | "checklist"
       reservation_status: "booked" | "to_book" | "decide_later"
-      reservation_type: "stay" | "transport" | "activity"
+      reservation_type: "stay" | "transport" | "activity" | "meal"
       stay_subtype: "hotel" | "camping" | "airbnb" | "ryokan" | "other"
       transport_mode: "flight" | "train" | "bus" | "ferry" | "car" | "other"
       transport_subtype: "point_to_point" | "at_disposal"
@@ -893,8 +897,9 @@ export const Constants = {
   public: {
     Enums: {
       activity_subtype: ["place", "checklist"],
+      meal_subtype: ["place", "checklist"],
       reservation_status: ["booked", "to_book", "decide_later"],
-      reservation_type: ["stay", "transport", "activity"],
+      reservation_type: ["stay", "transport", "activity", "meal"],
       stay_subtype: ["hotel", "camping", "airbnb", "ryokan", "other"],
       transport_mode: ["flight", "train", "bus", "ferry", "car", "other"],
       transport_subtype: ["point_to_point", "at_disposal"],

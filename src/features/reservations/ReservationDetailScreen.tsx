@@ -737,10 +737,20 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     // skipping the out-of-period check for a new type is exactly the kind of gap TABI-113 was
     // fixing); datePatchByType below is exhaustive, so there's no type this can crash on.
     if (trip?.start_date && trip?.end_date) {
+      // !!! STEP 4 TODO (Meal plan) !!! 'meal' points at activityDatePatch below as a
+      // placeholder, NOT a real computation — Meal has no date-edit UI yet (this screen's
+      // field sections are still only `reservation.type === 'stay'/'transport'/'activity'`
+      // conditionals, see the Step 3 blind-spot list), so activityDatePatch is always `{}`
+      // for a Meal reservation today, and this out-of-period check effectively no-ops for
+      // Meal (no dirty start/end to compare against the trip's range). Harmless while Meal
+      // is uncreatable, but Step 4 MUST give 'meal' its own mealDatePatch (same shape as
+      // activityDatePatch — same date model: start + duration, no end-date field) instead
+      // of reusing Activity's value by reference.
       const datePatchByType: Record<ReservationType, Partial<Reservation>> = {
         stay: stayDatePatch,
         transport: transportDatePatch,
         activity: activityDatePatch,
+        meal: activityDatePatch,
       }
       const datePatch = datePatchByType[reservation.type]
       const candidate: DatedCandidate = {
@@ -799,6 +809,11 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     if (!outOfPeriodConfirm) return
     const { field } = outOfPeriodConfirm
     setOutOfPeriodConfirm(null)
+    // !!! STEP 4 TODO (Meal plan) !!! 'meal' below reuses ACTIVITY_START_DATE_FIELD_ID as a
+    // placeholder, same reasoning as datePatchByType above — there is no Meal date field on
+    // this screen yet, so this id is never actually focused for a Meal reservation today.
+    // Step 4 MUST add Meal's own date-field id(s) once its date-edit UI exists (same model:
+    // one start field, no end-date field, mirroring Activity exactly).
     const outOfPeriodFocusTargetIdByType: Record<ReservationType, (field: OutOfPeriodField) => string> = {
       stay: (field) => (field === 'end' && manualEndDate ? STAY_CHECKOUT_DATE_FIELD_ID : STAY_CHECKIN_DATE_FIELD_ID),
       transport: (field) => (field === 'end' ? TRANSPORT_END_DATE_FIELD_ID : TRANSPORT_START_DATE_FIELD_ID),
@@ -806,6 +821,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       // duration pushed past the trip's range, and the date field is still the most direct
       // fix (the duration fields sit right below it).
       activity: () => ACTIVITY_START_DATE_FIELD_ID,
+      meal: () => ACTIVITY_START_DATE_FIELD_ID,
     }
     const targetId = outOfPeriodFocusTargetIdByType[reservation.type](field)
     // Wait a tick for the dialog to unmount before moving focus.

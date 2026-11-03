@@ -55,6 +55,20 @@ test('activity: requires neither start nor end, no end address, overlap NOT chec
   })
 })
 
+// Step 3 (Meal plan): same shape as Activity, with exactly one deliberate difference —
+// Meal DOES check overlap (two meals still warn each other), unlike Activity.
+test('meal: same requirements as activity, EXCEPT overlap IS checked', () => {
+  const req = fieldRequirementsByType.meal({ transportSubtype: 'point_to_point' })
+  assert.deepEqual(req, {
+    requiresStart: false,
+    requiresStartTime: false,
+    requiresEnd: false,
+    requiresEndTime: false,
+    requiresEndAddress: false,
+    checksOverlap: true,
+  })
+})
+
 test('requiresStartTime is false for every type today (no type hard-requires a start time)', () => {
   assert.equal(fieldRequirementsByType.stay({ transportSubtype: 'point_to_point' }).requiresStartTime, false)
   assert.equal(fieldRequirementsByType.transport({ transportSubtype: 'point_to_point' }).requiresStartTime, false)
@@ -62,6 +76,6 @@ test('requiresStartTime is false for every type today (no type hard-requires a s
   assert.equal(fieldRequirementsByType.activity({ transportSubtype: 'point_to_point' }).requiresStartTime, false)
 })
 
-test('the table has exactly the three types defined today (stay, transport, activity)', () => {
-  assert.deepEqual(Object.keys(fieldRequirementsByType).sort(), ['activity', 'stay', 'transport'])
+test('the table has exactly the four types defined today (stay, transport, activity, meal)', () => {
+  assert.deepEqual(Object.keys(fieldRequirementsByType).sort(), ['activity', 'meal', 'stay', 'transport'])
 })

@@ -180,11 +180,15 @@ export const strings = {
     stay: 'Stay',
     transport: 'Transport',
     activity: 'Activity',
+    meal: 'Meal',
   } satisfies Record<ReservationType, string>,
   reservationLegLabels: {
     stay: { start: 'Check-in', end: 'Check-out' },
     transport: { start: 'Departure', end: 'Arrival' },
     activity: { start: 'Start', end: 'End' },
+    // Same model as Activity (Step 3 of the Meal plan): one place or a checklist,
+    // no check-in/departure concept of its own.
+    meal: { start: 'Start', end: 'End' },
   } satisfies Record<ReservationType, { start: string; end: string }>,
   reservationLegLabelsAtDisposal: { start: 'Pick-up', end: 'Drop-off' },
   reservationDetail: {
@@ -309,6 +313,10 @@ export const strings = {
     stay: 'Stay',
     transport: 'Transport',
     activity: 'Activities',
+    // Step 3 (Meal plan): unused by any nav today — mainTypeOptions and tripNavTabs
+    // are deliberately NOT touched in this step, so this key exists for the
+    // compiler only, never read at runtime yet.
+    meal: 'Meals',
   } satisfies Record<ReservationType, string>,
   travelMode: {
     DRIVE: 'Drive',

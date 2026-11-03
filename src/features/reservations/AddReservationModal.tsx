@@ -592,6 +592,11 @@ export function AddReservationModal({
         transportMode,
         isPointToPoint,
         activitySubtype,
+        // Step 3 (Meal plan): no Meal UI state exists yet — mainType can never actually
+        // be 'meal' here (mainTypeOptions doesn't offer it), so this literal is never
+        // read. 'place' matches the documented default (mirrors defaultActivitySubtype)
+        // for whenever Step 4 adds real Meal state.
+        mealSubtype: 'place',
       }),
       name: resolvedName,
       // TABI checklist: the normal 3-state status doesn't apply — it's inherently

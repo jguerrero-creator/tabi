@@ -59,4 +59,17 @@ export const fieldRequirementsByType: Record<ReservationType, (ctx: FieldRequire
     requiresEndAddress: false,
     checksOverlap: false,
   }),
+  // Same model as Activity (one place or a checklist, no required start/end) with one
+  // deliberate difference: Meal DOES check overlap, so two meals still warn each other
+  // even though a Meal no longer overlaps an Activity (same-type-only, TABI-108). Unused
+  // by any UI yet — Step 3 of the Meal plan, inert until mainTypeOptions gets a 'meal'
+  // option (Step 4).
+  meal: () => ({
+    requiresStart: false,
+    requiresStartTime: false,
+    requiresEnd: false,
+    requiresEndTime: false,
+    requiresEndAddress: false,
+    checksOverlap: true,
+  }),
 }
