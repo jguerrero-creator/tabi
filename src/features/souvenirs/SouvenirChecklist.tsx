@@ -1,11 +1,11 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useMemo, useState, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { PlusIcon } from '../../components/ui/PlusIcon'
 import { Spinner } from '../../components/ui/Spinner'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
-import type { SouvenirItem } from '../../types/souvenirItem'
+import { SOUVENIR_RECIPIENT_MAX_LENGTH, type SouvenirItem } from '../../types/souvenirItem'
 import { SouvenirItemRow } from './SouvenirItemRow'
 import type { SouvenirItemInput } from './useTripSouvenirItems'
 
@@ -14,7 +14,9 @@ interface SouvenirChecklistProps {
   currency: string
   loading: boolean
   error: string | null
-  onCreate: (input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount'>>) => Promise<unknown>
+  onCreate: (
+    input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount' | 'recipient'>>,
+  ) => Promise<unknown>
   onUpdate: (itemId: string, patch: Partial<SouvenirItemInput>) => Promise<unknown>
   onDelete: (itemId: string) => Promise<void>
 }
@@ -27,26 +29,44 @@ interface SouvenirChecklistProps {
 export function SouvenirChecklist({ items, currency, loading, error, onCreate, onUpdate, onDelete }: SouvenirChecklistProps) {
   const newLabelFieldId = useId()
   const newAmountFieldId = useId()
+  const newRecipientFieldId = useId()
+  const recipientListId = useId()
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newAmount, setNewAmount] = useState('')
+  const [newRecipient, setNewRecipient] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
   const isEmpty = items.length === 0
+
+  // Nice-to-have: suggest recipients already typed on this trip to avoid typos.
+  const recipientSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(items.map((item) => item.recipient).filter((recipient): recipient is string => !!recipient)),
+      ).sort(),
+    [items],
+  )
 
   async function handleAddItem(event: FormEvent) {
     event.preventDefault()
     const trimmedLabel = newLabel.trim()
     const trimmedAmount = newAmount.trim()
     const parsedAmount = trimmedAmount === '' ? null : Number(trimmedAmount)
-    if (!trimmedLabel || (parsedAmount != null && !Number.isFinite(parsedAmount))) return
+    if (!trimmedLabel) return
+    if (parsedAmount != null && (!Number.isFinite(parsedAmount) || parsedAmount < 0)) {
+      setAddError(strings.souvenirsMenu.errorNegativeAmount)
+      return
+    }
+    const trimmedRecipient = newRecipient.trim().slice(0, SOUVENIR_RECIPIENT_MAX_LENGTH)
     setSubmitting(true)
     setAddError(null)
     try {
-      await onCreate({ label: trimmedLabel, amount: parsedAmount })
+      await onCreate({ label: trimmedLabel, amount: parsedAmount, recipient: trimmedRecipient === '' ? null : trimmedRecipient })
       setNewLabel('')
       setNewAmount('')
+      setNewRecipient('')
       setAdding(false)
       showSavedToast(strings.common.saved)
     } catch (err) {
@@ -80,7 +100,10 @@ export function SouvenirChecklist({ items, currency, loading, error, onCreate, o
       )}
 
       {(!isEmpty || adding) && (
-        <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <ul
+          aria-label={strings.souvenirsMenu.checklistLabel}
+          className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white"
+        >
           {adding && (
             <li className="px-4 py-3">
               <form onSubmit={handleAddItem} className="space-y-2">
@@ -95,14 +118,32 @@ export function SouvenirChecklist({ items, currency, loading, error, onCreate, o
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
                 <input
+                  id={newRecipientFieldId}
+                  name={newRecipientFieldId}
+                  value={newRecipient}
+                  onChange={(event) => setNewRecipient(event.target.value)}
+                  placeholder={strings.souvenirsMenu.recipientPlaceholder}
+                  aria-label={strings.souvenirsMenu.recipientFieldLabel}
+                  maxLength={SOUVENIR_RECIPIENT_MAX_LENGTH}
+                  list={recipientSuggestions.length > 0 ? recipientListId : undefined}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                />
+                {recipientSuggestions.length > 0 && (
+                  <datalist id={recipientListId}>
+                    {recipientSuggestions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                )}
+                <input
                   id={newAmountFieldId}
                   name={newAmountFieldId}
                   type="number"
                   step="0.01"
-                  min="0"
                   value={newAmount}
                   onChange={(event) => setNewAmount(event.target.value)}
                   placeholder={strings.souvenirsMenu.amountPlaceholder}
+                  aria-label={strings.souvenirsMenu.amountFieldLabel}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
                 {addError && <p className="text-xs text-red-600">{addError}</p>}
@@ -118,7 +159,14 @@ export function SouvenirChecklist({ items, currency, loading, error, onCreate, o
             </li>
           )}
           {items.map((item) => (
-            <SouvenirItemRow key={item.id} item={item} currency={currency} onUpdate={onUpdate} onDelete={onDelete} />
+            <SouvenirItemRow
+              key={item.id}
+              item={item}
+              currency={currency}
+              recipientSuggestions={recipientSuggestions}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
           ))}
         </ul>
       )}

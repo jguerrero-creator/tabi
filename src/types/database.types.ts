@@ -401,6 +401,7 @@ export type Database = {
           id: string
           is_checked: boolean
           label: string
+          recipient: string | null
           trip_id: string
           updated_at: string
         }
@@ -410,6 +411,7 @@ export type Database = {
           id?: string
           is_checked?: boolean
           label: string
+          recipient?: string | null
           trip_id: string
           updated_at?: string
         }
@@ -419,6 +421,7 @@ export type Database = {
           id?: string
           is_checked?: boolean
           label?: string
+          recipient?: string | null
           trip_id?: string
           updated_at?: string
         }

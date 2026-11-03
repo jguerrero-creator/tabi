@@ -186,6 +186,68 @@ test('budget screen folds the souvenirs checklist into the grand total as its ow
       path: '/private/tmp/claude-501/-Users-julianguerrero-Documents-Tabi/ebcfc314-3f60-499b-b4ac-8b033fa8e9bd/scratchpad/screenshots/souvenirs-budget-expanded-mobile-390.png',
       fullPage: true,
     })
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    // Backlog: "Souvenirs : modifier le montant après coup et ajouter le
+    // destinataire (pour qui)". Edited directly in the checklist row (tap the
+    // row to open the shared inline-edit form, same as every other compact
+    // row in the app) — no separate detail screen — and the Budget total
+    // recomputes immediately from local React state, no reload needed.
+    const checklist = page.getByRole('list', { name: 'Souvenirs checklist' })
+    const matchaRow = checklist.getByRole('listitem').filter({ hasText: `Matcha ${runId}` })
+    const keychainRow = checklist.getByRole('listitem').filter({ hasText: `Keychain ${runId}` })
+    const giftRow = checklist.getByRole('listitem').filter({ hasText: `Undecided gift ${runId}` })
+
+    // Change an amount (10 -> 25) and see the total move: 20 + 25 + 0 = 45.
+    await keychainRow.getByRole('button', { name: 'Edit' }).click()
+    await page.getByPlaceholder('Amount (optional)').fill('25')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(keychainRow.getByText('$25.00')).toBeVisible()
+    await expect(totalBanner.getByText('$45.00')).toBeVisible()
+
+    // Clear an amount and see it count for nothing, not as 0: 20 + 0 + 0 = 20.
+    await matchaRow.getByRole('button', { name: 'Edit' }).click()
+    await page.getByPlaceholder('Amount (optional)').fill('')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(matchaRow.getByText('No amount entered')).toBeVisible()
+    await expect(totalBanner.getByText('$25.00')).toBeVisible()
+
+    // Reject a negative amount: inline error, nothing saved, total unchanged.
+    await keychainRow.getByRole('button', { name: 'Edit' }).click()
+    await page.getByPlaceholder('Amount (optional)').fill('-5')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Amount must be 0 or more.')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(totalBanner.getByText('$25.00')).toBeVisible()
+
+    // Set a recipient and see it has no effect on the total.
+    await giftRow.getByRole('button', { name: 'Edit' }).click()
+    await page.getByPlaceholder('For whom? (optional)').fill('Maman')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(giftRow.getByText('For Maman')).toBeVisible()
+    await expect(totalBanner.getByText('$25.00')).toBeVisible()
+
+    // Reload and see the recipient persist.
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Budget' })).toBeVisible()
+    await page.getByRole('button', { name: /Souvenirs/ }).click()
+    const checklistAfterReload = page.getByRole('list', { name: 'Souvenirs checklist' })
+    const giftRowAfterReload = checklistAfterReload.getByRole('listitem').filter({ hasText: `Undecided gift ${runId}` })
+    await expect(giftRowAfterReload.getByText('For Maman')).toBeVisible()
+
+    // Clear the recipient.
+    await giftRowAfterReload.getByRole('button', { name: 'Edit' }).click()
+    await page.getByPlaceholder('For whom? (optional)').fill('')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(giftRowAfterReload.getByText('For Maman')).toHaveCount(0)
+
+    // A recipient longer than the 60-char limit is cut.
+    const longRecipient = 'A'.repeat(80)
+    await giftRowAfterReload.getByRole('button', { name: 'Edit' }).click()
+    await page.getByPlaceholder('For whom? (optional)').fill(longRecipient)
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(giftRowAfterReload.getByText(`For ${'A'.repeat(60)}`)).toBeVisible()
+    await expect(giftRowAfterReload.getByText(`For ${longRecipient}`)).toHaveCount(0)
   } finally {
     const { error: deleteSouvenirsError } = await client.from('souvenir_items').delete().eq('trip_id', trip.id)
     if (deleteSouvenirsError) throw deleteSouvenirsError
