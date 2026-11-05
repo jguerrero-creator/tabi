@@ -18,6 +18,7 @@ import type { Reservation } from '../../types/reservation'
 import type { TripDayLocation } from '../../types/dayLocation'
 import type { TripDayNote } from '../../types/dayNote'
 import { bookByBadgeInfo } from '../reservations/bookByBadge'
+import { isChecklistReservation } from '../reservations/placeOrChecklistSubtype'
 import type { ChecklistItemName } from '../reservations/useTripChecklistItemNames'
 import { resolveContextualLocation } from '../stay/computeAccommodationGaps'
 import { DayNote } from './DayNote'
@@ -514,7 +515,9 @@ function ReservationCard({
   checklistItemNames?: ChecklistItemName[]
 }) {
   const stayBadge = stayOccurrenceBadge(reservation)
-  const isChecklist = reservation.type === 'activity' && reservation.activity_subtype === 'checklist'
+  // Step 4a (Meal plan): also recognizes a checklist-subtype Meal — identical to the old
+  // inline check for every existing type.
+  const isChecklist = isChecklistReservation(reservation)
   const bookByBadge = bookByBadgeInfo(reservation)
   return (
     <SwipeableReservationCard reservation={reservation} onOpenNote={onOpenNote} onHoverDaySwitch={onHoverDaySwitch}>
@@ -878,7 +881,8 @@ function rowLabel(reservation: DayItem): string | null {
   // TABI checklist: a checklist block has no single "Start · HH:MM" leg worth calling out
   // (its position on the rail already conveys the time) — ReservationCard shows its item
   // names instead, via checklistItemNamesByReservationId, not this generic row label.
-  if (reservation.type === 'activity' && reservation.activity_subtype === 'checklist') return null
+  // Step 4a (Meal plan): also excludes a checklist-subtype Meal, same reasoning.
+  if (isChecklistReservation(reservation)) return null
   if (!reservation.start_at) return null
   const labels = strings.reservationLegLabels[reservation.type]
   const isEndOccurrence = reservation.isCheckoutOccurrence || reservation.isArrivalOccurrence

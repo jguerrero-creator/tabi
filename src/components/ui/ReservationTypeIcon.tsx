@@ -1,4 +1,12 @@
-import type { ActivitySubtype, ReservationType, StaySubtype, TransportMode, TransportSubtype } from '../../types/reservation'
+import { isChecklistReservation } from '../../features/reservations/placeOrChecklistSubtype'
+import type {
+  ActivitySubtype,
+  MealSubtype,
+  ReservationType,
+  StaySubtype,
+  TransportMode,
+  TransportSubtype,
+} from '../../types/reservation'
 
 /**
  * Type-identity colors (TABI-217) — distinct from the 3-state booking-status
@@ -135,6 +143,10 @@ interface ReservationIconInput {
   transport_subtype?: TransportSubtype | null
   transport_mode?: TransportMode | null
   activity_subtype?: ActivitySubtype | null
+  /** Step 4a (Meal plan): unused by any caller yet (MenuListRow, the only one that
+   * builds this object from separate props, has no mealSubtype prop of its own —
+   * Step 4b's job), but isChecklistReservation below reads it should one ever exist. */
+  meal_subtype?: MealSubtype | null
 }
 
 /** Single place picking the right glyph for a reservation, sub-type included (TABI-130). */
@@ -154,7 +166,10 @@ export function ReservationIcon({
   if (reservation.type === 'transport' && reservation.transport_subtype === 'point_to_point') {
     return <TransportModeIcon mode={reservation.transport_mode} className={className} />
   }
-  if (reservation.type === 'activity' && reservation.activity_subtype === 'checklist') {
+  // Step 4a (Meal plan): also recognizes a checklist-subtype Meal — identical to the old
+  // `type === 'activity' && activity_subtype === 'checklist'` check for every existing
+  // type.
+  if (isChecklistReservation(reservation)) {
     return <ChecklistIcon className={className} />
   }
   return <ReservationTypeIcon type={reservation.type} className={className} />

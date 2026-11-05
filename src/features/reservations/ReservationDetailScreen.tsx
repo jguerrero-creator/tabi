@@ -42,6 +42,7 @@ import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useChecklistItems } from './useChecklistItems'
+import { isChecklistReservation } from './placeOrChecklistSubtype'
 import { useReservation } from './useReservation'
 import { ChecklistItemsSection } from './ChecklistItemsSection'
 import { VehicleRentalLegsSection } from './VehicleRentalLegsSection'
@@ -261,7 +262,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   // TABI checklist: this subtype's own status doesn't apply (spec: inherently "decide on
   // location", fixed at creation, never surfaced as an editable picker) and it has no single
   // fixed place of its own — its candidate places live in ChecklistItemsSection instead.
-  const isChecklist = reservation.type === 'activity' && reservation.activity_subtype === 'checklist'
+  // Step 4a (Meal plan): isChecklistReservation also recognizes a checklist-subtype Meal —
+  // identical to this line's old `reservation.type === 'activity' && activity_subtype ===
+  // 'checklist'` for every existing type, since Meal can't exist here yet either way.
+  const isChecklist = isChecklistReservation(reservation)
   // Single useChecklistItems instance for this whole screen — called unconditionally (Rules of
   // Hooks; harmless no-op query for non-Activity types) so both the picker below and
   // ChecklistItemsSection share one source of truth instead of drifting out of sync.
