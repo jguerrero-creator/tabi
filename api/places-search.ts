@@ -19,6 +19,10 @@ interface PlacesSearchRequestBody {
   // (a radius the LLM estimated from the traveler's request) — the plain manual search never
   // sends this and keeps the original fixed BIAS_RADIUS_METERS behavior unchanged.
   radiusMeters?: number
+  // Step 4b (Meal plan): restaurant bias for a Meal's place search. Fixed server-side
+  // allow-list (same pattern as places-nearby.ts's TOURIST_TYPES) — a client-supplied
+  // value never reaches Google unless it's in ALLOWED_TYPE_BIASES.
+  typeBias?: string
 }
 
 export type { PlaceSearchResult }
@@ -29,6 +33,7 @@ const MAX_RESULTS = 8
 const BIAS_RADIUS_METERS = 15000
 const MIN_RADIUS_METERS = 300
 const MAX_RADIUS_METERS = 30000
+const ALLOWED_TYPE_BIASES = ['restaurant']
 
 export const config = { runtime: 'edge' }
 
@@ -78,6 +83,11 @@ export default async function handler(request: Request): Promise<Response> {
     }
   } else if (body.regionCode) {
     requestBody.regionCode = body.regionCode
+  }
+  if (body.typeBias && ALLOWED_TYPE_BIASES.includes(body.typeBias)) {
+    // Text Search (New) takes a single `includedType`, unlike Nearby Search's plural
+    // `includedTypes` (places-nearby.ts) — restricts results to that one Google type.
+    requestBody.includedType = body.typeBias
   }
 
   let googleResponse: Response

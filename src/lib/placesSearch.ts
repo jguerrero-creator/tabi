@@ -17,13 +17,24 @@ export type PlaceSearchBias = { lat: number; lng: number } | { regionCode: strin
 
 export class PlaceSearchFailedError extends Error {}
 
+/** Step 4b (Meal plan): restaurant bias for a Meal's place search — server-side
+ * allow-list (places-search.ts), same shape as places-nearby.ts's TOURIST_TYPES. Not
+ * wired to any caller yet (no Meal search entry point exists until Step 5), but ready:
+ * costs one prop here and one request field server-side, no new endpoint. */
+export type PlaceTypeBias = 'restaurant'
+
 // TABI-49: rich Google Places search for the Activities menu's Add flow — distinct
 // from the plain address-autocomplete (PlaceAutocompleteField), which never surfaces
 // rating/photo/category metadata.
 // TABI-79: `radiusMeters` is optional and only ever passed by the natural-language search flow
 // (a detour radius Claude estimated from the traveler's free-text request) — omitted, the
 // server keeps its original fixed default, so the plain manual search above is unaffected.
-export async function searchPlaces(query: string, bias: PlaceSearchBias, radiusMeters?: number): Promise<PlaceSearchResult[]> {
+export async function searchPlaces(
+  query: string,
+  bias: PlaceSearchBias,
+  radiusMeters?: number,
+  typeBias?: PlaceTypeBias,
+): Promise<PlaceSearchResult[]> {
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
 
@@ -33,7 +44,12 @@ export async function searchPlaces(query: string, bias: PlaceSearchBias, radiusM
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify({ query, ...(bias ?? {}), ...(radiusMeters ? { radiusMeters } : {}) }),
+    body: JSON.stringify({
+      query,
+      ...(bias ?? {}),
+      ...(radiusMeters ? { radiusMeters } : {}),
+      ...(typeBias ? { typeBias } : {}),
+    }),
   })
 
   if (!response.ok) {

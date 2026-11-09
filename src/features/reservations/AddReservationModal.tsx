@@ -22,12 +22,14 @@ import {
   type GeocodeResult,
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
+import { isMealsEnabled } from '../../lib/mealsFeatureSwitch'
 import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { strings } from '../../lib/strings'
 import type { Json } from '../../types/database.types'
 import { showSavedToast } from '../../lib/toast'
 import type {
   ActivitySubtype,
+  MealSubtype,
   NewReservation,
   Reservation,
   ReservationStatus,
@@ -42,6 +44,7 @@ import { useTripDayLocations } from '../trips/useTripDayLocations'
 import { useTripReservations } from '../trips/useTripReservations'
 import { lastKnownTripLocation } from './lastKnownTripLocation'
 import { findLocationMismatch, type LocationMismatch } from './locationMismatch'
+import { isChecklistReservation, isPlaceOrChecklistType } from './placeOrChecklistSubtype'
 import { findOverlappingReservation } from './reservationOverlap'
 import { fieldRequirementsByType } from './reservationFieldRequirements'
 import { buildTypeSpecificColumns } from './reservationTypeSpecificFields'
@@ -89,11 +92,15 @@ const DAY_START_TIME_FALLBACK = '08:00'
 const START_DATE_FIELD_ID = 'reservation-date-start'
 const END_DATE_FIELD_ID = 'reservation-date-end'
 
-const mainTypeOptions: ReservationType[] = ['stay', 'transport', 'activity']
+// Step 4b (Meal plan): 'meal' is filtered in/out at render time (inside the component,
+// see `mainTypeOptions` there) based on isMealsEnabled() — this is the full list it
+// filters down from, never rendered directly.
+const ALL_MAIN_TYPE_OPTIONS: ReservationType[] = ['stay', 'transport', 'activity', 'meal']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
 const transportSubtypeOptions: TransportSubtype[] = ['point_to_point', 'at_disposal']
 const transportModeOptions: TransportMode[] = ['flight', 'train', 'bus', 'ferry', 'car', 'other']
 const activitySubtypeOptions: ActivitySubtype[] = ['place', 'checklist']
+const mealSubtypeOptions: MealSubtype[] = ['place', 'checklist']
 
 interface AddReservationModalProps {
   tripId: string
@@ -137,6 +144,8 @@ interface AddReservationModalProps {
   defaultTransportMode?: TransportMode | null
   /** Checklist-subtype Activity: a time block with multiple candidate places instead of one fixed location — see ActivityPlaceSearchModal's "make this a checklist" exit. */
   defaultActivitySubtype?: ActivitySubtype
+  /** Step 4b (Meal plan): same place-or-checklist model as defaultActivitySubtype above, for a Meal. */
+  defaultMealSubtype?: MealSubtype
   initialName?: string | null
   initialStartAddressText?: string | null
   initialEndAddressText?: string | null
@@ -176,6 +185,7 @@ export function AddReservationModal({
   defaultTransportSubtype = 'point_to_point',
   defaultTransportMode = null,
   defaultActivitySubtype = 'place',
+  defaultMealSubtype = 'place',
   requireTypeChoice = false,
   initialStartAt = null,
   initialTimezone = null,
@@ -213,6 +223,7 @@ export function AddReservationModal({
   const [transportSubtype, setTransportSubtype] = useState<TransportSubtype>(defaultTransportSubtype)
   const [transportMode, setTransportMode] = useState<TransportMode | null>(defaultTransportMode)
   const [activitySubtype, setActivitySubtype] = useState<ActivitySubtype>(defaultActivitySubtype)
+  const [mealSubtype, setMealSubtype] = useState<MealSubtype>(defaultMealSubtype)
   const [parkingIncluded, setParkingIncluded] = useState<boolean | null>(null)
   const [checkInDeadline, setCheckInDeadline] = useState('')
   const [name, setName] = useState(initialName ?? '')
@@ -286,10 +297,17 @@ export function AddReservationModal({
   // exhaustive fieldRequirementsByType table (reservationFieldRequirements.ts) so a type added
   // to the ReservationType union without an entry there is a compile error, not a silent
   // fallback.
+  // Step 4b (Meal plan): 'meal' only ever appears in the type selector while the switch
+  // is on — recomputed per render (cheap, synchronous) rather than a module-level
+  // constant, so flipping the switch takes effect on the form's next render without
+  // needing its own state/effect.
+  const mainTypeOptions = isMealsEnabled() ? ALL_MAIN_TYPE_OPTIONS : ALL_MAIN_TYPE_OPTIONS.filter((type) => type !== 'meal')
   const isTransport = mainType === 'transport'
   const isPointToPoint = isTransport && transportSubtype === 'point_to_point'
   const isAtDisposal = isTransport && transportSubtype === 'at_disposal'
-  const isChecklist = mainType === 'activity' && activitySubtype === 'checklist'
+  // Shared helper (Step 4a) rather than `mainType === 'activity' && activitySubtype ===
+  // 'checklist'` — identical result for Activity, also true for a checklist Meal.
+  const isChecklist = isChecklistReservation({ type: mainType, activity_subtype: activitySubtype, meal_subtype: mealSubtype })
   const option = {
     dbType: mainType,
     ...fieldRequirementsByType[mainType]({ transportSubtype }),
@@ -307,8 +325,11 @@ export function AddReservationModal({
         ? strings.addReservation.staySubtypes[staySubtype]
         : isAtDisposal
           ? strings.addReservation.transportSubtypes.at_disposal
-          : option.dbType === 'activity'
-            ? strings.reservationType.activity
+          // Step 4b: generalized from `option.dbType === 'activity'` — identical result
+          // for Activity ("Activity"), gives "Meal" for a Meal (item 3: reuses
+          // suggestedName() as-is, "New Meal", no new naming logic).
+          : isPlaceOrChecklistType(option.dbType)
+            ? strings.reservationType[option.dbType]
             : null
     if (subtypeLabel) setName(strings.addReservation.suggestedName(subtypeLabel))
   }, [nameManuallyEdited, isAutoNamedTransport, suggestDefaultName, option.dbType, isAtDisposal, staySubtype])
@@ -401,8 +422,10 @@ export function AddReservationModal({
   // an end date directly — end always stays on the same calendar day as start. A blank start
   // time still anchors off the trip's day-start time (same fallback `buildAndProceed` applies
   // at submit) rather than dropping an entered duration just because time was left blank.
+  // Step 4b: also covers Meal — same date model (item 4: "a twin for 'meal', same shape"),
+  // expressed as one broadened guard via the shared helper rather than a duplicated effect.
   useEffect(() => {
-    if (option.dbType !== 'activity') return
+    if (!isPlaceOrChecklistType(option.dbType)) return
     const hours = Number(durationHours) || 0
     const minutes = Number(durationMinutes) || 0
     if (!startDate || (hours === 0 && minutes === 0)) {
@@ -554,8 +577,11 @@ export function AddReservationModal({
     // Bugs — a date-only Activity used to have its date silently discarded, landing in
     // "Unscheduled" instead of its own day, contradicting TABI-16's original spec). A fully blank
     // Activity (no date at all) stays fully unscheduled — this only fires once a date is chosen.
+    // Step 4b: generalized from `option.dbType === 'activity'` — a date-only Meal gets the
+    // same fallback (and the same reason to: without it, `startAt` stays null below, and a
+    // null start_at silently skips the out-of-period check entirely).
     const startTimeDefaulted =
-      (option.dbType === 'stay' || isPointToPoint || (option.dbType === 'activity' && startDate !== '')) &&
+      (option.dbType === 'stay' || isPointToPoint || (isPlaceOrChecklistType(option.dbType) && startDate !== '')) &&
       !startTime
     const endTimeDefaulted = option.dbType === 'stay' && !endTime
     const tripDayStartTime = trip?.day_start_time.slice(0, 5) ?? DAY_START_TIME_FALLBACK
@@ -592,11 +618,7 @@ export function AddReservationModal({
         transportMode,
         isPointToPoint,
         activitySubtype,
-        // Step 3 (Meal plan): no Meal UI state exists yet — mainType can never actually
-        // be 'meal' here (mainTypeOptions doesn't offer it), so this literal is never
-        // read. 'place' matches the documented default (mirrors defaultActivitySubtype)
-        // for whenever Step 4 adds real Meal state.
-        mealSubtype: 'place',
+        mealSubtype,
       }),
       name: resolvedName,
       // TABI checklist: the normal 3-state status doesn't apply — it's inherently
@@ -736,7 +758,9 @@ export function AddReservationModal({
     if (!outOfPeriodConfirm) return
     const { field } = outOfPeriodConfirm
     setOutOfPeriodConfirm(null)
-    const hasEditableEndDateField = option.dbType !== 'activity' && (option.dbType !== 'stay' || manualEndDate)
+    // Step 4b: generalized from `option.dbType !== 'activity'` — Meal has no editable
+    // end-date field either (same date model as Activity).
+    const hasEditableEndDateField = !isPlaceOrChecklistType(option.dbType) && (option.dbType !== 'stay' || manualEndDate)
     const targetId = field === 'end' && hasEditableEndDateField ? END_DATE_FIELD_ID : START_DATE_FIELD_ID
     // Wait a tick for the dialog to unmount before moving focus.
     requestAnimationFrame(() => {
@@ -848,6 +872,15 @@ export function AddReservationModal({
               {strings.addReservation.activitySubtypeLabel}
             </p>
             <ActivitySubtypePicker value={activitySubtype} onChange={setActivitySubtype} />
+          </div>
+        )}
+
+        {option.dbType === 'meal' && (
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-700">
+              {strings.addReservation.mealSubtypeLabel}
+            </p>
+            <MealSubtypePicker value={mealSubtype} onChange={setMealSubtype} />
           </div>
         )}
 
@@ -1025,7 +1058,7 @@ export function AddReservationModal({
               {strings.addReservation.manualCheckoutToggle}
             </button>
           </div>
-        ) : option.dbType === 'activity' ? (
+        ) : isPlaceOrChecklistType(option.dbType) ? (
           <DurationField
             legend={strings.addReservation.durationLabel}
             hours={durationHours}
@@ -1246,6 +1279,41 @@ function ActivitySubtypePicker({
   return (
     <div role="radiogroup" className="flex flex-wrap gap-2">
       {activitySubtypeOptions.map((subtype) => {
+        const selected = subtype === value
+        return (
+          <button
+            key={subtype}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(subtype)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.activitySubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// Step 4b (Meal plan): mirrors ActivitySubtypePicker exactly — same place-or-checklist
+// model, so it deliberately reuses `activitySubtypes` for the two radio labels rather
+// than duplicating that text under a new `mealSubtypes` key.
+function MealSubtypePicker({
+  value,
+  onChange,
+}: {
+  value: MealSubtype
+  onChange: (subtype: MealSubtype) => void
+}) {
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      {mealSubtypeOptions.map((subtype) => {
         const selected = subtype === value
         return (
           <button

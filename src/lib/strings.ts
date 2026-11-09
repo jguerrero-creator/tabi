@@ -516,6 +516,10 @@ export const strings = {
       place: 'Specific place',
       checklist: 'Checklist (a few options to pick from)',
     },
+    // Step 4b (Meal plan): same place-or-checklist model as Activity, same two radio
+    // labels — MealSubtypePicker reuses `activitySubtypes` above for the options
+    // themselves (deliberately, not duplicated) and only needs its own field label.
+    mealSubtypeLabel: 'Meal type',
     // Backlog: "Afficher le mode de transport en premier dans le titre + icône par mode" —
     // optional, point-to-point only; unset is a valid, common state (older bookings, or a
     // mode the AI/user never determined) and must never block or default to a guess.
