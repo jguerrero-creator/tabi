@@ -449,6 +449,20 @@ export const strings = {
     unscheduledLabel: 'Unscheduled',
     addCta: 'Add activity',
   },
+  // Step 5 (Meal plan): mirrors transportMenu's structure exactly (SubtypeFilterPills,
+  // no accommodation-gap-style complexity) rather than activitiesMenu's search-first
+  // flow — Meal's Add button opens the plain shared AddReservationModal directly.
+  mealsMenu: {
+    title: 'Meals',
+    loading: 'Loading meals…',
+    errorLoading: 'Could not load this trip.',
+    emptyTitle: 'No meals booked yet',
+    emptyBody: 'This trip has no restaurants or meal plans yet.',
+    addCta: 'Add reservation (Meal)',
+    noFilterMatchTitle: 'No meals match this filter',
+    noFilterMatchBody: 'Try selecting a different meal type, or clear the filter.',
+    unscheduledLabel: 'Unscheduled',
+  },
   budgetMenu: {
     loading: 'Loading budget…',
     errorLoading: 'Could not load this trip.',

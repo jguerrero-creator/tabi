@@ -8,6 +8,8 @@ import { ActivitiesMenuScreen } from './features/activities/ActivitiesMenuScreen
 import { PasswordRecoveryModal } from './features/account/PasswordRecoveryModal'
 import { BudgetMenuScreen } from './features/budget/BudgetMenuScreen'
 import { PrivacyPolicyScreen } from './features/legal/PrivacyPolicyScreen'
+import { MealsMenuScreen } from './features/meals/MealsMenuScreen'
+import { isMealsEnabled } from './lib/mealsFeatureSwitch'
 import { ReservationDetailScreen } from './features/reservations/ReservationDetailScreen'
 import { StayMenuScreen } from './features/stay/StayMenuScreen'
 import { TransportMenuScreen } from './features/transport/TransportMenuScreen'
@@ -53,6 +55,10 @@ export function App() {
           <Route path="stay" element={<StayMenuScreen />} />
           <Route path="transport" element={<TransportMenuScreen />} />
           <Route path="activities" element={<ActivitiesMenuScreen />} />
+          {/* Step 5 (Meal plan): behind the feature switch — reachable only via the nav
+              tab tripNavTabs.ts already hides when the switch is off, but a direct/typed
+              URL must not render a half-finished screen either, hence the redirect. */}
+          <Route path="meals" element={isMealsEnabled() ? <MealsMenuScreen /> : <MealsRedirect />} />
           <Route path="budget" element={<BudgetMenuScreen />} />
           {/* Souvenirs merged into Budget as its own category — redirect old
               links/bookmarks there instead of 404ing (`replace` so Back
@@ -73,4 +79,12 @@ export function App() {
 function SouvenirsRedirect() {
   const { tripId } = useParams<{ tripId: string }>()
   return <Navigate to={`/trips/${tripId}/budget`} replace />
+}
+
+/** `/trips/:tripId/meals` with the Meal feature switch off — back to the trip's own
+    Overview (`replace`, so Back doesn't bounce between the two routes), not a 404 or a
+    half-finished screen for anyone who types/bookmarks the URL directly. */
+function MealsRedirect() {
+  const { tripId } = useParams<{ tripId: string }>()
+  return <Navigate to={`/trips/${tripId}`} replace />
 }

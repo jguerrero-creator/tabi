@@ -10,6 +10,10 @@ import { authenticatedClientFor } from './support/auth'
 // and the redirect itself — including that it's a `replace` (no back-button
 // bounce between the old and new routes).
 
+async function enableMealsSwitch(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => localStorage.setItem('tabi.feature.meals', '1'))
+}
+
 async function makeTrip(client: Awaited<ReturnType<typeof authenticatedClientFor>>, suffix: string) {
   const {
     data: { user },
@@ -101,4 +105,48 @@ test('the old Souvenirs route redirects to Budget (replace — no back-button bo
   // stacked on top, so Back must land on Overview, not bounce back to /souvenirs.
   await page.goBack()
   await expect(page).toHaveURL(`/trips/${trip.id}`)
+})
+
+// Step 5 (Meal plan): with the feature switch ON, a 6th "Meals" entry appears (violet
+// fork-and-knife icon) — everything above this test asserts the OFF state is still
+// exactly 5; this is the complementary ON assertion the Meal plan's checklist calls for.
+test('switch ON: bottom nav and desktop sidebar show 6 entries including Meals, still no layout gap at 390px/320px', async ({
+  page,
+  registerTrip,
+}) => {
+  await enableMealsSwitch(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+  const client = await authenticatedClientFor(page)
+  const trip = await makeTrip(client, 'C')
+  registerTrip(client, trip.id)
+
+  await page.goto(`/trips/${trip.id}`)
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const sidebarNav = page.locator('aside nav')
+  await expect(sidebarNav.getByRole('link')).toHaveCount(6)
+  // Nav icons inherit color from the Link's own active/inactive state (teal/slate), same
+  // as every other tab today — no per-type color in the nav itself, just the glyph shape.
+  await expect(sidebarNav.getByRole('link', { name: 'Meals' })).toBeVisible()
+  await expect(sidebarNav.getByRole('link', { name: 'Meals' }).locator('svg')).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  const bottomNav = page.locator('nav.fixed')
+  await expect(bottomNav.getByRole('link')).toHaveCount(6)
+  await expect(bottomNav.getByRole('link', { name: 'Meals' })).toBeVisible()
+  const widths390 = await bottomNav.getByRole('link').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width))
+  expect(Math.max(...widths390) - Math.min(...widths390)).toBeLessThan(1)
+
+  await page.setViewportSize({ width: 320, height: 760 })
+  await expect(bottomNav.getByRole('link')).toHaveCount(6)
+  const widths320 = await bottomNav.getByRole('link').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width))
+  expect(Math.max(...widths320) - Math.min(...widths320)).toBeLessThan(1)
+  const navBox = await bottomNav.boundingBox()
+  expect(navBox).not.toBeNull()
+  expect(Math.abs((navBox?.width ?? 0) - 320)).toBeLessThan(1)
+  // Even spacing/full-width hold at 320px (asserted above) — but a real screenshot at
+  // this width shows "Transport"/"Activities" visually crowding together with no gap
+  // between labels. Flagged to the user rather than guessing at a fix (icon-only below
+  // a breakpoint, shorter labels, etc.) — see the Step 5 report.
 })

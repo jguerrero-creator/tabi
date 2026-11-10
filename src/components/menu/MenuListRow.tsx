@@ -6,6 +6,7 @@ import { strings } from '../../lib/strings'
 import type { BookByBadgeInfo } from '../../features/reservations/bookByBadge'
 import type {
   ActivitySubtype,
+  MealSubtype,
   ReservationStatus,
   ReservationType,
   StaySubtype,
@@ -33,6 +34,8 @@ interface MenuListRowProps {
   transportSubtype?: TransportSubtype | null
   transportMode?: TransportMode | null
   activitySubtype?: ActivitySubtype | null
+  /** Step 5 (Meal plan): mirrors activitySubtype above — same place-or-checklist icon model. */
+  mealSubtype?: MealSubtype | null
   /** Optional trailing content on the row's right edge, e.g. a cost (budget category detail list). */
   trailing?: React.ReactNode
   /** Book-by days-remaining/overdue badge (new feature, 2026-09-30) — null/undefined
@@ -59,6 +62,7 @@ export function MenuListRow({
   transportSubtype,
   transportMode,
   activitySubtype,
+  mealSubtype,
   trailing,
   bookByBadge,
 }: MenuListRowProps) {
@@ -78,6 +82,7 @@ export function MenuListRow({
               transport_subtype: transportSubtype,
               transport_mode: transportMode,
               activity_subtype: activitySubtype,
+              meal_subtype: mealSubtype,
             }}
             className="h-4 w-4"
           />

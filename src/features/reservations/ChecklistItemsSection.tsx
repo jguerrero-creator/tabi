@@ -220,6 +220,9 @@ export function ChecklistItemsSection({
           onSelect={handleSelectPlace}
           onSkip={() => setAddStep('manual')}
           onCancel={() => setAddStep(null)}
+          // Step 5 (Meal plan): a Meal checklist's candidate-place search is biased
+          // toward restaurants; an Activity checklist's isn't.
+          typeBias={reservation.type === 'meal' ? 'restaurant' : undefined}
         />
       )}
 

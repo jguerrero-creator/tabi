@@ -7,7 +7,13 @@ import { fetchGeocodeByPlaceId } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
 import { translateSearchIntent } from '../../lib/nlPlacesSearch'
 import { fetchPlaceOpeningHours } from '../../lib/placeOpeningHours'
-import { placePhotoUrl, searchPlaces, type PlaceSearchBias, type PlaceSearchResult } from '../../lib/placesSearch'
+import {
+  placePhotoUrl,
+  searchPlaces,
+  type PlaceSearchBias,
+  type PlaceSearchResult,
+  type PlaceTypeBias,
+} from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { useProfile } from '../../lib/useProfile'
 import type { ResolvedPlace } from './AddReservationModal'
@@ -57,6 +63,11 @@ interface ActivityPlaceSearchModalProps {
    * so every other caller of this modal (NearbyPlacesMapModal, SavePlaceModal) is unaffected. */
   onChecklist?: () => void
   onCancel: () => void
+  /** Step 5 (Meal plan): biases results toward restaurants — passed through to
+   * searchPlaces/places-search.ts's own server-side allow-list unchanged. Optional so
+   * every other caller (Activity checklist items, NearbyPlacesMapModal, SavePlaceModal)
+   * is unaffected. */
+  typeBias?: PlaceTypeBias
 }
 
 // TABI-49: rich Google Places search launched first from the Activities menu's Add
@@ -65,7 +76,14 @@ interface ActivityPlaceSearchModalProps {
 // the existing /api/geocode place-id lookup (the same call the plain-autocomplete path
 // already uses) before handing a fully-formed ResolvedPlace back to the caller.
 // "Enter manually instead" skips straight to the existing blank form.
-export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onChecklist, onCancel }: ActivityPlaceSearchModalProps) {
+export function ActivityPlaceSearchModal({
+  tripId,
+  onSelect,
+  onSkip,
+  onChecklist,
+  onCancel,
+  typeBias,
+}: ActivityPlaceSearchModalProps) {
   const { trip } = useTrip(tripId)
   const { locationsByDate } = useTripDayLocations(tripId)
   const { profile, can } = useProfile()
@@ -122,7 +140,7 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onChecklist
 
     try {
       const bias = computeBias()
-      const found = await searchPlaces(text, bias)
+      const found = await searchPlaces(text, bias, undefined, typeBias)
       if (requestId !== requestIdRef.current) return
       setResults(found)
       setSearched(true)
@@ -159,7 +177,7 @@ export function ActivityPlaceSearchModal({ tripId, onSelect, onSkip, onChecklist
 
       const bias = computeBias()
       const resultsByIntent = await Promise.all(
-        filters.intents.map((intent) => searchPlaces(intent.searchQuery, bias, intent.radiusMeters)),
+        filters.intents.map((intent) => searchPlaces(intent.searchQuery, bias, intent.radiusMeters, typeBias)),
       )
       if (requestId !== requestIdRef.current) return
       setResults(dedupeByPlaceId(resultsByIntent.flat()))
