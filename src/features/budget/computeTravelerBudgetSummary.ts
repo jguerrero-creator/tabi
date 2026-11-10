@@ -15,13 +15,14 @@ export interface TravelerBudgetTotal {
  * from today's output, by design: the "no change" guarantee).
  *
  * For every named traveler: total = their share of the divided categories (today:
- * Stay/effectiveN, see isDividedByTravelerCount) + every non-divided category and
- * manual budget IN FULL (already entered per person, decision #28/08 confirmed
- * 08/11) + souvenirs assigned to them IN FULL + their equal share of UNASSIGNED
- * souvenirs. Assigning a souvenir therefore moves money between travelers without
- * changing the group total — the sum of every traveler's total (effectiveN of
- * them, including any unnamed "slot") always equals effectiveN × the shared base
- * plus every souvenir's amount, named or not.
+ * Stay/effectiveN, see isDividedByTravelerCount) + every non-divided category
+ * (Transport/Activity/Meal), any "Other" reservations (a future type Budget hasn't
+ * been updated for), and manual budget IN FULL (already entered per person,
+ * decision #28/08 confirmed 08/11) + souvenirs assigned to them IN FULL + their
+ * equal share of UNASSIGNED souvenirs. Assigning a souvenir therefore moves money
+ * between travelers without changing the group total — the sum of every
+ * traveler's total (effectiveN of them, including any unnamed "slot") always
+ * equals effectiveN × the shared base plus every souvenir's amount, named or not.
  *
  * effectiveN can exceed the number of NAMED travelers (Step A's reconciliation:
  * the stored traveler_count is a floor, names are optional labels on top of it).
@@ -47,7 +48,9 @@ export function computeTravelerBudgetSummary(
   const flatBase =
     summary.categories
       .filter((category) => !isDividedByTravelerCount(category.type))
-      .reduce((sum, category) => sum + category.total, 0) + summary.manualTotal
+      .reduce((sum, category) => sum + category.total, 0) +
+    summary.other.total +
+    summary.manualTotal
 
   const dividedShares = splitEqually(dividedTotal, effectiveN, minorUnitStep)
 

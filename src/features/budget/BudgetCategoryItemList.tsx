@@ -8,7 +8,8 @@ import type { Reservation, ReservationType } from '../../types/reservation'
 import { isDividedByTravelerCount } from './computeBudgetSummary'
 
 interface BudgetCategoryItemListProps {
-  type: ReservationType
+  /** 'other' (Step 6: a future type not in categoryOrder) is never divided by traveler count — there's no known division rule for a type Budget hasn't been updated for. */
+  type: ReservationType | 'other'
   reservations: Reservation[]
   currency: string
   travelerCount: number
@@ -34,7 +35,7 @@ export function BudgetCategoryItemList({ type, reservations, currency, travelerC
       return <span className="text-xs text-slate-400">{strings.budgetMenu.noPriceEntered}</span>
     }
     const amount = formatCurrency(reservation.price_amount, reservation.price_currency ?? currency)
-    if (!isDividedByTravelerCount(type) || travelerCount <= 1) {
+    if (type === 'other' || !isDividedByTravelerCount(type) || travelerCount <= 1) {
       return <span className="text-sm font-semibold text-slate-900">{amount}</span>
     }
     const perPerson = formatCurrency(reservation.price_amount / travelerCount, reservation.price_currency ?? currency)

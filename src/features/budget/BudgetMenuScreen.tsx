@@ -23,7 +23,27 @@ import { computeTravelerBudgetSummary } from './computeTravelerBudgetSummary'
 import { useTripBudgetCategories } from './useTripBudgetCategories'
 import type { ReservationType } from '../../types/reservation'
 
-type ExpandedCategory = ReservationType | 'souvenirs'
+type ExpandedCategory = ReservationType | 'souvenirs' | 'other'
+
+/** Step 6: generic placeholder for a reservation type Budget hasn't been updated for yet — see BudgetSummary.other. */
+function OtherCategoryIcon({ className }: { className: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
 
 export function BudgetMenuScreen() {
   const newLabelFieldId = useId()
@@ -83,6 +103,10 @@ export function BudgetMenuScreen() {
   const currency = trip?.currency ?? ''
   const travelerCount = trip?.traveler_count ?? 1
   const isEmpty = summary.count === 0 && budgetCategories.length === 0 && souvenirItems.length === 0
+  // Step 6: reservations whose type isn't one of the known categories (summary.other) —
+  // derived from summary.categories rather than re-importing categoryOrder, so this stays
+  // correct even if that list changes.
+  const categorizedTypes = useMemo(() => new Set(summary.categories.map((category) => category.type)), [summary])
 
   async function handleAddCategory(event: FormEvent) {
     event.preventDefault()
@@ -282,6 +306,52 @@ export function BudgetMenuScreen() {
                               onDelete={deleteSouvenirItem}
                             />
                           </div>
+                        )}
+                      </li>
+                    )
+                  })()}
+                {summary.other.count > 0 &&
+                  (() => {
+                    const isExpanded = expandedType === 'other'
+                    return (
+                      <li key="other">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedType(isExpanded ? null : 'other')}
+                          aria-expanded={isExpanded}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                            <OtherCategoryIcon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-900">{strings.budgetMenu.otherLabel}</p>
+                            <p className="text-xs text-slate-500">{strings.budgetMenu.itemCount(summary.other.count)}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold text-slate-900">
+                              {formatCurrency(summary.other.total, currency)}
+                            </p>
+                          </div>
+                          <svg
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                        {isExpanded && (
+                          <BudgetCategoryItemList
+                            type="other"
+                            reservations={reservations.filter((reservation) => !categorizedTypes.has(reservation.type))}
+                            currency={currency}
+                            travelerCount={travelerCount}
+                          />
                         )}
                       </li>
                     )

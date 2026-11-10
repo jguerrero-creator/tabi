@@ -1,6 +1,9 @@
 import { expect, test } from './support/fixtures'
 import { authenticatedClientFor } from './support/auth'
-import { activitySeed } from './support/reservationSeeds'
+import { activitySeed, mealSeed } from './support/reservationSeeds'
+
+const SCREENSHOT_DIR =
+  '/private/tmp/claude-501/-Users-julianguerrero-Documents-Tabi/46048985-96dd-4b62-8913-63006fd94adc/scratchpad/screenshots'
 
 // TABI-55 — "Vue Budget agrégée automatiquement depuis les réservations". Spec:
 // "Somme automatique des prix renseignés sur les réservations et activités
@@ -289,6 +292,127 @@ test('budget screen shows the empty state when the trip has no reservations', as
     await expect(page.getByText('No prices entered yet')).toBeVisible()
     await expect(page.getByText('Total entered so far')).toHaveCount(0)
   } finally {
+    const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
+    if (deleteTripError) throw deleteTripError
+  }
+})
+
+// Step 6 (Meal plan — the Budget). Meal joins the "By category" accordion as its own
+// row (label "Meal", violet icon — reservationTypeBadgeClasses/ReservationTypeIcon
+// already cover it generically) once it's in categoryOrder. A priced place Meal and an
+// unpriced checklist Meal (which renders through BudgetCategoryItemList exactly like an
+// unpriced checklist Activity — no per-item price UI, just "No price entered") both
+// count toward the reservation total/counter — this is the exact "0 of 1 reservations
+// have a price entered" bug Step 3 found, now fixed. Feature switch ON (a throwaway
+// trip, never "Japon décembre" — that trip has zero Meal reservations by design, kept
+// that way so its Budget figures stay the "no change" baseline for this ticket).
+test('budget screen includes a priced place Meal and an unpriced checklist Meal under their own Meal category', async ({
+  page,
+  registerTrip,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('tabi.feature.meals', '1'))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+
+  const client = await authenticatedClientFor(page)
+  const {
+    data: { user },
+  } = await client.auth.getUser()
+  if (!user) throw new Error('Anonymous sign-in did not produce a user')
+
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .insert({
+      organizer_id: user.id,
+      name: `E2E meal budget trip ${runId}`,
+      start_date: null,
+      end_date: null,
+      currency: 'USD',
+    })
+    .select()
+    .single()
+  if (tripError || !trip) throw tripError ?? new Error('Trip insert returned no row')
+  registerTrip(client, trip.id)
+
+  try {
+    const { error: reservationsError } = await client.from('reservations').insert([
+      {
+        trip_id: trip.id,
+        type: 'stay',
+        stay_subtype: 'hotel',
+        status: 'booked',
+        name: `E2E meal budget stay ${runId}`,
+        start_at: START_AT,
+        end_at: END_AT,
+        price_amount: 150,
+        price_currency: 'USD',
+      },
+      mealSeed({
+        trip_id: trip.id,
+        type: 'meal',
+        meal_subtype: 'place',
+        status: 'booked',
+        name: `E2E place meal ${runId}`,
+        start_at: START_AT,
+        start_timezone: 'America/New_York',
+        end_at: END_AT,
+        end_timezone: 'America/New_York',
+        price_amount: 40,
+        price_currency: 'USD',
+      }),
+      mealSeed({
+        trip_id: trip.id,
+        type: 'meal',
+        meal_subtype: 'checklist',
+        status: 'decide_later',
+        name: `E2E checklist meal ${runId}`,
+        start_at: null,
+        end_at: null,
+      }),
+    ])
+    if (reservationsError) throw reservationsError
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(`/trips/${trip.id}/budget`)
+
+    await expect(page.getByRole('heading', { name: 'Budget' })).toBeVisible()
+    // 150 (stay) + 40 (priced place meal) = 190; the unpriced checklist meal
+    // contributes $0 but still counts in the reservation total (3) and the "N of M
+    // have a price" counter (2 of 3 — not the pre-fix "0 of 1"/undercounted shape).
+    const totalBanner = page.locator('section').filter({ hasText: 'Total entered so far' })
+    await expect(totalBanner.getByText('$190.00')).toBeVisible()
+    await expect(page.getByText('2 of 3 reservations have a price entered')).toBeVisible()
+
+    const mealsRow = page.getByRole('listitem').filter({ hasText: 'Meal' })
+    await expect(mealsRow).toBeVisible()
+    await expect(mealsRow.getByText('2 items')).toBeVisible()
+    await expect(mealsRow.getByText('$40.00')).toBeVisible()
+
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/meal-budget-collapsed-1440.png`, fullPage: true })
+
+    const mealsToggle = page.getByRole('button', { name: /^Meal\b/ })
+    await expect(mealsToggle).toHaveAttribute('aria-expanded', 'false')
+    await mealsToggle.click()
+    await expect(mealsToggle).toHaveAttribute('aria-expanded', 'true')
+
+    // Both meals render — the priced place meal shows its amount, the unpriced
+    // checklist meal shows "No price entered", same treatment as a checklist Activity.
+    const placeMealItem = page.getByRole('link', { name: new RegExp(`E2E place meal ${runId}`) })
+    const checklistMealItem = page.getByRole('link', { name: new RegExp(`E2E checklist meal ${runId}`) })
+    await expect(placeMealItem).toBeVisible()
+    await expect(placeMealItem.getByText('$40.00')).toBeVisible()
+    await expect(checklistMealItem).toBeVisible()
+    await expect(checklistMealItem.getByText('No price entered')).toBeVisible()
+
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/meal-budget-expanded-1440.png`, fullPage: true })
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/meal-budget-expanded-390.png`, fullPage: true })
+  } finally {
+    const { error: deleteReservationsError } = await client.from('reservations').delete().eq('trip_id', trip.id)
+    if (deleteReservationsError) throw deleteReservationsError
     const { error: deleteTripError } = await client.from('trips').delete().eq('id', trip.id)
     if (deleteTripError) throw deleteTripError
   }

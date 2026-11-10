@@ -490,6 +490,9 @@ export const strings = {
     perTravelerCaption: 'Includes shared lodging and amounts entered per person.',
     perTravelerSectionLabel: 'By traveler',
     perTravelerExplainer: 'Assigning a souvenir moves money between travelers — it never changes the group total.',
+    // Step 6: a reservation type Budget hasn't been updated for yet (BudgetSummary.other) — always
+    // empty today, but keeps a future type from silently vanishing from the totals.
+    otherLabel: 'Other',
   },
   budgetCategoryDetail: {
     loading: 'Loading…',
