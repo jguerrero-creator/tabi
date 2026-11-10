@@ -7,6 +7,7 @@ import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import type { Trip } from '../../types/trip'
 import type { Enums } from '../../types/database.types'
+import { TripTravelersSection } from './TripTravelersSection'
 
 const DEFAULT_DAY_START_TIME = '08:00'
 const DEFAULT_DAY_END_TIME = '22:00'
@@ -180,6 +181,13 @@ export function TripFormModal({ trip, onClose, onSubmit }: TripFormModalProps) {
         />
         <p className="mt-1 text-xs text-slate-500">{strings.createTrip.travelerCountHint}</p>
       </div>
+      {isEditing && (
+        <TripTravelersSection
+          tripId={trip.id}
+          travelerCount={Number(travelerCount) || 1}
+          onTravelerCountBumped={(newCount) => setTravelerCount(String(newCount))}
+        />
+      )}
       <div className="flex gap-3">
         <div className="flex-1">
           <label htmlFor="trip-start" className="mb-1 block text-sm font-medium text-slate-700">
