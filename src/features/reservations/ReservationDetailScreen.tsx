@@ -33,7 +33,7 @@ import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { placePhotoUrl } from '../../lib/placesSearch'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
-import type { ActivitySubtype, Reservation, ReservationStatus, ReservationType, TransportMode } from '../../types/reservation'
+import type { ActivitySubtype, MealSubtype, Reservation, ReservationStatus, ReservationType, TransportMode } from '../../types/reservation'
 import type { ChecklistItem } from '../../types/checklistItem'
 import { addDays, nightsBetween } from '../stay/computeAccommodationGaps'
 import { useTrip } from '../trips/useTrip'
@@ -42,7 +42,12 @@ import { transportRouteName } from './transportRouteName'
 import { extendedTripRange, outOfPeriodField, type OutOfPeriodField } from './tripPeriod'
 import { useAddressPicker } from './useAddressPicker'
 import { useChecklistItems } from './useChecklistItems'
-import { isChecklistReservation } from './placeOrChecklistSubtype'
+import {
+  getPlaceOrChecklistSubtype,
+  isChecklistReservation,
+  isPlaceOrChecklistType,
+  type PlaceOrChecklistSubtype,
+} from './placeOrChecklistSubtype'
 import { useReservation } from './useReservation'
 import { ChecklistItemsSection } from './ChecklistItemsSection'
 import { VehicleRentalLegsSection } from './VehicleRentalLegsSection'
@@ -235,23 +240,26 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   const initialCheckOutDateRef = useRef(checkOutDate)
   // TABI-182: symmetric to the TABI-160 Stay block above, but for Activity — previously there
   // was no UI at all to edit an Activity's start date/time or add a missing end/duration.
+  // Step 4c (Meal plan): a Meal shares this exact date model (start + duration, no end-date
+  // field) — gated by isPlaceOrChecklistType rather than renaming every "activity"-prefixed
+  // identifier below, same precedent as activityDatePatch/datePatchByType further down.
   const [activityStartDate, setActivityStartDate] = useState(() =>
-    reservation.type === 'activity' && reservation.start_at
+    isPlaceOrChecklistType(reservation.type) && reservation.start_at
       ? localDateKey(reservation.start_at, reservation.start_timezone)
       : '',
   )
   const [activityStartTime, setActivityStartTime] = useState(() =>
-    reservation.type === 'activity' && reservation.start_at
+    isPlaceOrChecklistType(reservation.type) && reservation.start_at
       ? localTimeKey(reservation.start_at, reservation.start_timezone)
       : '',
   )
   const initialActivityStartTimeRef = useRef(activityStartTime)
   const [durationHours, setDurationHours] = useState(() => {
-    if (reservation.type !== 'activity' || !reservation.start_at || !reservation.end_at) return ''
+    if (!isPlaceOrChecklistType(reservation.type) || !reservation.start_at || !reservation.end_at) return ''
     return String(durationHoursMinutes(reservation.start_at, reservation.end_at).hours)
   })
   const [durationMinutes, setDurationMinutes] = useState(() => {
-    if (reservation.type !== 'activity' || !reservation.start_at || !reservation.end_at) return ''
+    if (!isPlaceOrChecklistType(reservation.type) || !reservation.start_at || !reservation.end_at) return ''
     return String(durationHoursMinutes(reservation.start_at, reservation.end_at).minutes)
   })
   // TABI-211: Transport had no date/time editing at all — same "editable dates in the detail
@@ -373,8 +381,12 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
   // Backlog: "Permettre de convertir une Activité existante (place) en checklist... sans
   // perdre les notes" — `note` is a generic field never touched by either branch below, so it
   // survives automatically; only the location-specific fields (place ↔ checklist_items) move.
-  async function handleSubtypeChange(next: ActivitySubtype) {
-    if (next === reservation.activity_subtype) return
+  // Step 4c (Meal plan): `next` now also carries a MealSubtype for a Meal reservation —
+  // identical underlying values ('place' | 'checklist'), compared against whichever column
+  // actually applies via getPlaceOrChecklistSubtype rather than reservation.activity_subtype
+  // directly (which is always null for a Meal row).
+  async function handleSubtypeChange(next: PlaceOrChecklistSubtype) {
+    if (next === getPlaceOrChecklistSubtype(reservation)) return
     setSubtypeSwitchError(null)
     if (next === 'checklist') {
       await convertToChecklist()
@@ -407,7 +419,9 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
         })
       }
       await onUpdate({
-        activity_subtype: 'checklist',
+        // Step 4c (Meal plan): writes whichever subtype column actually applies — Activity's
+        // activity_subtype or Meal's meal_subtype, never both, mirroring buildTypeSpecificColumns.
+        ...(reservation.type === 'meal' ? { meal_subtype: 'checklist' } : { activity_subtype: 'checklist' }),
         // A checklist's status is fixed/hidden (see isChecklist gates below) — must actually
         // be decide_later once the picker disappears, not just visually ignored.
         status: 'decide_later',
@@ -431,23 +445,25 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('ReservationDetailScreen.convertToChecklist', err)
-      setSubtypeSwitchError(strings.activitySubtypeSwitch.errorGeneric)
+      setSubtypeSwitchError(strings.activitySubtypeSwitch.errorGeneric(strings.reservationType[reservation.type]))
     } finally {
       setSwitchingSubtype(false)
     }
   }
 
-  // checklist → place: only one address fits on a place-subtype Activity. `chosen` is the
+  // checklist → place: only one address fits on a place-subtype Activity/Meal. `chosen` is the
   // item to promote (its address/place metadata copied onto the reservation itself), or null
   // to clear the location entirely — either way the whole checklist_items list is then cleared,
   // since leaving items behind would let them silently reappear on a later switch back.
   async function convertToPlace(chosen: ChecklistItem | null) {
     setSwitchingSubtype(true)
     try {
+      // Step 4c (Meal plan): same subtype-column split as convertToChecklist above.
+      const subtypeColumn = reservation.type === 'meal' ? ({ meal_subtype: 'place' } as const) : ({ activity_subtype: 'place' } as const)
       await onUpdate(
         chosen
           ? {
-              activity_subtype: 'place',
+              ...subtypeColumn,
               start_address: chosen.address,
               start_lat: chosen.lat,
               start_lng: chosen.lng,
@@ -458,7 +474,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               place_photo_ref: chosen.place_photo_ref,
               place_category: chosen.place_category,
             }
-          : { activity_subtype: 'place' },
+          : subtypeColumn,
       )
       if (checklistItems.length > 0) await clearChecklistItems()
       // Same local edit-buffer resync as convertToChecklist above — reflect the promoted
@@ -469,7 +485,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
       showSavedToast(strings.common.saved)
     } catch (err) {
       logClientError('ReservationDetailScreen.convertToPlace', err)
-      setSubtypeSwitchError(strings.activitySubtypeSwitch.errorGeneric)
+      setSubtypeSwitchError(strings.activitySubtypeSwitch.errorGeneric(strings.reservationType[reservation.type]))
     } finally {
       setSwitchingSubtype(false)
     }
@@ -580,7 +596,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     // contradicting the Add form's own TABI-16 spec), flagged via start_time_is_default the same
     // way Stay/Transport already do; an explicit time clears that flag.
     let activityDatePatch: Partial<Reservation> = {}
-    if (reservation.type === 'activity') {
+    if (isPlaceOrChecklistType(reservation.type)) {
       const trimmedStartDate = activityStartDate.trim()
       const trimmedStartTime = activityStartTime.trim()
       const hours = Number(durationHours) || 0
@@ -741,15 +757,9 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     // skipping the out-of-period check for a new type is exactly the kind of gap TABI-113 was
     // fixing); datePatchByType below is exhaustive, so there's no type this can crash on.
     if (trip?.start_date && trip?.end_date) {
-      // !!! STEP 4 TODO (Meal plan) !!! 'meal' points at activityDatePatch below as a
-      // placeholder, NOT a real computation — Meal has no date-edit UI yet (this screen's
-      // field sections are still only `reservation.type === 'stay'/'transport'/'activity'`
-      // conditionals, see the Step 3 blind-spot list), so activityDatePatch is always `{}`
-      // for a Meal reservation today, and this out-of-period check effectively no-ops for
-      // Meal (no dirty start/end to compare against the trip's range). Harmless while Meal
-      // is uncreatable, but Step 4 MUST give 'meal' its own mealDatePatch (same shape as
-      // activityDatePatch — same date model: start + duration, no end-date field) instead
-      // of reusing Activity's value by reference.
+      // Step 4c (Meal plan): 'meal' now shares the real activityDatePatch computation above
+      // (gated by isPlaceOrChecklistType, not just 'activity') — same date model, start +
+      // duration, no end-date field — rather than reusing Activity's value as a placeholder.
       const datePatchByType: Record<ReservationType, Partial<Reservation>> = {
         stay: stayDatePatch,
         transport: transportDatePatch,
@@ -813,11 +823,8 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     if (!outOfPeriodConfirm) return
     const { field } = outOfPeriodConfirm
     setOutOfPeriodConfirm(null)
-    // !!! STEP 4 TODO (Meal plan) !!! 'meal' below reuses ACTIVITY_START_DATE_FIELD_ID as a
-    // placeholder, same reasoning as datePatchByType above — there is no Meal date field on
-    // this screen yet, so this id is never actually focused for a Meal reservation today.
-    // Step 4 MUST add Meal's own date-field id(s) once its date-edit UI exists (same model:
-    // one start field, no end-date field, mirroring Activity exactly).
+    // Step 4c (Meal plan): 'meal' genuinely shares ACTIVITY_START_DATE_FIELD_ID now — the
+    // same rendered input, gated by isPlaceOrChecklistType below, not a separate Meal field.
     const outOfPeriodFocusTargetIdByType: Record<ReservationType, (field: OutOfPeriodField) => string> = {
       stay: (field) => (field === 'end' && manualEndDate ? STAY_CHECKOUT_DATE_FIELD_ID : STAY_CHECKIN_DATE_FIELD_ID),
       transport: (field) => (field === 'end' ? TRANSPORT_END_DATE_FIELD_ID : TRANSPORT_START_DATE_FIELD_ID),
@@ -897,16 +904,26 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
               <MiniMap points={points} heightClassName="h-40 lg:h-full lg:min-h-48" />
             </div>
             <div className="space-y-4 lg:col-start-2 lg:mt-0">
-              {reservation.type === 'activity' && (
+              {isPlaceOrChecklistType(reservation.type) && (
                 <div>
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {strings.addReservation.activitySubtypeLabel}
+                    {reservation.type === 'meal'
+                      ? strings.addReservation.mealSubtypeLabel
+                      : strings.addReservation.activitySubtypeLabel}
                   </p>
-                  <ActivitySubtypePicker
-                    value={reservation.activity_subtype ?? 'place'}
-                    onChange={handleSubtypeChange}
-                    disabled={switchingSubtype}
-                  />
+                  {reservation.type === 'meal' ? (
+                    <MealSubtypePicker
+                      value={reservation.meal_subtype ?? 'place'}
+                      onChange={handleSubtypeChange}
+                      disabled={switchingSubtype}
+                    />
+                  ) : (
+                    <ActivitySubtypePicker
+                      value={reservation.activity_subtype ?? 'place'}
+                      onChange={handleSubtypeChange}
+                      disabled={switchingSubtype}
+                    />
+                  )}
                   {subtypeSwitchError && <p className="mt-1 text-sm text-red-600">{subtypeSwitchError}</p>}
                 </div>
               )}
@@ -1091,7 +1108,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                   </button>
                 </div>
               ))}
-            {reservation.type === 'activity' && (
+            {isPlaceOrChecklistType(reservation.type) && (
               <div className="flex gap-3">
                 <Field label={strings.reservationDetail.startDateLabel} className="flex-1">
                   <input
@@ -1112,7 +1129,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                 </Field>
               </div>
             )}
-            {reservation.type === 'activity' && (
+            {isPlaceOrChecklistType(reservation.type) && (
               <DurationField
                 legend={strings.addReservation.durationLabel}
                 hours={durationHours}
@@ -1285,6 +1302,7 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             onConfirm={convertToPlace}
             onCancel={() => setConvertToPlaceChooserOpen(false)}
             confirming={switchingSubtype}
+            typeLabel={strings.reservationType[reservation.type]}
           />
         )}
         {outOfPeriodConfirm && (
@@ -1679,19 +1697,60 @@ function ActivitySubtypePicker({
   )
 }
 
+// Step 4c (Meal plan): mirrors ActivitySubtypePicker exactly, same as AddReservationModal's
+// own pair of these two components (Step 4b) — reuses `activitySubtypes` for the labels
+// rather than a duplicate `mealSubtypes` key, since the two radio options read identically.
+function MealSubtypePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: MealSubtype
+  onChange: (subtype: MealSubtype) => void
+  disabled?: boolean
+}) {
+  const options: MealSubtype[] = ['place', 'checklist']
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-2">
+      {options.map((subtype) => {
+        const selected = subtype === value
+        return (
+          <button
+            key={subtype}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            onClick={() => onChange(subtype)}
+            className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+              selected
+                ? 'border-teal-600 bg-teal-50 text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {strings.addReservation.activitySubtypes[subtype]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // Backlog: converting checklist → place needs an explicit choice, not a silent pick — only
-// one address fits on a place-subtype Activity, so the traveler decides which (if any)
-// candidate becomes the kept place; the rest of the list is cleared either way.
+// one address fits on a place-subtype Activity or Meal, so the traveler decides which (if
+// any) candidate becomes the kept place; the rest of the list is cleared either way.
 function ConvertToPlaceDialog({
   items,
   onConfirm,
   onCancel,
   confirming,
+  typeLabel,
 }: {
   items: ChecklistItem[]
   onConfirm: (chosen: ChecklistItem | null) => void
   onCancel: () => void
   confirming: boolean
+  typeLabel: string
 }) {
   const [selectedId, setSelectedId] = useState<string | 'none'>(items[0]?.id ?? 'none')
 
@@ -1700,7 +1759,7 @@ function ConvertToPlaceDialog({
       <div className="w-full max-w-sm space-y-4 rounded-t-2xl bg-white p-6 sm:rounded-2xl">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{strings.activitySubtypeSwitch.convertToPlaceTitle}</h2>
-          <p className="mt-1 text-sm text-slate-600">{strings.activitySubtypeSwitch.convertToPlaceBody(items.length)}</p>
+          <p className="mt-1 text-sm text-slate-600">{strings.activitySubtypeSwitch.convertToPlaceBody(items.length, typeLabel)}</p>
         </div>
         <div role="radiogroup" className="space-y-2">
           {items.map((item) => {

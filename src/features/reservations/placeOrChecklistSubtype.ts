@@ -1,6 +1,6 @@
 import type { MealSubtype, ReservationType, ActivitySubtype } from '../../types/reservation'
 
-type PlaceOrChecklistSubtype = ActivitySubtype | MealSubtype
+export type PlaceOrChecklistSubtype = ActivitySubtype | MealSubtype
 
 /**
  * Deliberately NOT `Pick<Reservation, ...>` — the subtype fields are optional here

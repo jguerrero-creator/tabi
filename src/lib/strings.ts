@@ -387,12 +387,14 @@ export const strings = {
   },
   activitySubtypeSwitch: {
     convertToPlaceTitle: 'Switch to a specific place',
-    convertToPlaceBody: (itemCount: number) =>
-      `This checklist has ${itemCount} ${itemCount === 1 ? 'item' : 'items'} — only one place fits on a single-place Activity. Pick one to keep, or clear the location.`,
+    // Step 4c (Meal plan): parametrized by the reservation's own type label (Activity or
+    // Meal) — this dialog and error now serve both place-or-checklist types.
+    convertToPlaceBody: (itemCount: number, typeLabel: string) =>
+      `This checklist has ${itemCount} ${itemCount === 1 ? 'item' : 'items'} — only one place fits on a single-place ${typeLabel}. Pick one to keep, or clear the location.`,
     convertToPlaceDiscardOption: "Don't keep any — clear the location",
     confirmCta: 'Switch',
     cancelCta: 'Cancel',
-    errorGeneric: 'Could not switch this activity. Please try again.',
+    errorGeneric: (typeLabel: string) => `Could not switch this ${typeLabel.toLowerCase()}. Please try again.`,
   },
   checklistItems: {
     title: 'Places to explore',
