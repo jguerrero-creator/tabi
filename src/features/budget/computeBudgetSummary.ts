@@ -32,6 +32,17 @@ export interface BudgetSummary {
 
 const categoryOrder: ReservationType[] = ['stay', 'transport', 'activity']
 
+/**
+ * TABI-263: the ONE place that decides which reservation categories are shared and
+ * divided by traveler count vs. counted per person as entered. Today only Stay (a
+ * shared room) — everything else is assumed already entered per person. A later
+ * ticket ("Prix par personne ou pour tous") may turn this into a per-reservation
+ * price_basis setting; when it does, only this function should need to change.
+ */
+export function isDividedByTravelerCount(type: ReservationType): boolean {
+  return type === 'stay'
+}
+
 export function computeBudgetSummary(
   reservations: Reservation[],
   budgetCategories: BudgetCategory[] = [],
@@ -63,7 +74,7 @@ export function computeBudgetSummary(
       total,
       count: items.length,
       pricedCount: priced.length,
-      perPersonTotal: type === 'stay' && travelerCount > 1 ? total / travelerCount : null,
+      perPersonTotal: isDividedByTravelerCount(type) && travelerCount > 1 ? total / travelerCount : null,
     }
   })
 

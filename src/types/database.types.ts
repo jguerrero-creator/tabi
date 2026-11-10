@@ -402,6 +402,7 @@ export type Database = {
           is_checked: boolean
           label: string
           recipient: string | null
+          traveler_id: string | null
           trip_id: string
           updated_at: string
         }
@@ -412,6 +413,7 @@ export type Database = {
           is_checked?: boolean
           label: string
           recipient?: string | null
+          traveler_id?: string | null
           trip_id: string
           updated_at?: string
         }
@@ -422,10 +424,18 @@ export type Database = {
           is_checked?: boolean
           label?: string
           recipient?: string | null
+          traveler_id?: string | null
           trip_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "souvenir_items_traveler_fkey"
+            columns: ["trip_id", "traveler_id"]
+            isOneToOne: false
+            referencedRelation: "trip_travelers"
+            referencedColumns: ["trip_id", "id"]
+          },
           {
             foreignKeyName: "souvenir_items_trip_id_fkey"
             columns: ["trip_id"]

@@ -14,10 +14,12 @@ import { SouvenirChecklist } from '../souvenirs/SouvenirChecklist'
 import { useTripSouvenirItems } from '../souvenirs/useTripSouvenirItems'
 import { useTrip } from '../trips/useTrip'
 import { useTripReservations } from '../trips/useTripReservations'
+import { useTripTravelers } from '../trips/useTripTravelers'
 import { BudgetCategoryItemList } from './BudgetCategoryItemList'
 import { BudgetCategoryRow } from './BudgetCategoryRow'
 import { BudgetConverter } from './BudgetConverter'
 import { computeBudgetSummary } from './computeBudgetSummary'
+import { computeTravelerBudgetSummary } from './computeTravelerBudgetSummary'
 import { useTripBudgetCategories } from './useTripBudgetCategories'
 import type { ReservationType } from '../../types/reservation'
 
@@ -49,6 +51,9 @@ export function BudgetMenuScreen() {
     updateItem: updateSouvenirItem,
     deleteItem: deleteSouvenirItem,
   } = useTripSouvenirItems(tripId ?? '')
+  // Read-only here — Budget never adds/renames travelers, that's TripFormModal's job
+  // (Step A), so the bump-reconciliation callback is a no-op.
+  const { travelers: namedTravelers } = useTripTravelers(tripId ?? '', trip?.traveler_count ?? 1, () => {})
 
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
@@ -69,6 +74,11 @@ export function BudgetMenuScreen() {
         souvenirItems,
       ),
     [reservations, budgetCategories, trip?.traveler_count, trip?.currency, souvenirItems],
+  )
+  // TABI-263 Step B' — null (no section, no change) below 2 named travelers.
+  const travelerTotals = useMemo(
+    () => computeTravelerBudgetSummary(summary, souvenirItems, namedTravelers, trip?.traveler_count ?? 1, trip?.currency),
+    [summary, souvenirItems, namedTravelers, trip?.traveler_count, trip?.currency],
   )
   const currency = trip?.currency ?? ''
   const travelerCount = trip?.traveler_count ?? 1
@@ -136,12 +146,31 @@ export function BudgetMenuScreen() {
                     {strings.budgetMenu.perPersonAmount(formatCurrency(summary.totalPerPerson, currency))}
                   </p>
                 )}
+                {travelerTotals != null && (
+                  <p className="mt-0.5 text-xs text-teal-100">{strings.budgetMenu.perTravelerCaption}</p>
+                )}
                 {summary.pricedCount < summary.count && (
                   <p className="mt-1 text-xs text-teal-100">
                     {strings.budgetMenu.partialHint(summary.pricedCount, summary.count)}
                   </p>
                 )}
               </section>
+            )}
+
+            {travelerTotals != null && (
+              <div className="space-y-2">
+                <MenuSection label={strings.budgetMenu.perTravelerSectionLabel}>
+                  {travelerTotals.map((traveler) => (
+                    <li key={traveler.travelerId} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <p className="min-w-0 truncate text-sm font-medium text-slate-900">{traveler.name}</p>
+                      <p className="shrink-0 text-sm font-semibold text-slate-900">
+                        {formatCurrency(traveler.total, currency)}
+                      </p>
+                    </li>
+                  ))}
+                </MenuSection>
+                <p className="text-xs text-slate-500">{strings.budgetMenu.perTravelerExplainer}</p>
+              </div>
             )}
 
             {(summary.count > 0 || summary.souvenirs.count > 0) && (
@@ -247,6 +276,7 @@ export function BudgetMenuScreen() {
                               currency={currency}
                               loading={souvenirItemsLoading}
                               error={souvenirItemsError}
+                              namedTravelers={namedTravelers}
                               onCreate={createSouvenirItem}
                               onUpdate={updateSouvenirItem}
                               onDelete={deleteSouvenirItem}

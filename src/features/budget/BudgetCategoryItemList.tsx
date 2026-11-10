@@ -5,6 +5,7 @@ import { groupByDate } from '../../components/menu/groupByDate'
 import { formatCurrency } from '../../lib/currency'
 import { strings } from '../../lib/strings'
 import type { Reservation, ReservationType } from '../../types/reservation'
+import { isDividedByTravelerCount } from './computeBudgetSummary'
 
 interface BudgetCategoryItemListProps {
   type: ReservationType
@@ -33,7 +34,7 @@ export function BudgetCategoryItemList({ type, reservations, currency, travelerC
       return <span className="text-xs text-slate-400">{strings.budgetMenu.noPriceEntered}</span>
     }
     const amount = formatCurrency(reservation.price_amount, reservation.price_currency ?? currency)
-    if (type !== 'stay' || travelerCount <= 1) {
+    if (!isDividedByTravelerCount(type) || travelerCount <= 1) {
       return <span className="text-sm font-semibold text-slate-900">{amount}</span>
     }
     const perPerson = formatCurrency(reservation.price_amount / travelerCount, reservation.price_currency ?? currency)

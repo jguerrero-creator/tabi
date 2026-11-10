@@ -6,6 +6,7 @@ import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import { SOUVENIR_RECIPIENT_MAX_LENGTH, type SouvenirItem } from '../../types/souvenirItem'
+import type { TripTraveler } from '../../types/tripTraveler'
 import { SouvenirItemRow } from './SouvenirItemRow'
 import type { SouvenirItemInput } from './useTripSouvenirItems'
 
@@ -14,8 +15,10 @@ interface SouvenirChecklistProps {
   currency: string
   loading: boolean
   error: string | null
+  /** TABI-263 Step C — the assignment select only renders with 2+ of these. */
+  namedTravelers: TripTraveler[]
   onCreate: (
-    input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount' | 'recipient'>>,
+    input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount' | 'recipient' | 'traveler_id'>>,
   ) => Promise<unknown>
   onUpdate: (itemId: string, patch: Partial<SouvenirItemInput>) => Promise<unknown>
   onDelete: (itemId: string) => Promise<void>
@@ -26,15 +29,26 @@ interface SouvenirChecklistProps {
  * screen and the Souvenirs category in the Budget accordion (TABI merge), so
  * add/rename/delete/toggle only exist in one place.
  */
-export function SouvenirChecklist({ items, currency, loading, error, onCreate, onUpdate, onDelete }: SouvenirChecklistProps) {
+export function SouvenirChecklist({
+  items,
+  currency,
+  loading,
+  error,
+  namedTravelers,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: SouvenirChecklistProps) {
   const newLabelFieldId = useId()
   const newAmountFieldId = useId()
   const newRecipientFieldId = useId()
+  const newAssignedToFieldId = useId()
   const recipientListId = useId()
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newAmount, setNewAmount] = useState('')
   const [newRecipient, setNewRecipient] = useState('')
+  const [newTravelerId, setNewTravelerId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
@@ -63,10 +77,16 @@ export function SouvenirChecklist({ items, currency, loading, error, onCreate, o
     setSubmitting(true)
     setAddError(null)
     try {
-      await onCreate({ label: trimmedLabel, amount: parsedAmount, recipient: trimmedRecipient === '' ? null : trimmedRecipient })
+      await onCreate({
+        label: trimmedLabel,
+        amount: parsedAmount,
+        recipient: trimmedRecipient === '' ? null : trimmedRecipient,
+        traveler_id: newTravelerId || null,
+      })
       setNewLabel('')
       setNewAmount('')
       setNewRecipient('')
+      setNewTravelerId('')
       setAdding(false)
       showSavedToast(strings.common.saved)
     } catch (err) {
@@ -146,6 +166,27 @@ export function SouvenirChecklist({ items, currency, loading, error, onCreate, o
                   aria-label={strings.souvenirsMenu.amountFieldLabel}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
                 />
+                {namedTravelers.length >= 2 && (
+                  <div>
+                    <label htmlFor={newAssignedToFieldId} className="mb-1 block text-xs font-medium text-slate-700">
+                      {strings.souvenirsMenu.assignedToLabel}
+                    </label>
+                    <select
+                      id={newAssignedToFieldId}
+                      name={newAssignedToFieldId}
+                      value={newTravelerId}
+                      onChange={(event) => setNewTravelerId(event.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+                    >
+                      <option value="">{strings.souvenirsMenu.assignedToNobody}</option>
+                      {namedTravelers.map((traveler) => (
+                        <option key={traveler.id} value={traveler.id}>
+                          {traveler.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {addError && <p className="text-xs text-red-600">{addError}</p>}
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="secondary" onClick={() => setAdding(false)} disabled={submitting}>
@@ -164,6 +205,7 @@ export function SouvenirChecklist({ items, currency, loading, error, onCreate, o
               item={item}
               currency={currency}
               recipientSuggestions={recipientSuggestions}
+              namedTravelers={namedTravelers}
               onUpdate={onUpdate}
               onDelete={onDelete}
             />

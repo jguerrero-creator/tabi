@@ -8,6 +8,8 @@ export interface SouvenirItemInput {
   is_checked: boolean
   amount: number | null
   recipient: string | null
+  /** TABI-263 Step C — independent of `recipient` (the free-text "for whom"); coexist, no auto-clearing. */
+  traveler_id: string | null
 }
 
 /**
@@ -44,7 +46,7 @@ export function useTripSouvenirItems(tripId: string) {
 
   const createItem = useCallback(
     async (
-      input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount' | 'recipient'>>,
+      input: Pick<SouvenirItemInput, 'label'> & Partial<Pick<SouvenirItemInput, 'amount' | 'recipient' | 'traveler_id'>>,
     ): Promise<SouvenirItem> => {
       const { data, error: createError } = await supabase
         .from('souvenir_items')
@@ -53,6 +55,7 @@ export function useTripSouvenirItems(tripId: string) {
           label: input.label,
           amount: input.amount ?? null,
           recipient: input.recipient ?? null,
+          traveler_id: input.traveler_id ?? null,
         })
         .select()
         .single()

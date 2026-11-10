@@ -1,16 +1,19 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { formatCurrency } from '../../lib/currency'
 import { logClientError } from '../../lib/logError'
 import { strings } from '../../lib/strings'
 import { showSavedToast } from '../../lib/toast'
 import { SOUVENIR_RECIPIENT_MAX_LENGTH, type SouvenirItem } from '../../types/souvenirItem'
+import type { TripTraveler } from '../../types/tripTraveler'
 import type { SouvenirItemInput } from './useTripSouvenirItems'
 
 interface SouvenirItemRowProps {
   item: SouvenirItem
   currency: string
   recipientSuggestions: string[]
+  /** TABI-263 Step C — the assignment select only renders with 2+ of these. */
+  namedTravelers: TripTraveler[]
   onUpdate: (itemId: string, patch: Partial<SouvenirItemInput>) => Promise<unknown>
   onDelete: (itemId: string) => Promise<void>
 }
@@ -20,12 +23,13 @@ interface SouvenirItemRowProps {
  * row's content (name, recipient or amount) to edit all three in place, no
  * separate detail screen for something this small.
  */
-export function SouvenirItemRow({ item, currency, recipientSuggestions, onUpdate, onDelete }: SouvenirItemRowProps) {
+export function SouvenirItemRow({ item, currency, recipientSuggestions, namedTravelers, onUpdate, onDelete }: SouvenirItemRowProps) {
   const labelFieldId = useId()
   const amountFieldId = useId()
   const recipientFieldId = useId()
   const recipientListId = useId()
   const checkedFieldId = useId()
+  const assignedToFieldId = useId()
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(item.label)
   const [amount, setAmount] = useState(item.amount != null ? String(item.amount) : '')
@@ -77,6 +81,20 @@ export function SouvenirItemRow({ item, currency, recipientSuggestions, onUpdate
       await onUpdate(item.id, { is_checked: !item.is_checked })
     } catch (err) {
       logClientError('SouvenirItemRow.handleToggleChecked', err)
+      setError(strings.souvenirsMenu.errorGeneric)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleAssignChange(event: ChangeEvent<HTMLSelectElement>) {
+    const travelerId = event.target.value || null
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onUpdate(item.id, { traveler_id: travelerId })
+    } catch (err) {
+      logClientError('SouvenirItemRow.handleAssignChange', err)
       setError(strings.souvenirsMenu.errorGeneric)
     } finally {
       setSubmitting(false)
@@ -153,50 +171,77 @@ export function SouvenirItemRow({ item, currency, recipientSuggestions, onUpdate
   }
 
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
-      <input
-        id={checkedFieldId}
-        name={checkedFieldId}
-        type="checkbox"
-        checked={item.is_checked}
-        onChange={handleToggleChecked}
-        disabled={submitting}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-teal-600"
-        aria-label={strings.souvenirsMenu.toggleChecked}
-      />
-      <button type="button" onClick={openEditing} className="min-w-0 flex-1 text-left" aria-label={strings.souvenirsMenu.edit}>
-        <p
-          className={`truncate text-sm font-medium ${
-            item.is_checked ? 'text-slate-400 line-through' : 'text-slate-900'
-          }`}
-        >
-          {item.label}
-        </p>
-        <div className="mt-0.5 flex items-center gap-2">
-          {item.recipient && (
-            <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
-              {strings.souvenirsMenu.recipientPrefix} {item.recipient}
-            </span>
-          )}
-          <span
-            className={`shrink-0 text-xs ${item.recipient ? '' : 'ml-auto'} ${
-              item.amount != null ? 'font-semibold text-slate-900' : 'text-slate-400'
+    <li className="flex flex-col gap-1.5 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <input
+          id={checkedFieldId}
+          name={checkedFieldId}
+          type="checkbox"
+          checked={item.is_checked}
+          onChange={handleToggleChecked}
+          disabled={submitting}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-teal-600"
+          aria-label={strings.souvenirsMenu.toggleChecked}
+        />
+        <button type="button" onClick={openEditing} className="min-w-0 flex-1 text-left" aria-label={strings.souvenirsMenu.edit}>
+          <p
+            className={`truncate text-sm font-medium ${
+              item.is_checked ? 'text-slate-400 line-through' : 'text-slate-900'
             }`}
           >
-            {item.amount != null ? formatCurrency(item.amount, currency) : strings.souvenirsMenu.noAmountEntered}
-          </span>
+            {item.label}
+          </p>
+          <div className="mt-0.5 flex items-center gap-2">
+            {item.recipient && (
+              <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                {strings.souvenirsMenu.recipientPrefix} {item.recipient}
+              </span>
+            )}
+            <span
+              className={`shrink-0 text-xs ${item.recipient ? '' : 'ml-auto'} ${
+                item.amount != null ? 'font-semibold text-slate-900' : 'text-slate-400'
+              }`}
+            >
+              {item.amount != null ? formatCurrency(item.amount, currency) : strings.souvenirsMenu.noAmountEntered}
+            </span>
+          </div>
+        </button>
+        {error && <p className="shrink-0 text-xs text-red-600">{error}</p>}
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={submitting}
+          aria-label={strings.souvenirsMenu.delete}
+          className="mt-0.5 shrink-0 text-lg leading-none text-slate-400 hover:text-red-600"
+        >
+          ×
+        </button>
+      </div>
+      {namedTravelers.length >= 2 && (
+        // Independent of the <button> above (a <select> can't live inside it) and of
+        // the free-text recipient field — persists immediately on change, same as the
+        // checkbox, rather than going through the edit-mode Save button.
+        <div className="ml-7 flex items-center gap-2">
+          <label htmlFor={assignedToFieldId} className="shrink-0 text-xs text-slate-500">
+            {strings.souvenirsMenu.assignedToLabel}
+          </label>
+          <select
+            id={assignedToFieldId}
+            name={assignedToFieldId}
+            value={item.traveler_id ?? ''}
+            onChange={handleAssignChange}
+            disabled={submitting}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-teal-600 focus:outline-none"
+          >
+            <option value="">{strings.souvenirsMenu.assignedToNobody}</option>
+            {namedTravelers.map((traveler) => (
+              <option key={traveler.id} value={traveler.id}>
+                {traveler.name}
+              </option>
+            ))}
+          </select>
         </div>
-      </button>
-      {error && <p className="shrink-0 text-xs text-red-600">{error}</p>}
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={submitting}
-        aria-label={strings.souvenirsMenu.delete}
-        className="mt-0.5 shrink-0 text-lg leading-none text-slate-400 hover:text-red-600"
-      >
-        ×
-      </button>
+      )}
     </li>
   )
 }

@@ -469,6 +469,11 @@ export const strings = {
     edit: 'Edit',
     delete: 'Delete',
     errorGeneric: 'Could not save this category. Please try again.',
+    // TABI-263 Step B' — only shown with 2+ named travelers; the group total above
+    // keeps its exact existing formula either way (decision: "no change" below 2 names).
+    perTravelerCaption: 'Includes shared lodging and amounts entered per person.',
+    perTravelerSectionLabel: 'By traveler',
+    perTravelerExplainer: 'Assigning a souvenir moves money between travelers — it never changes the group total.',
   },
   budgetCategoryDetail: {
     loading: 'Loading…',
@@ -508,6 +513,10 @@ export const strings = {
     delete: 'Delete',
     toggleChecked: 'Toggle checked',
     errorGeneric: 'Could not save this item. Please try again.',
+    // TABI-263 Step C — only shown with 2+ named travelers; independent of `recipient`
+    // (the free-text "for whom") above, no auto-clearing either way.
+    assignedToLabel: 'Counts in the budget of',
+    assignedToNobody: 'Nobody (shared)',
   },
   addReservation: {
     title: 'Add Reservation',
