@@ -390,7 +390,13 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
     setSubtypeSwitchError(null)
     if (next === 'checklist') {
       await convertToChecklist()
-    } else if (checklistItems.length > 0) {
+    } else if (reservation.checklist_item_count > 0) {
+      // Bug (reported, repro'd): this used to read `checklistItems.length` — useChecklistItems'
+      // own fetch, which can still be empty right after the detail screen mounts/remounts. A
+      // subtype click that lands before that fetch resolves saw a false 0 and skipped straight
+      // to `convertToPlace(null)`, silently dropping the location without ever asking which item
+      // to keep. checklist_item_count arrives WITH the reservation row itself (DB-trigger
+      // maintained, no fetch of its own) — this decision no longer has a loading window at all.
       setConvertToPlaceChooserOpen(true)
     } else {
       await convertToPlace(null)
@@ -476,7 +482,10 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
             }
           : subtypeColumn,
       )
-      if (checklistItems.length > 0) await clearChecklistItems()
+      // Unconditional (clearItems deletes by reservation_id server-side, harmless if already
+      // empty) — same reasoning as the checklist_item_count switch above, this must not depend
+      // on the local checklistItems fetch having resolved either.
+      await clearChecklistItems()
       // Same local edit-buffer resync as convertToChecklist above — reflect the promoted
       // item's address (or a cleared field, if discarding) immediately, not just in `reservation`.
       setStartAddress(chosen?.address ?? '')
@@ -915,13 +924,18 @@ function ReservationDetailBody({ reservation, onBack, onUpdate, onDelete }: Rese
                     <MealSubtypePicker
                       value={reservation.meal_subtype ?? 'place'}
                       onChange={handleSubtypeChange}
-                      disabled={switchingSubtype}
+                      // checklistItemsLoading: belt-and-suspenders alongside the
+                      // checklist_item_count fix above — the chooser dialog reads the live
+                      // `checklistItems` array (for the actual item names/addresses to choose
+                      // from), so switching subtype before that fetch resolves is blocked
+                      // rather than opening the dialog with a still-empty list.
+                      disabled={switchingSubtype || checklistItemsLoading}
                     />
                   ) : (
                     <ActivitySubtypePicker
                       value={reservation.activity_subtype ?? 'place'}
                       onChange={handleSubtypeChange}
-                      disabled={switchingSubtype}
+                      disabled={switchingSubtype || checklistItemsLoading}
                     />
                   )}
                   {subtypeSwitchError && <p className="mt-1 text-sm text-red-600">{subtypeSwitchError}</p>}

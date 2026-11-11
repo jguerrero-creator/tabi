@@ -342,15 +342,20 @@ test('detail screen converts a place Activity to checklist and back: notes survi
       .toBe('checklist')
     const afterToChecklist = await client
       .from('reservations')
-      .select('status, start_address, note')
+      .select('status, start_address, start_lat, note')
       .eq('id', activity.id)
       .single()
     expect(afterToChecklist.data?.status).toBe('decide_later')
     expect(afterToChecklist.data?.start_address).toBeNull()
+    expect(afterToChecklist.data?.start_lat).toBeNull()
     expect(afterToChecklist.data?.note).toBe(noteText)
     await expect(page.getByText('Status', { exact: true })).toHaveCount(0)
-    const { data: checklistItems } = await client.from('checklist_items').select('name').eq('reservation_id', activity.id)
+    const { data: checklistItems } = await client
+      .from('checklist_items')
+      .select('name, address')
+      .eq('reservation_id', activity.id)
     expect(checklistItems?.[0]?.name).toBe(placeName)
+    expect(checklistItems?.[0]?.address).toBe('456 Test Ave')
 
     await page.getByRole('radio', { name: 'Specific place' }).click()
     await expect(page.getByRole('heading', { name: 'Switch to a specific place' })).toBeVisible()
@@ -366,9 +371,19 @@ test('detail screen converts a place Activity to checklist and back: notes survi
         async () => (await client.from('reservations').select('activity_subtype').eq('id', activity.id).single()).data?.activity_subtype,
       )
       .toBe('place')
-    const afterToPlace = await client.from('reservations').select('status, note').eq('id', activity.id).single()
+    const afterToPlace = await client
+      .from('reservations')
+      .select('status, note, start_place_name')
+      .eq('id', activity.id)
+      .single()
     expect(afterToPlace.data?.note).toBe(noteText)
     expect(afterToPlace.data?.status).toBe('decide_later')
+    // The chosen checklist item's place is what actually lands back on the reservation —
+    // not just whatever it already had before the first conversion (the real "no other
+    // field lost" check: `placeName` here IS the round-tripped checklist item's name).
+    expect(afterToPlace.data?.start_place_name).toBe(placeName)
+    const { data: itemsAfterRoundTrip } = await client.from('checklist_items').select('id').eq('reservation_id', activity.id)
+    expect(itemsAfterRoundTrip).toHaveLength(0)
 
     await expect(page.getByText('Status', { exact: true })).toBeVisible()
     await page.getByRole('radio', { name: 'Booked' }).click()
@@ -380,4 +395,158 @@ test('detail screen converts a place Activity to checklist and back: notes survi
     await client.from('reservations').delete().eq('trip_id', trip.id)
     await client.from('trips').delete().eq('id', trip.id)
   }
+})
+
+// Bugs DB: "Conversion checklist vers lieu : la boîte quel item garder peut être sautée
+// si les items ne sont pas chargés". handleSubtypeChange used to decide whether to show
+// the "which item do you want to keep" chooser from `checklistItems.length` — the local
+// useChecklistItems fetch, which is still `[]` for a brief window right after the detail
+// screen mounts. A subtype click landing in that window saw a false 0, skipped the
+// chooser, and called convertToPlace(null) directly — not deleting the checklist items
+// (clearChecklistItems was ALSO gated on the same stale `checklistItems.length`, so it
+// was skipped too), but silently dropping the reservation's location and leaving the
+// real checklist_items rows orphaned: still in the DB, attached to a reservation that
+// no longer shows them anywhere, ready to reappear unexpectedly if ever converted back.
+//
+// Fixed two ways: (1) the open/skip decision now reads `reservation.checklist_item_count`
+// — a DB-trigger-maintained column that arrives WITH the reservation row itself, no fetch
+// of its own, so the decision has no loading window left to race against; (2) the subtype
+// picker is also disabled while useChecklistItems is still loading, so — belt and
+// suspenders — no click can even reach the handler during that window in the first place.
+// clearChecklistItems() is also now called unconditionally in convertToPlace (it deletes
+// by reservation_id server-side, harmless if already empty) rather than re-checking the
+// same stale local array a second time.
+async function runChecklistLoadRaceCase(
+  type: 'activity' | 'meal',
+  page: import('@playwright/test').Page,
+  registerTrip: (client: Awaited<ReturnType<typeof authenticatedClientFor>>, tripId: string) => void,
+) {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
+  const client = await authenticatedClientFor(page)
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const trip = await createTrip(client, `E2E ${type} checklist race ${runId}`, {
+    start_date: '2027-12-01',
+    end_date: '2027-12-05',
+  })
+  registerTrip(client, trip.id)
+
+  try {
+    const seed = type === 'meal' ? mealSeed : activitySeed
+    const subtypeColumn = type === 'meal' ? 'meal_subtype' : 'activity_subtype'
+    const { data: reservation, error: reservationError } = await client
+      .from('reservations')
+      .insert(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- seed() narrows by `type`, not expressible generically across both helpers here.
+        (seed as any)({
+          trip_id: trip.id,
+          type,
+          [subtypeColumn]: 'checklist',
+          status: 'decide_later',
+          name: `E2E ${type} checklist race ${runId}`,
+          start_at: null,
+          end_at: null,
+        }),
+      )
+      .select()
+      .single()
+    if (reservationError || !reservation) throw reservationError ?? new Error('Reservation insert returned no row')
+
+    const itemAName = `Race item A ${runId}`
+    const itemBName = `Race item B ${runId}`
+    const { error: itemsError } = await client.from('checklist_items').insert([
+      { reservation_id: reservation.id, trip_id: trip.id, name: itemAName, position: 0 },
+      { reservation_id: reservation.id, trip_id: trip.id, name: itemBName, position: 1 },
+    ])
+    if (itemsError) throw itemsError
+
+    // checklist_item_count is DB-trigger-maintained — confirm the trigger actually ran
+    // before relying on it below, or this test would pass/fail for the wrong reason.
+    const { data: beforeNav } = await client
+      .from('reservations')
+      .select('checklist_item_count')
+      .eq('id', reservation.id)
+      .single()
+    expect(beforeNav?.checklist_item_count).toBe(2)
+
+    // Delay the checklist_items GET (useChecklistItems' own fetch) so the detail screen
+    // sits in its "loading" window long enough to reliably attempt an early click against.
+    let releaseDelay: () => void = () => {}
+    const delayPromise = new Promise<void>((resolve) => {
+      releaseDelay = resolve
+    })
+    await page.route('**/rest/v1/checklist_items*', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      await delayPromise
+      await route.continue()
+    })
+
+    await page.goto(`/reservations/${reservation.id}`)
+    await expect(page.getByRole('heading', { name: `E2E ${type} checklist race ${runId}` })).toBeVisible()
+
+    const placeRadio = page.getByRole('radio', { name: 'Specific place' })
+    // The early click: fired deliberately before releasing the delayed fetch below, while
+    // useChecklistItems is still loading. `force: true` bypasses Playwright's own
+    // actionability wait (which would otherwise just wait for the button to re-enable) —
+    // this is exactly the "click lands inside the loading window" scenario being tested.
+    await placeRadio.click({ force: true })
+    // Give any (buggy) synchronous handler a moment to run, then confirm nothing happened
+    // yet: no dialog, no subtype flip in the DB — the click found the control genuinely
+    // inert, not merely slow.
+    await page.waitForTimeout(300)
+    await expect(page.getByRole('heading', { name: 'Switch to a specific place' })).toHaveCount(0)
+    const { data: duringLoad } = await client
+      .from('reservations')
+      .select(subtypeColumn)
+      .eq('id', reservation.id)
+      .single()
+    expect((duringLoad as Record<string, unknown> | null)?.[subtypeColumn]).toBe('checklist')
+
+    releaseDelay()
+    await expect(placeRadio).toBeEnabled()
+
+    // Now the real click: the chooser must appear, every time, listing both real items —
+    // never skipped, never shown with a stale/empty list.
+    await placeRadio.click()
+    await expect(page.getByRole('heading', { name: 'Switch to a specific place' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: itemAName })).toBeVisible()
+    await expect(page.getByRole('radio', { name: itemBName })).toBeVisible()
+
+    // No item was ever deleted by the early click — both still exist right up to the
+    // moment the user actually makes a choice.
+    const { data: itemsStillThere } = await client.from('checklist_items').select('id').eq('reservation_id', reservation.id)
+    expect(itemsStillThere).toHaveLength(2)
+
+    await page.getByRole('radio', { name: itemAName }).click()
+    await page.getByRole('button', { name: 'Switch' }).click()
+    await expect(page.getByRole('heading', { name: 'Switch to a specific place' })).toHaveCount(0)
+    await expect
+      .poll(async () => (await client.from('reservations').select(subtypeColumn).eq('id', reservation.id).single()).data)
+      .toMatchObject({ [subtypeColumn]: 'place' })
+    const { data: afterChoice } = await client.from('reservations').select('start_place_name').eq('id', reservation.id).single()
+    expect(afterChoice?.start_place_name).toBe(itemAName)
+    // The unchosen item (and the chosen one, now promoted onto the reservation) are both
+    // cleared from checklist_items — only an explicit choice removes them, and it removes
+    // all of them, not just the discarded one.
+    const { data: itemsAfterChoice } = await client.from('checklist_items').select('id').eq('reservation_id', reservation.id)
+    expect(itemsAfterChoice).toHaveLength(0)
+  } finally {
+    await client.from('checklist_items').delete().eq('trip_id', trip.id)
+    await client.from('reservations').delete().eq('trip_id', trip.id)
+    await client.from('trips').delete().eq('id', trip.id)
+  }
+}
+
+test('Activity: an early subtype click during the checklist-items loading window never skips the chooser and never loses an item', async ({
+  page,
+  registerTrip,
+}) => {
+  await runChecklistLoadRaceCase('activity', page, registerTrip)
+})
+
+test('Meal: an early subtype click during the checklist-items loading window never skips the chooser and never loses an item', async ({
+  page,
+  registerTrip,
+}) => {
+  await runChecklistLoadRaceCase('meal', page, registerTrip)
 })
