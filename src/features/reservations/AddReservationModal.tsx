@@ -970,6 +970,10 @@ export function AddReservationModal({
             onTextChange={handleStartAddressChange}
             onPlaceSelect={handleStartPlaceSelect}
             citiesOnly={isAtDisposal}
+            // Small commit (Meal plan): only this form's own place-subtype Meal field —
+            // Stay/Transport/Activity and the checklist "Add place" search
+            // (ActivityPlaceSearchModal's separate typeBias) are untouched.
+            foodPlacesOnly={option.dbType === 'meal' && mealSubtype === 'place'}
           />
         )}
 

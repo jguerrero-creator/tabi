@@ -1,6 +1,7 @@
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
 import { useEffect, useRef, useState } from 'react'
 import { logClientError } from '../../lib/logError'
+import { buildIncludedPrimaryTypes } from '../../lib/placeAutocompleteTypeFilter'
 
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
@@ -23,6 +24,15 @@ interface PlaceAutocompleteFieldProps {
   className?: string
   /** Restricts suggestions to city/locality-level places (TABI-123 vehicle rental pickup/drop-off) instead of exact addresses. */
   citiesOnly?: boolean
+  /**
+   * Restricts suggestions to food/drink establishments (Meal plan small commit: a
+   * place-subtype Meal's own address field in the main Add form) — Autocomplete (New)'s
+   * `includedPrimaryTypes` matches a place's single declared primary type, so this has to
+   * be a short list, not just `['restaurant']` alone, or an actual cafe/bar/bakery whose
+   * primary type isn't literally "restaurant" would be silently excluded. See
+   * lib/placeAutocompleteTypeFilter.ts (FOOD_PLACE_TYPES) for the exact list and why.
+   */
+  foodPlacesOnly?: boolean
 }
 
 export function PlaceAutocompleteField({
@@ -35,6 +45,7 @@ export function PlaceAutocompleteField({
   required,
   className = '',
   citiesOnly,
+  foodPlacesOnly,
 }: PlaceAutocompleteFieldProps) {
   if (!mapsApiKey) {
     return (
@@ -65,6 +76,7 @@ export function PlaceAutocompleteField({
       required={required}
       className={className}
       citiesOnly={citiesOnly}
+      foodPlacesOnly={foodPlacesOnly}
     />
   )
 }
@@ -79,6 +91,7 @@ function PlaceAutocompleteFieldWithPlaces({
   required,
   className,
   citiesOnly,
+  foodPlacesOnly,
 }: PlaceAutocompleteFieldProps) {
   const placesLib = useMapsLibrary('places')
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompleteSuggestion[]>([])
@@ -141,10 +154,11 @@ function PlaceAutocompleteFieldWithPlaces({
     }
 
     try {
+      const includedPrimaryTypes = buildIncludedPrimaryTypes({ citiesOnly, foodPlacesOnly })
       const { suggestions: results } = await currentPlacesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: text,
         sessionToken: sessionTokenRef.current,
-        ...(citiesOnly ? { includedPrimaryTypes: ['(cities)'] } : {}),
+        ...(includedPrimaryTypes ? { includedPrimaryTypes } : {}),
       })
       if (requestId !== requestIdRef.current) return
       setSuggestions(results)
