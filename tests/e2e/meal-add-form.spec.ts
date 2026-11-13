@@ -3,15 +3,8 @@ import { authenticatedClientFor } from './support/auth'
 import { activitySeed } from './support/reservationSeeds'
 
 // Backlog: "Nouveau type de réservation Repas (Meal)" — Step 4b. The Add form can
-// create a Meal (place or checklist) ONLY while the feature switch is on
-// (`tabi.feature.meals` in localStorage) — every test here turns it on explicitly via
-// addInitScript. Every trip here is throwaway (never the real "Japon décembre" trip);
-// Budget deliberately still ignores Meal spend until Step 6, so these tests check
-// Planning and the raw DB row, not Budget.
-
-async function enableMealsSwitch(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => localStorage.setItem('tabi.feature.meals', '1'))
-}
+// create a Meal (place or checklist). Every trip here is throwaway (never the real
+// "Japon décembre" trip).
 
 async function createTrip(
   client: Awaited<ReturnType<typeof authenticatedClientFor>>,
@@ -60,11 +53,10 @@ async function openAddFormAsMeal(page: import('@playwright/test').Page) {
   ])
 }
 
-test('switch ON: create a place Meal (date/time/duration/price) and a checklist Meal (no status, no address)', async ({
+test('create a place Meal (date/time/duration/price) and a checklist Meal (no status, no address)', async ({
   page,
   registerTrip,
 }) => {
-  await enableMealsSwitch(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
   const client = await authenticatedClientFor(page)
@@ -168,8 +160,7 @@ test('switch ON: create a place Meal (date/time/duration/price) and a checklist 
   }
 })
 
-test('switch ON: two overlapping meals warn; a meal overlapping an Activity does not', async ({ page, registerTrip }) => {
-  await enableMealsSwitch(page)
+test('two overlapping meals warn; a meal overlapping an Activity does not', async ({ page, registerTrip }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
   const client = await authenticatedClientFor(page)
@@ -234,11 +225,10 @@ test('switch ON: two overlapping meals warn; a meal overlapping an Activity does
   }
 })
 
-test('switch ON: a Meal outside the trip dates shows Outside trip dates (Go back, then Extend)', async ({
+test('a Meal outside the trip dates shows Outside trip dates (Go back, then Extend)', async ({
   page,
   registerTrip,
 }) => {
-  await enableMealsSwitch(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
   const client = await authenticatedClientFor(page)
@@ -292,11 +282,10 @@ test('switch ON: a Meal outside the trip dates shows Outside trip dates (Go back
   }
 })
 
-test('switch ON: a Meal in a different city than the day\'s planned location shows the location-mismatch dialog', async ({
+test('a Meal in a different city than the day\'s planned location shows the location-mismatch dialog', async ({
   page,
   registerTrip,
 }) => {
-  await enableMealsSwitch(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
   const client = await authenticatedClientFor(page)

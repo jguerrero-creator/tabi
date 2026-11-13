@@ -303,14 +303,13 @@ test('budget screen shows the empty state when the trip has no reservations', as
 // unpriced checklist Meal (which renders through BudgetCategoryItemList exactly like an
 // unpriced checklist Activity — no per-item price UI, just "No price entered") both
 // count toward the reservation total/counter — this is the exact "0 of 1 reservations
-// have a price entered" bug Step 3 found, now fixed. Feature switch ON (a throwaway
-// trip, never "Japon décembre" — that trip has zero Meal reservations by design, kept
-// that way so its Budget figures stay the "no change" baseline for this ticket).
+// have a price entered" bug Step 3 found, now fixed. A throwaway trip, never "Japon
+// décembre" — that trip has zero Meal reservations by design, kept that way so its
+// Budget figures stay the "no change" baseline for this ticket.
 test('budget screen includes a priced place Meal and an unpriced checklist Meal under their own Meal category', async ({
   page,
   registerTrip,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('tabi.feature.meals', '1'))
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
 

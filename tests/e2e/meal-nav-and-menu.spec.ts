@@ -3,13 +3,7 @@ import { authenticatedClientFor } from './support/auth'
 import { mealSeed } from './support/reservationSeeds'
 
 // Backlog: "Nouveau type de réservation Repas (Meal)" — Step 5 (nav tab, route, Meal
-// menu), all behind the feature switch (tabi.feature.meals). A throwaway trip only —
-// never "Japon décembre" (the real trip). Budget still ignores meals until Step 6, so
-// these tests don't touch it.
-
-async function enableMealsSwitch(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => localStorage.setItem('tabi.feature.meals', '1'))
-}
+// menu). A throwaway trip only — never "Japon décembre" (the real trip).
 
 async function createTrip(client: Awaited<ReturnType<typeof authenticatedClientFor>>, name: string) {
   const {
@@ -25,11 +19,10 @@ async function createTrip(client: Awaited<ReturnType<typeof authenticatedClientF
   return trip
 }
 
-test('switch ON: the Meals tab, route, and menu work — place and checklist meals, filter pills, add preselects Meal', async ({
+test('the Meals tab, route, and menu work — place and checklist meals, filter pills, add preselects Meal', async ({
   page,
   registerTrip,
 }) => {
-  await enableMealsSwitch(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
   const client = await authenticatedClientFor(page)
@@ -94,40 +87,6 @@ test('switch ON: the Meals tab, route, and menu work — place and checklist mea
     await expect(page.getByRole('button', { name: 'Change type' })).toBeVisible()
   } finally {
     await client.from('checklist_items').delete().eq('trip_id', trip.id)
-    await client.from('reservations').delete().eq('trip_id', trip.id)
-    await client.from('trips').delete().eq('id', trip.id)
-  }
-})
-
-test('switch OFF: no Meals tab, and the /meals route redirects to Overview (replace, no history loop)', async ({
-  page,
-  registerTrip,
-}) => {
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
-  const client = await authenticatedClientFor(page)
-  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const trip = await createTrip(client, `E2E meal nav off ${runId}`)
-  registerTrip(client, trip.id)
-
-  try {
-    // Mobile viewport — the bottom nav (`nav.fixed`, `lg:hidden`) only renders below the
-    // lg breakpoint; the desktop sidebar takes over above it.
-    await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto(`/trips/${trip.id}`)
-    await expect(page.getByRole('link', { name: 'Meals' })).toHaveCount(0)
-    const bottomNav = page.locator('nav.fixed')
-    await expect(bottomNav.getByRole('link')).toHaveCount(5)
-
-    // Direct/typed navigation to the hidden route must not show a half-finished screen.
-    await page.goto(`/trips/${trip.id}/meals`)
-    await expect(page).toHaveURL(`/trips/${trip.id}`)
-    await expect(page.getByRole('heading', { name: 'Meals' })).toHaveCount(0)
-
-    // `replace`, not `push`: Back from the redirect target must not bounce to /meals.
-    await page.goBack()
-    await expect(page).not.toHaveURL(`/trips/${trip.id}/meals`)
-  } finally {
     await client.from('reservations').delete().eq('trip_id', trip.id)
     await client.from('trips').delete().eq('id', trip.id)
   }

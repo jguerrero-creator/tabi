@@ -51,11 +51,10 @@ async function createTrip(client: Awaited<ReturnType<typeof authenticatedClientF
   return trip
 }
 
-test('switch ON: a place-subtype Meal address search carries the food types; Stay/Transport/Activity do not', async ({
+test('a place-subtype Meal address search carries the food types; Stay/Transport/Activity do not', async ({
   page,
   registerTrip,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('tabi.feature.meals', '1'))
   const captured = captureAutocompleteTypes(page)
 
   await page.goto('/')
@@ -102,37 +101,6 @@ test('switch ON: a place-subtype Meal address search carries the food types; Sta
     await page.getByLabel('Address').fill('shibuya test query d')
     await expect.poll(() => captured.length).toBeGreaterThan(0)
     expect(captured[0]).toEqual(FOOD_PLACE_TYPES)
-  } finally {
-    await client.from('trips').delete().eq('id', trip.id)
-  }
-})
-
-test('switch OFF: the Add form is unchanged — no Meal type option, and Stay\'s address field stays unrestricted', async ({
-  page,
-  registerTrip,
-}) => {
-  const captured = captureAutocompleteTypes(page)
-
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'My Trips' })).toBeVisible()
-  const client = await authenticatedClientFor(page)
-  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const trip = await createTrip(client, `E2E meal food autocomplete off ${runId}`)
-  registerTrip(client, trip.id)
-
-  try {
-    await page.goto(`/trips/${trip.id}/stay`)
-    await page.getByRole('button', { name: 'Add reservation' }).click()
-    await expect(page.getByRole('heading', { name: 'Add Reservation' })).toBeVisible()
-
-    await page.getByRole('button', { name: 'Change type' }).click()
-    const typeOptions = await page.getByLabel('Type').locator('option').allTextContents()
-    expect(typeOptions).toEqual(['Stay', 'Transport', 'Activity'])
-
-    captured.length = 0
-    await page.getByLabel('Address').fill('shibuya test query e')
-    await expect.poll(() => captured.length).toBeGreaterThan(0)
-    expect(captured[0]).toBeNull()
   } finally {
     await client.from('trips').delete().eq('id', trip.id)
   }

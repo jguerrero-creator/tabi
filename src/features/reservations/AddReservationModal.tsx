@@ -22,7 +22,6 @@ import {
   type GeocodeResult,
 } from '../../lib/geocode'
 import { logClientError } from '../../lib/logError'
-import { isMealsEnabled } from '../../lib/mealsFeatureSwitch'
 import type { RegularOpeningHours } from '../../lib/placeOpeningHours'
 import { strings } from '../../lib/strings'
 import type { Json } from '../../types/database.types'
@@ -92,10 +91,7 @@ const DAY_START_TIME_FALLBACK = '08:00'
 const START_DATE_FIELD_ID = 'reservation-date-start'
 const END_DATE_FIELD_ID = 'reservation-date-end'
 
-// Step 4b (Meal plan): 'meal' is filtered in/out at render time (inside the component,
-// see `mainTypeOptions` there) based on isMealsEnabled() — this is the full list it
-// filters down from, never rendered directly.
-const ALL_MAIN_TYPE_OPTIONS: ReservationType[] = ['stay', 'transport', 'activity', 'meal']
+const MAIN_TYPE_OPTIONS: ReservationType[] = ['stay', 'transport', 'activity', 'meal']
 const staySubtypeOptions: StaySubtype[] = ['hotel', 'camping', 'airbnb', 'ryokan', 'other']
 const transportSubtypeOptions: TransportSubtype[] = ['point_to_point', 'at_disposal']
 const transportModeOptions: TransportMode[] = ['flight', 'train', 'bus', 'ferry', 'car', 'other']
@@ -297,11 +293,6 @@ export function AddReservationModal({
   // exhaustive fieldRequirementsByType table (reservationFieldRequirements.ts) so a type added
   // to the ReservationType union without an entry there is a compile error, not a silent
   // fallback.
-  // Step 4b (Meal plan): 'meal' only ever appears in the type selector while the switch
-  // is on — recomputed per render (cheap, synchronous) rather than a module-level
-  // constant, so flipping the switch takes effect on the form's next render without
-  // needing its own state/effect.
-  const mainTypeOptions = isMealsEnabled() ? ALL_MAIN_TYPE_OPTIONS : ALL_MAIN_TYPE_OPTIONS.filter((type) => type !== 'meal')
   const isTransport = mainType === 'transport'
   const isPointToPoint = isTransport && transportSubtype === 'point_to_point'
   const isAtDisposal = isTransport && transportSubtype === 'at_disposal'
@@ -819,7 +810,7 @@ export function AddReservationModal({
               onChange={(event) => setMainType(event.target.value as ReservationType)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
             >
-              {mainTypeOptions.map((candidate) => (
+              {MAIN_TYPE_OPTIONS.map((candidate) => (
                 <option key={candidate} value={candidate}>
                   {strings.reservationType[candidate]}
                 </option>
