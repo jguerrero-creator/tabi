@@ -8,7 +8,17 @@ export interface KnownLocation {
   lng: number
   city: string | null
   timezone: string | null
+  /**
+   * Provenance of this location — lets a caller like `resolveDefaultAddressForDay`
+   * (which layers a day-scoped lookup on top of this trip-wide one) or a UI hint
+   * decide what to say about where the value came from, without re-deriving it.
+   * This function itself only ever produces the first two; 'accommodation' is
+   * `resolveDefaultAddressForDay`'s own day-scoped addition.
+   */
+  source: KnownLocationSource
 }
+
+export type KnownLocationSource = 'reservation' | 'day_location' | 'accommodation'
 
 /**
  * TABI-204: the most recently-dated geocoded location already entered for the trip —
@@ -55,6 +65,7 @@ export function lastKnownTripLocation(
         lng,
         city: (hasEnd ? reservation.end_city : reservation.start_city) ?? null,
         timezone,
+        source: 'reservation',
       }
     }
   }
@@ -70,6 +81,7 @@ export function lastKnownTripLocation(
       lng: dayLocation.lng,
       city: dayLocation.city,
       timezone: dayLocation.timezone,
+      source: 'day_location',
     }
   }
 

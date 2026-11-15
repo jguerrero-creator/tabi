@@ -589,6 +589,10 @@ export const strings = {
     endAddressLabel: 'Arrival address',
     startAddressLabelAtDisposal: 'Pick-up city',
     endAddressLabelAtDisposal: 'Drop-off city',
+    // TABI-267: discreet hint under the address field when it was auto-filled from the
+    // day's own planned location specifically (not the broader accommodation/trip-wide
+    // fallback, which don't get a hint — only this most-specific case is worth calling out).
+    startAddressDayLocationHint: "This day's location",
     startLabel: 'Start',
     endLabel: 'End',
     nightsLabel: 'Nights',

@@ -41,7 +41,8 @@ import { addDays, computeAccommodationGaps } from '../stay/computeAccommodationG
 import { useTrip } from '../trips/useTrip'
 import { useTripDayLocations } from '../trips/useTripDayLocations'
 import { useTripReservations } from '../trips/useTripReservations'
-import { lastKnownTripLocation } from './lastKnownTripLocation'
+import { lastKnownTripLocation, type KnownLocationSource } from './lastKnownTripLocation'
+import { resolveDefaultAddressForDay } from './resolveDefaultAddressForDay'
 import { findLocationMismatch, type LocationMismatch } from './locationMismatch'
 import { isChecklistReservation, isPlaceOrChecklistType } from './placeOrChecklistSubtype'
 import { findOverlappingReservation } from './reservationOverlap'
@@ -331,7 +332,7 @@ export function AddReservationModal({
     option.dbType,
   )
   const { trip, loading: tripLoading, error: tripError, updateDates: updateTripDates } = useTrip(tripId)
-  const { locationsByDate: dayLocationsByDate } = useTripDayLocations(tripId)
+  const { locationsByDate: dayLocationsByDate, loading: dayLocationsLoading } = useTripDayLocations(tripId)
   // TABI-204: last-known-location prefill draws from every reservation in the trip
   // (not just the current type), since the goal is "where did the traveler's plan
   // leave off", regardless of what kind of booking put them there.
@@ -369,32 +370,76 @@ export function AddReservationModal({
     startDate,
   ])
 
+  // TABI-267: Activity/Meal (place subtype) and Transport's own departure address resolve
+  // PER DAY — the day's explicit planned location, else the accommodation active that night,
+  // else the TABI-204 trip-wide fallback below. Stay and a checklist-subtype Activity/Meal
+  // (no address field) keep the plain TABI-204 behavior untouched: it's deliberately not
+  // day-aware, since a new Stay shouldn't inherit the day's existing accommodation address.
+  const usesDayAwareAddressPrefill = isTransport || (isPlaceOrChecklistType(option.dbType) && !isChecklist)
+
   // TABI-204: prefill the start address with the trip's last known location — its most
   // recently-dated planned day-location or geocoded reservation address — so back-to-back
   // reservations in the same area don't start from a blank field. Only while the field is
   // still untouched (covers the plain "Add" entry point; the AI-extraction and Getting-Around
   // prefill paths above already seed a non-empty value via `initialStart*`, so this never
-  // overwrites those) and applied once, same guard shape as the TABI-111 start-date prefill.
-  const hasPrefilledLocationRef = useRef(false)
+  // overwrites those). TABI-267 extends this: for the day-aware types above, re-resolves
+  // against `startDate` whenever it changes — e.g. opened from a type menu with no date yet,
+  // then the user picks a start date — but only ever while the field still holds a value we
+  // auto-filled ourselves (`addressIsAutoManaged`), never once the user has typed/selected
+  // their own address (see `handleStartAddressChange`).
+  const hasAttemptedInitialPrefillRef = useRef(false)
+  const lastResolvedDateKeyRef = useRef<string | null | undefined>(undefined)
+  const [addressIsAutoManaged, setAddressIsAutoManaged] = useState(false)
+  const [addressAutoFillSource, setAddressAutoFillSource] = useState<KnownLocationSource | null>(null)
   useEffect(() => {
-    if (hasPrefilledLocationRef.current) return
-    if (allTripReservationsLoading) return
-    if (startAddress !== '') return
+    if (allTripReservationsLoading || dayLocationsLoading) return
 
-    const known = lastKnownTripLocation(allTripReservations, dayLocationsByDate)
-    if (known) {
-      setStartAddress(known.formattedAddress)
-      setStartPlace({
-        lat: known.lat,
-        lng: known.lng,
-        formattedAddress: known.formattedAddress,
-        timezone: known.timezone ?? localTimeZone(),
-        city: known.city,
-        placeName: known.placeName,
-      })
-      hasPrefilledLocationRef.current = true
+    if (!hasAttemptedInitialPrefillRef.current) {
+      // A non-empty field here means AI extraction or the Getting-Around flow already seeded
+      // a real value via `initialStart*` props — this effect must never take over that field.
+      if (startAddress !== '') return
+      hasAttemptedInitialPrefillRef.current = true
+      setAddressIsAutoManaged(true)
     }
-  }, [allTripReservations, allTripReservationsLoading, dayLocationsByDate, startAddress])
+    if (!addressIsAutoManaged) return
+    // Stay and checklist types resolve once only, exactly like the original TABI-204 behavior
+    // (never re-run on a later date change) — detected by this being their first resolution.
+    if (!usesDayAwareAddressPrefill && lastResolvedDateKeyRef.current !== undefined) return
+
+    const dateKey = startDate || null
+    if (lastResolvedDateKeyRef.current === dateKey) return
+    lastResolvedDateKeyRef.current = dateKey
+
+    const resolved = usesDayAwareAddressPrefill
+      ? resolveDefaultAddressForDay(dateKey, allTripReservations, dayLocationsByDate)
+      : lastKnownTripLocation(allTripReservations, dayLocationsByDate)
+
+    if (resolved) {
+      setStartAddress(resolved.formattedAddress)
+      setStartPlace({
+        lat: resolved.lat,
+        lng: resolved.lng,
+        formattedAddress: resolved.formattedAddress,
+        timezone: resolved.timezone ?? localTimeZone(),
+        city: resolved.city,
+        placeName: resolved.placeName,
+      })
+      setAddressAutoFillSource(resolved.source)
+    } else {
+      setStartAddress('')
+      setStartPlace(null)
+      setAddressAutoFillSource(null)
+    }
+  }, [
+    usesDayAwareAddressPrefill,
+    startDate,
+    allTripReservations,
+    allTripReservationsLoading,
+    dayLocationsByDate,
+    dayLocationsLoading,
+    startAddress,
+    addressIsAutoManaged,
+  ])
 
   // TABI-112: for Stay, derive the checkout date from check-in + nights instead of asking the
   // user to pick it directly. Only while manualEndDate is off — flipping it hands endDate back
@@ -432,6 +477,10 @@ export function AddReservationModal({
   function handleStartAddressChange(text: string) {
     setStartAddress(text)
     setStartPlace(null)
+    // TABI-267: the user is typing their own value — the day-aware auto-fill/recompute
+    // effect above must never touch this field again for the rest of this form session.
+    setAddressIsAutoManaged(false)
+    setAddressAutoFillSource(null)
   }
 
   function handleEndAddressChange(text: string) {
@@ -966,6 +1015,9 @@ export function AddReservationModal({
             // (ActivityPlaceSearchModal's separate typeBias) are untouched.
             foodPlacesOnly={option.dbType === 'meal' && mealSubtype === 'place'}
           />
+        )}
+        {!isChecklist && addressIsAutoManaged && addressAutoFillSource === 'day_location' && startAddress !== '' && (
+          <p className="-mt-2 text-xs text-slate-400">{strings.addReservation.startAddressDayLocationHint}</p>
         )}
 
         {option.requiresEndAddress && (
