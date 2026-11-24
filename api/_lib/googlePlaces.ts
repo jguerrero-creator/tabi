@@ -71,15 +71,21 @@ export const GooglePlaceDetailsSchema = z.object({
 
 export const PLACE_DETAILS_OPENING_HOURS_FIELD_MASK = 'id,regularOpeningHours'
 
+// `fallbackName` is only meaningful when the caller has something identifying to fall
+// back to (places-search.ts uses the user's own typed query — still tells them
+// something). Nearby Search has no such input, so places-nearby.ts omits it: a place
+// with no `displayName` at all is dropped rather than shown as an unhelpful generic
+// placeholder (e.g. "Nearby place" for every unnamed result — indistinguishable from
+// one another in the TABI-24 suggestion list).
 export function mapGooglePlaces(
   places: z.infer<typeof GoogleSearchResponseSchema>['places'],
-  fallbackName: string,
+  fallbackName?: string,
 ): PlaceSearchResult[] {
   return (places ?? [])
-    .filter((place) => place.location)
+    .filter((place) => place.location && (place.displayName?.text || fallbackName))
     .map((place) => ({
       googlePlaceId: place.id,
-      name: place.displayName?.text ?? fallbackName,
+      name: place.displayName?.text ?? fallbackName!,
       formattedAddress: place.formattedAddress ?? '',
       lat: place.location!.latitude,
       lng: place.location!.longitude,

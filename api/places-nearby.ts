@@ -2,19 +2,20 @@
 // secret GOOGLE_MAPS_API_KEY. Never call this API from src/. See ./README.md.
 //
 // TABI-24: powers the free-block "+ Add" nearby-places map — unlike places-search.ts's
-// Text Search (a user-typed query), this takes only a center point and returns whatever
-// is around it. Shares its response schema/mapping with places-search.ts via
-// ./_lib/googlePlaces.ts since both call the same underlying `places[]` shape.
+// Text Search (a user-typed query), this takes only a center point and returns curated
+// "things to do" types around it (see CURATED_PLACE_TYPES below). Shares its response
+// schema/mapping with places-search.ts via ./_lib/googlePlaces.ts since both call the
+// same underlying `places[]` shape.
 import { checkRateLimit } from './_lib/rateLimit.js'
 import { GoogleSearchResponseSchema, mapGooglePlaces, PLACE_FIELD_MASK, type PlaceSearchResult } from './_lib/googlePlaces.js'
 
 interface PlacesNearbyRequestBody {
   lat?: number
   lng?: number
-  // TABI-135: 'tourist' powers the opt-in "Show tourist places" map overlay
-  // (restaurant/bar/cafe/tourist_attraction/museum, scoped to the viewport),
-  // scoped to a caller-supplied radius. Omitted/'default' keeps the original
-  // TABI-24 free-block "nearby suggestions" behavior unchanged.
+  // TABI-135: 'tourist' powers the opt-in "Show tourist places" map overlay, scoped to
+  // the viewport via a caller-supplied radius; omitted/'default' is the TABI-24
+  // free-block "+ Add" suggestions. Both modes share the same CURATED_PLACE_TYPES
+  // allow-list — they differ only in radius bounds and result count.
   mode?: 'default' | 'tourist'
   radius?: number
 }
@@ -23,13 +24,23 @@ type PlacesNearbyResponse = { status: 'ok'; results: PlaceSearchResult[] }
 
 const MAX_RESULTS = 15
 const RADIUS_METERS = 1500
-// Suggestions here are "things to do" for a free block, not lodging — TABI-24 spec.
-// A static exclusion, not per-country logic (CLAUDE.md #3).
-const EXCLUDED_TYPES = ['lodging']
 
 // TABI-135: fixed server-side allow-list — a client-supplied `mode: 'tourist'` never
-// lets arbitrary Google place types through, only these five.
-const TOURIST_TYPES = ['restaurant', 'bar', 'cafe', 'tourist_attraction', 'museum']
+// lets arbitrary Google place types through, only these five. TABI-24's default "+ Add"
+// suggestions used to only exclude lodging, letting an unrestricted POPULARITY-ranked
+// Nearby Search return whatever Google considered popular nearby — including place
+// types (transit stops, administrative points, etc.) that aren't really "things to do"
+// for a free block, and that are also disproportionately likely to lack a Google
+// displayName (see googlePlaces.ts's dropped-if-unnamed handling). Both modes now share
+// this same curated list rather than default mode having its own broader, unrestricted one.
+//
+// Matched via `includedPrimaryTypes`, not `includedTypes`: Google's Nearby Search
+// matches `includedTypes` against a place's *entire* `types[]` array, so a hotel with
+// "restaurant"/"bar"/"cafe" among its secondary types (most hotels have at least one)
+// would still pass an `includedTypes` filter — reintroducing exactly the lodging results
+// this list is meant to keep out. `includedPrimaryTypes` matches only the place's single
+// `primaryType`, so a hotel (primaryType "hotel") is excluded regardless of its amenities.
+const CURATED_PLACE_TYPES = ['restaurant', 'bar', 'cafe', 'tourist_attraction', 'museum']
 const TOURIST_MAX_RESULTS = 20
 const TOURIST_MIN_RADIUS_METERS = 200
 const TOURIST_MAX_RADIUS_METERS = 3000
@@ -79,7 +90,7 @@ export default async function handler(request: Request): Promise<Response> {
     },
     maxResultCount: isTourist ? TOURIST_MAX_RESULTS : MAX_RESULTS,
     rankPreference: 'POPULARITY',
-    ...(isTourist ? { includedTypes: TOURIST_TYPES } : { excludedTypes: EXCLUDED_TYPES }),
+    includedPrimaryTypes: CURATED_PLACE_TYPES,
   }
 
   let googleResponse: Response
@@ -110,7 +121,7 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'Failed to search nearby places' }, 502)
   }
 
-  const results = mapGooglePlaces(parsed.data.places, 'Nearby place')
+  const results = mapGooglePlaces(parsed.data.places)
 
   return jsonResponse<PlacesNearbyResponse>({ status: 'ok', results })
 }

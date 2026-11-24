@@ -740,6 +740,10 @@ export const strings = {
     manualFallbackCta: 'Enter manually instead',
     cancel: 'Cancel',
     ratingLabel: (rating: number, count: number) => `★ ${rating.toFixed(1)} (${count})`,
+    changeLocationLabel: 'Change location',
+    changeLocationPlaceholder: 'Search a different area…',
+    changeLocationError: 'Could not find that location. Please try again.',
+    listLabel: 'Suggested places',
   },
   savePlace: {
     triggerLabel: 'Save a place',
